@@ -23,7 +23,7 @@ export default function ProductCard({ product }: ProductCardProps) {
   }
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 flex flex-col gap-3">
+    <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-4 flex flex-col gap-3">
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
           {product.image_url && (
@@ -36,30 +36,30 @@ export default function ProductCard({ product }: ProductCardProps) {
           )}
           <Link
             to={`/products/${product.id}`}
-            className="text-lg font-semibold text-gray-900 hover:text-indigo-600 truncate block"
+            className="text-lg font-semibold text-gray-900 dark:text-gray-100 hover:text-indigo-600 truncate block"
           >
             {product.name}
           </Link>
           {product.category && (
-            <p className="text-xs text-gray-500 mt-0.5">Category: {product.category}</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Category: {product.category}</p>
           )}
           {product.tags.length > 0 && (
-            <p className="text-xs text-gray-500 mt-0.5">Tags: {product.tags.join(', ')}</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Tags: {product.tags.join(', ')}</p>
           )}
           <a
             href={product.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-xs text-gray-400 hover:text-indigo-500 truncate block"
+            className="text-xs text-gray-400 dark:text-gray-500 hover:text-indigo-500 truncate block"
           >
             {product.url}
           </a>
         </div>
         <span
           className={`shrink-0 px-2 py-0.5 rounded-full text-xs font-medium ${
-            product.active
-              ? 'bg-green-100 text-green-700'
-              : 'bg-gray-100 text-gray-500'
+              product.active
+                ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300'
+                : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-300'
           }`}
         >
           {product.active ? 'Active' : 'Paused'}
@@ -68,15 +68,15 @@ export default function ProductCard({ product }: ProductCardProps) {
 
       <div className="flex items-center gap-4">
         <div>
-          <p className="text-xs text-gray-400">Latest price</p>
+          <p className="text-xs text-gray-400 dark:text-gray-500">Latest price</p>
           <p className="text-2xl font-bold text-indigo-600">{formatPrice(product.latest_price)}</p>
         </div>
         <div>
-          <p className="text-xs text-gray-400">Check interval</p>
-          <p className="text-sm text-gray-700">{product.check_interval_minutes} min</p>
+          <p className="text-xs text-gray-400 dark:text-gray-500">Check interval</p>
+          <p className="text-sm text-gray-700 dark:text-gray-300">{product.check_interval_minutes} min</p>
         </div>
       </div>
-      <div className="text-xs text-gray-500">
+      <div className="text-xs text-gray-500 dark:text-gray-400">
         Last change: {formatPercent(product.last_price_change_percent)} on{' '}
         {formatDate(product.last_price_change_at, settings?.date_format)}
       </div>
@@ -91,7 +91,7 @@ export default function ProductCard({ product }: ProductCardProps) {
         </button>
         <Link
           to={`/products/${product.id}`}
-          className="flex-1 text-sm py-1.5 rounded-lg bg-gray-50 text-gray-700 hover:bg-gray-100 font-medium text-center"
+          className="flex-1 text-sm py-1.5 rounded-lg bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 font-medium text-center"
         >
           Details
         </Link>

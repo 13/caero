@@ -1,3 +1,13 @@
+type DateFormat = 'DD.MM.YYYY' | 'DD/MM/YYYY' | 'MM/DD/YYYY' | 'YYYY-MM-DD'
+
+export function localeFromDateFormat(format?: DateFormat) {
+  if (format === 'DD.MM.YYYY') return 'de-DE'
+  if (format === 'DD/MM/YYYY') return 'en-GB'
+  if (format === 'MM/DD/YYYY') return 'en-US'
+  if (format === 'YYYY-MM-DD') return 'sv-SE'
+  return navigator.language || 'en-US'
+}
+
 export function formatPrice(value: string | null) {
   if (!value) return '—'
   return `€ ${parseFloat(value).toFixed(2)}`
@@ -22,4 +32,3 @@ export function formatDate(value: string | null, format = 'DD.MM.YYYY') {
   if (format === 'YYYY-MM-DD') return `${year}-${month}-${day}`
   return `${day}.${month}.${year}`
 }
-

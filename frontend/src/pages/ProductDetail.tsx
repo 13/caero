@@ -109,26 +109,26 @@ export default function ProductDetail() {
   return (
     <div className="max-w-4xl mx-auto px-4 py-8 space-y-8">
       {/* Header */}
-      <div className="flex items-start justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
         <div>
           <button
             onClick={() => navigate('/')}
-            className="text-sm text-gray-400 hover:text-gray-600 mb-2 block"
+            className="text-sm text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 mb-2 block"
           >
             ← Back
           </button>
-          <h1 className="text-2xl font-bold text-gray-900">{product.name}</h1>
-          {product.category && <p className="text-sm text-gray-600 mt-1">Category: {product.category}</p>}
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">{product.name}</h1>
+          {product.category && <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Category: {product.category}</p>}
           {product.tags.length > 0 && (
-            <p className="text-xs text-gray-500 mt-1">Tags: {product.tags.join(', ')}</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Tags: {product.tags.join(', ')}</p>
           )}
           {product.image_url && (
             <img
               src={product.image_url}
-              alt={product.name}
-              className="mt-3 w-full max-w-md h-48 object-cover rounded-lg border border-gray-200"
-              loading="lazy"
-            />
+               alt={product.name}
+               className="mt-3 w-full max-w-md h-48 object-cover rounded-lg border border-gray-200 dark:border-gray-800"
+               loading="lazy"
+             />
           )}
           <a
             href={product.url}
@@ -139,7 +139,7 @@ export default function ProductDetail() {
             {product.url}
           </a>
         </div>
-        <div className="flex gap-2">
+         <div className="flex flex-wrap gap-2">
           <button
             onClick={() => checkMutation.mutate(productId)}
             disabled={checkMutation.isPending}
@@ -150,6 +150,7 @@ export default function ProductDetail() {
           <button
             onClick={handleEdit}
             className="px-3 py-1.5 text-sm rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50"
+            className="px-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800"
           >
             Edit
           </button>
@@ -166,21 +167,21 @@ export default function ProductDetail() {
       {editMode && (
         <form
           onSubmit={handleSave}
-          className="bg-gray-50 rounded-xl border border-gray-200 p-5 space-y-4"
+          className="bg-gray-50 dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5 space-y-4"
         >
-          <h2 className="font-semibold text-gray-800">Edit product</h2>
-            <div className="grid grid-cols-2 gap-3">
+          <h2 className="font-semibold text-gray-800 dark:text-gray-100">Edit product</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="text-xs font-medium text-gray-600 mb-1 block">Name</label>
+                <label className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1 block">Name</label>
               <input
                 type="text"
                 value={editForm.name}
                 onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                className="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
             </div>
               <div>
-                <label className="text-xs font-medium text-gray-600 mb-1 block">
+                <label className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1 block">
                   Check interval (min)
                 </label>
               <input
@@ -193,52 +194,52 @@ export default function ProductDetail() {
                     check_interval_minutes: parseInt(e.target.value) || 30,
                   })
                 }
-                className="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
             </div>
             <div>
-              <label className="text-xs font-medium text-gray-600 mb-1 block">Category</label>
+              <label className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1 block">Category</label>
               <input
                 type="text"
                 value={editForm.category}
                 onChange={(e) => setEditForm({ ...editForm, category: e.target.value })}
-                className="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
             </div>
             <div>
-              <label className="text-xs font-medium text-gray-600 mb-1 block">Tags</label>
+              <label className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1 block">Tags</label>
               <input
                 type="text"
                 value={editForm.tags}
                 onChange={(e) => setEditForm({ ...editForm, tags: e.target.value })}
-                className="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
             </div>
-            <div className="col-span-2">
-              <label className="text-xs font-medium text-gray-600 mb-1 block">URL</label>
+            <div className="sm:col-span-2">
+              <label className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1 block">URL</label>
               <input
                 type="url"
                 value={editForm.url}
                 onChange={(e) => setEditForm({ ...editForm, url: e.target.value })}
-                className="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
             </div>
-            <div className="col-span-2">
-              <label className="text-xs font-medium text-gray-600 mb-1 block">CSS selector</label>
+            <div className="sm:col-span-2">
+              <label className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1 block">CSS selector</label>
               <input
                 type="text"
                 value={editForm.selector}
                 onChange={(e) => setEditForm({ ...editForm, selector: e.target.value })}
-                className="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 px-3 py-1.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
             </div>
-            <div className="col-span-2">
-              <label className="text-xs font-medium text-gray-600 mb-1 block">Image URL</label>
+            <div className="sm:col-span-2">
+              <label className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1 block">Image URL</label>
               <input
                 type="url"
                 value={editForm.image_url}
                 onChange={(e) => setEditForm({ ...editForm, image_url: e.target.value })}
-                className="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
             </div>
           </div>
@@ -250,7 +251,7 @@ export default function ProductDetail() {
               onChange={(e) => setEditForm({ ...editForm, active: e.target.checked })}
               className="rounded text-indigo-600"
             />
-            <label htmlFor="edit-active" className="text-sm text-gray-700">
+            <label htmlFor="edit-active" className="text-sm text-gray-700 dark:text-gray-300">
               Active
             </label>
           </div>
@@ -265,7 +266,7 @@ export default function ProductDetail() {
             <button
               type="button"
               onClick={() => setEditMode(false)}
-              className="px-4 py-1.5 rounded-lg border border-gray-300 text-sm text-gray-700 hover:bg-gray-50"
+              className="px-4 py-1.5 rounded-lg border border-gray-300 dark:border-gray-700 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800"
             >
               Cancel
             </button>
@@ -274,29 +275,29 @@ export default function ProductDetail() {
       )}
 
       {/* Current price + stats */}
-      <div className="grid grid-cols-3 gap-4">
-        <div className="bg-white rounded-xl border border-gray-200 p-4">
-          <p className="text-xs text-gray-400">Current price</p>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-4">
+          <p className="text-xs text-gray-400 dark:text-gray-500">Current price</p>
           <p className="text-3xl font-bold text-indigo-600">{formatPrice(product.latest_price)}</p>
         </div>
-        <div className="bg-white rounded-xl border border-gray-200 p-4">
-          <p className="text-xs text-gray-400">All-time low</p>
+        <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-4">
+          <p className="text-xs text-gray-400 dark:text-gray-500">All-time low</p>
           <p className="text-2xl font-bold text-green-600">
             {prices.length
               ? `€ ${Math.min(...prices.map((p) => parseFloat(p.price))).toFixed(2)}`
               : '—'}
           </p>
         </div>
-        <div className="bg-white rounded-xl border border-gray-200 p-4">
-          <p className="text-xs text-gray-400">Last change</p>
-          <p className="text-2xl font-bold text-gray-700">
+        <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-4">
+          <p className="text-xs text-gray-400 dark:text-gray-500">Last change</p>
+          <p className="text-2xl font-bold text-gray-700 dark:text-gray-200">
             {formatPercent(product.last_price_change_percent)}
           </p>
         </div>
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-200 p-5">
-        <h2 className="font-semibold text-gray-800 mb-4">Statistics</h2>
+      <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5">
+        <h2 className="font-semibold text-gray-800 dark:text-gray-100 mb-4">Statistics</h2>
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
           <div>Average: <span className="font-semibold">{formatPrice(stats?.average_price ?? null)}</span></div>
           <div>Current: <span className="font-semibold">{formatPrice(stats?.current_price ?? null)}</span></div>
@@ -316,32 +317,32 @@ export default function ProductDetail() {
       </div>
 
       {/* Price chart */}
-      <div className="bg-white rounded-xl border border-gray-200 p-5">
-        <h2 className="font-semibold text-gray-800 mb-4">Price history</h2>
+      <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5">
+        <h2 className="font-semibold text-gray-800 dark:text-gray-100 mb-4">Price history</h2>
         <PriceChart data={prices} />
       </div>
 
       {/* Alerts */}
-      <div className="bg-white rounded-xl border border-gray-200 p-5">
-        <h2 className="font-semibold text-gray-800 mb-4">Price alerts</h2>
+      <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5">
+        <h2 className="font-semibold text-gray-800 dark:text-gray-100 mb-4">Price alerts</h2>
 
         {alerts.length > 0 && (
           <ul className="space-y-2 mb-4">
             {alerts.map((alert) => (
               <li
                 key={alert.id}
-                className="flex items-center justify-between text-sm bg-gray-50 rounded-lg px-3 py-2"
+                className="flex items-center justify-between text-sm bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2"
               >
                 <div>
-                  <span className="font-medium text-gray-800 capitalize">
+                  <span className="font-medium text-gray-800 dark:text-gray-200 capitalize">
                     {alert.condition.replace('_', ' ')}
                   </span>
                   {alert.threshold_price && (
-                    <span className="text-gray-500 ml-1">
+                    <span className="text-gray-500 dark:text-gray-400 ml-1">
                       € {parseFloat(alert.threshold_price).toFixed(2)}
                     </span>
                   )}
-                  <span className="text-gray-400 ml-2">→ {alert.email}</span>
+                  <span className="text-gray-400 dark:text-gray-500 ml-2">→ {alert.email}</span>
                 </div>
                 <button
                   onClick={() => deleteAlertMutation.mutate(alert.id)}
@@ -354,9 +355,9 @@ export default function ProductDetail() {
           </ul>
         )}
 
-        <form onSubmit={handleAddAlert} className="grid grid-cols-2 gap-3">
+        <form onSubmit={handleAddAlert} className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <label className="text-xs font-medium text-gray-600 mb-1 block">Condition</label>
+            <label className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1 block">Condition</label>
             <select
               value={alertForm.condition}
               onChange={(e) =>
@@ -365,7 +366,7 @@ export default function ProductDetail() {
                   condition: e.target.value as AlertCreate['condition'],
                 })
               }
-              className="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
             >
               <option value="below">Below threshold</option>
               <option value="changed">Price changed</option>
@@ -374,7 +375,7 @@ export default function ProductDetail() {
           </div>
           {alertForm.condition === 'below' && (
             <div>
-              <label className="text-xs font-medium text-gray-600 mb-1 block">
+              <label className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1 block">
                 Threshold price (€)
               </label>
               <input
@@ -385,22 +386,22 @@ export default function ProductDetail() {
                 onChange={(e) =>
                   setAlertForm({ ...alertForm, threshold_price: e.target.value || null })
                 }
-                className="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
             </div>
           )}
-          <div className="col-span-2">
-            <label className="text-xs font-medium text-gray-600 mb-1 block">Email</label>
+          <div className="sm:col-span-2">
+            <label className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1 block">Email</label>
             <input
               required
               type="email"
               value={alertForm.email}
               onChange={(e) => setAlertForm({ ...alertForm, email: e.target.value })}
               placeholder="you@example.com"
-              className="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
           </div>
-          <div className="col-span-2">
+          <div className="sm:col-span-2">
             <button
               type="submit"
               disabled={createAlertMutation.isPending}
