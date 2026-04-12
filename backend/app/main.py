@@ -22,6 +22,7 @@ from app.scheduler import load_all_jobs, scheduler
 logger = logging.getLogger(__name__)
 
 STATIC_DIR = Path(__file__).parent / "static"
+STATIC_DIR_RESOLVED = STATIC_DIR.resolve()
 
 
 @asynccontextmanager
@@ -91,8 +92,12 @@ if assets_dir.exists():
 @app.get("/{full_path:path}", include_in_schema=False)
 async def spa_fallback(full_path: str):
     if full_path:
-        candidate = (STATIC_DIR / full_path).resolve()
-        if candidate.is_file() and candidate.is_relative_to(STATIC_DIR.resolve()):
+        candidate = (STATIC_DIR_RESOLVED / full_path).resolve()
+        try:
+            candidate.relative_to(STATIC_DIR_RESOLVED)
+        except ValueError:
+            candidate = None
+        if candidate and candidate.is_file():
             return FileResponse(candidate)
 
     index = STATIC_DIR / "index.html"
