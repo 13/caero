@@ -18,7 +18,6 @@ export default function CaeroBrand({
       <img
         src="/caero.svg"
         aria-hidden={logoAriaHidden}
-        role={logoAriaHidden ? undefined : 'img'}
         alt={logoAriaHidden ? '' : logoTitle}
         className="h-7 w-7 rounded-md"
       />

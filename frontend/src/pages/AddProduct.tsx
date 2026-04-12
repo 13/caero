@@ -137,7 +137,7 @@ export default function AddProduct() {
               const hours = parseFloat(e.target.value)
               setForm({
                 ...form,
-                check_interval_minutes: Number.isNaN(hours) ? 60 : Math.max(1, Math.round(hours * 60)),
+                check_interval_minutes: Number.isNaN(hours) ? 60 : Math.max(30, Math.round(hours * 60)),
               })
             }}
             className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
