@@ -14,6 +14,8 @@ import {
   useSettings,
   useSaveSettings,
   useTestDb,
+  useTestEmail,
+  useTestTelegram,
   useUsers,
 } from '../api/hooks'
 import type { AppSettings } from '../api/types'
@@ -38,6 +40,8 @@ export default function Setup() {
 
   const saveMutation = useSaveSettings()
   const testDbMutation = useTestDb()
+  const testEmailMutation = useTestEmail()
+  const testTelegramMutation = useTestTelegram()
   const changePasswordMutation = useChangePassword()
   const createUserMutation = useCreateUser()
   const deleteUserMutation = useDeleteUser()
@@ -72,6 +76,8 @@ export default function Setup() {
   const [resetPasswordByUserId, setResetPasswordByUserId] = useState<Record<number, string>>({})
   const [adminImportError, setAdminImportError] = useState<string | null>(null)
   const [myImportError, setMyImportError] = useState<string | null>(null)
+  const [testEmail, setTestEmail] = useState('')
+  const [testTelegramChatId, setTestTelegramChatId] = useState('')
 
   useEffect(() => {
     if (currentSettings) {
@@ -315,6 +321,70 @@ export default function Setup() {
                   {saveMutation.isPending ? 'Saving…' : 'Save settings'}
                 </button>
                 {saved && <span className="text-sm text-green-600 font-medium">✓ Saved</span>}
+              </div>
+
+              <div className="pt-3 border-t border-gray-200 dark:border-gray-800 space-y-3">
+                <h3 className="font-medium text-gray-800 dark:text-gray-100">Notification tests</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <label className="text-xs font-medium text-gray-600 dark:text-gray-400 block">Test email recipient</label>
+                    <div className="flex gap-2">
+                      <input
+                        type="email"
+                        value={testEmail}
+                        onChange={(e) => setTestEmail(e.target.value)}
+                        placeholder="you@example.com"
+                        className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 px-3 py-2 text-sm"
+                      />
+                      <button
+                        type="button"
+                        disabled={testEmailMutation.isPending || !testEmail.trim()}
+                        onClick={() => testEmailMutation.mutate({ email: testEmail.trim() })}
+                        className="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 text-sm whitespace-nowrap text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50"
+                      >
+                        {testEmailMutation.isPending ? 'Sending…' : 'Test email'}
+                      </button>
+                    </div>
+                    {testEmailMutation.data && (
+                      <p
+                        className={`text-xs ${
+                          testEmailMutation.data.status === 'sent' ? 'text-green-600' : 'text-red-600'
+                        }`}
+                      >
+                        {testEmailMutation.data.message}
+                      </p>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-medium text-gray-600 dark:text-gray-400 block">Test Telegram chat ID</label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={testTelegramChatId}
+                        onChange={(e) => setTestTelegramChatId(e.target.value)}
+                        placeholder="123456789"
+                        className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 px-3 py-2 text-sm"
+                      />
+                      <button
+                        type="button"
+                        disabled={testTelegramMutation.isPending || !testTelegramChatId.trim()}
+                        onClick={() => testTelegramMutation.mutate({ chat_id: testTelegramChatId.trim() })}
+                        className="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 text-sm whitespace-nowrap text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50"
+                      >
+                        {testTelegramMutation.isPending ? 'Sending…' : 'Test Telegram'}
+                      </button>
+                    </div>
+                    {testTelegramMutation.data && (
+                      <p
+                        className={`text-xs ${
+                          testTelegramMutation.data.status === 'sent' ? 'text-green-600' : 'text-red-600'
+                        }`}
+                      >
+                        {testTelegramMutation.data.message}
+                      </p>
+                    )}
+                  </div>
+                </div>
               </div>
             </form>
           </div>

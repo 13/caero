@@ -189,6 +189,19 @@ class TestDbResponse(BaseModel):
     message: str
 
 
+class TestEmailRequest(BaseModel):
+    email: str = Field(min_length=3, max_length=256)
+
+
+class TestTelegramRequest(BaseModel):
+    chat_id: str = Field(min_length=1, max_length=64)
+
+
+class TestNotificationResponse(BaseModel):
+    status: Literal["sent", "error"]
+    message: str
+
+
 class CheckResult(BaseModel):
     product_id: int
     price: Decimal | None

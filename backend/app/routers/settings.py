@@ -2,13 +2,17 @@
 from __future__ import annotations
 
 import logging
+import smtplib
 from decimal import Decimal
 from datetime import datetime, timezone
+from email.message import EmailMessage
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
 from app.database import get_db
 from app.models import Alert, AppSettings, PriceHistory, Product, User
 from app.routers.auth import require_admin, require_user
@@ -19,6 +23,9 @@ from app.schemas import (
     DataExportPayload,
     TestDbRequest,
     TestDbResponse,
+    TestEmailRequest,
+    TestNotificationResponse,
+    TestTelegramRequest,
     UserDataExportPayload,
 )
 
@@ -95,6 +102,54 @@ async def test_db_connection(
             return TestDbResponse(status="error", message=str(exc))
 
     raise HTTPException(status_code=422, detail="Unknown db_type")
+
+
+@router.post("/test-email", response_model=TestNotificationResponse)
+async def test_email_notification(
+    body: TestEmailRequest,
+    _admin: User = Depends(require_admin),
+) -> TestNotificationResponse:
+    if not settings.smtp_host:
+        return TestNotificationResponse(status="error", message="SMTP is not configured")
+    try:
+        msg = EmailMessage()
+        msg["Subject"] = "[Caero] Test email"
+        msg["From"] = settings.smtp_from
+        msg["To"] = body.email
+        msg.set_content("This is a test email from Caero settings.")
+        if settings.smtp_tls:
+            with smtplib.SMTP(settings.smtp_host, settings.smtp_port) as server:
+                server.starttls()
+                if settings.smtp_user:
+                    server.login(settings.smtp_user, settings.smtp_password)
+                server.send_message(msg)
+        else:
+            with smtplib.SMTP(settings.smtp_host, settings.smtp_port) as server:
+                if settings.smtp_user:
+                    server.login(settings.smtp_user, settings.smtp_password)
+                server.send_message(msg)
+        return TestNotificationResponse(status="sent", message=f"Test email sent to {body.email}")
+    except Exception as exc:
+        return TestNotificationResponse(status="error", message=str(exc))
+
+
+@router.post("/test-telegram", response_model=TestNotificationResponse)
+async def test_telegram_notification(
+    body: TestTelegramRequest,
+    _admin: User = Depends(require_admin),
+) -> TestNotificationResponse:
+    if not settings.telegram_bot_token:
+        return TestNotificationResponse(status="error", message="Telegram bot token is not configured")
+    try:
+        response = httpx.post(
+            f"https://api.telegram.org/bot{settings.telegram_bot_token}/sendMessage",
+            json={"chat_id": body.chat_id, "text": "✅ Test message from Caero settings."},
+            timeout=10.0,
+        )
+        response.raise_for_status()
+        return TestNotificationResponse(status="sent", message=f"Test Telegram message sent to {body.chat_id}")
+    except Exception as exc:
+        return TestNotificationResponse(status="error", message=str(exc))
 
 
 def _serialize_decimal(value: Decimal | None) -> str | None:

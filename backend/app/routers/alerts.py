@@ -73,3 +73,32 @@ async def delete_alert(
     if not alert:
         raise HTTPException(status_code=404, detail="Alert not found")
     await db.delete(alert)
+
+
+@router.patch("/alerts/{alert_id}", response_model=AlertOut)
+async def update_alert(
+    alert_id: int,
+    body: AlertCreate,
+    user: User = Depends(require_user),
+    db: AsyncSession = Depends(get_db),
+) -> AlertOut:
+    result = await db.execute(
+        select(Alert)
+        .join(Product, Alert.product_id == Product.id)
+        .where(Alert.id == alert_id, Product.user_id == user.id)
+    )
+    alert = result.scalar_one_or_none()
+    if not alert:
+        raise HTTPException(status_code=404, detail="Alert not found")
+
+    if body.condition == "below" and body.threshold_price is None:
+        raise HTTPException(
+            status_code=422, detail="threshold_price required for 'below' condition"
+        )
+
+    for key, value in body.model_dump().items():
+        setattr(alert, key, value)
+
+    await db.flush()
+    await db.refresh(alert)
+    return alert
