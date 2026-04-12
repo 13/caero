@@ -155,7 +155,9 @@ export default function ProductDetail() {
     )
   }
 
-  const productUrlPreview = product.url.length > 40 ? `${product.url.slice(0, 40)}…` : product.url
+  const productUrlChars = Array.from(product.url)
+  const productUrlPreview =
+    productUrlChars.length > 40 ? `${productUrlChars.slice(0, 40).join('')}…` : product.url
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8 space-y-8">
