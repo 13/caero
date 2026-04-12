@@ -211,13 +211,20 @@ async def import_data(
         )
 
     for product in payload.products:
+        tags_value = product.get("tags", [])
+        if isinstance(tags_value, list):
+            tags_value = ",".join(str(tag).strip() for tag in tags_value if str(tag).strip())
+        elif tags_value is None:
+            tags_value = ""
+        else:
+            tags_value = str(tags_value)
         db.add(
             Product(
                 id=product["id"],
                 user_id=product["user_id"],
                 name=product["name"],
                 category=product.get("category"),
-                tags=product.get("tags", ""),
+                tags=tags_value,
                 image_url=product.get("image_url"),
                 url=product["url"],
                 selector=product["selector"],
