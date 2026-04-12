@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import type { Product } from '../api/types'
-import { useCheckProduct, useDeleteProduct } from '../api/hooks'
+import { useCheckProduct, useDeleteProduct, useSettings } from '../api/hooks'
+import { formatDate, formatPercent, formatPrice } from '../utils/format'
 
 interface ProductCardProps {
   product: Product
@@ -9,6 +10,7 @@ interface ProductCardProps {
 export default function ProductCard({ product }: ProductCardProps) {
   const deleteMutation = useDeleteProduct()
   const checkMutation = useCheckProduct()
+  const { data: settings } = useSettings()
 
   const handleDelete = () => {
     if (confirm(`Delete "${product.name}"?`)) {
@@ -24,12 +26,26 @@ export default function ProductCard({ product }: ProductCardProps) {
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 flex flex-col gap-3">
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
+          {product.image_url && (
+            <img
+              src={product.image_url}
+              alt={product.name}
+              className="w-full h-32 object-cover rounded-lg mb-2"
+              loading="lazy"
+            />
+          )}
           <Link
             to={`/products/${product.id}`}
             className="text-lg font-semibold text-gray-900 hover:text-indigo-600 truncate block"
           >
             {product.name}
           </Link>
+          {product.category && (
+            <p className="text-xs text-gray-500 mt-0.5">Category: {product.category}</p>
+          )}
+          {product.tags.length > 0 && (
+            <p className="text-xs text-gray-500 mt-0.5">Tags: {product.tags.join(', ')}</p>
+          )}
           <a
             href={product.url}
             target="_blank"
@@ -53,14 +69,16 @@ export default function ProductCard({ product }: ProductCardProps) {
       <div className="flex items-center gap-4">
         <div>
           <p className="text-xs text-gray-400">Latest price</p>
-          <p className="text-2xl font-bold text-indigo-600">
-            {product.latest_price ? `€ ${parseFloat(product.latest_price).toFixed(2)}` : '—'}
-          </p>
+          <p className="text-2xl font-bold text-indigo-600">{formatPrice(product.latest_price)}</p>
         </div>
         <div>
           <p className="text-xs text-gray-400">Check interval</p>
           <p className="text-sm text-gray-700">{product.check_interval_minutes} min</p>
         </div>
+      </div>
+      <div className="text-xs text-gray-500">
+        Last change: {formatPercent(product.last_price_change_percent)} on{' '}
+        {formatDate(product.last_price_change_at, settings?.date_format)}
       </div>
 
       <div className="flex gap-2 pt-1">

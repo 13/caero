@@ -8,10 +8,13 @@ import {
   useDeleteProduct,
   usePrices,
   useProduct,
+  useProductStats,
+  useSettings,
   useUpdateProduct,
 } from '../api/hooks'
 import type { AlertCreate } from '../api/types'
 import PriceChart from '../components/PriceChart'
+import { formatDate, formatPercent, formatPrice } from '../utils/format'
 
 export default function ProductDetail() {
   const { id } = useParams<{ id: string }>()
@@ -21,6 +24,8 @@ export default function ProductDetail() {
   const { data: product, isLoading } = useProduct(productId)
   const { data: prices = [] } = usePrices(productId)
   const { data: alerts = [] } = useAlerts(productId)
+  const { data: stats } = useProductStats(productId)
+  const { data: settings } = useSettings()
 
   const updateMutation = useUpdateProduct(productId)
   const deleteMutation = useDeleteProduct()
@@ -31,6 +36,9 @@ export default function ProductDetail() {
   const [editMode, setEditMode] = useState(false)
   const [editForm, setEditForm] = useState({
     name: '',
+    category: '',
+    tags: '',
+    image_url: '',
     url: '',
     selector: '',
     check_interval_minutes: 30,
@@ -46,11 +54,14 @@ export default function ProductDetail() {
 
   const handleEdit = () => {
     if (product) {
-      setEditForm({
-        name: product.name,
-        url: product.url,
-        selector: product.selector,
-        check_interval_minutes: product.check_interval_minutes,
+        setEditForm({
+          name: product.name,
+          category: product.category ?? '',
+          tags: product.tags.join(', '),
+          image_url: product.image_url ?? '',
+          url: product.url,
+          selector: product.selector,
+          check_interval_minutes: product.check_interval_minutes,
         active: product.active,
       })
     }
@@ -59,7 +70,18 @@ export default function ProductDetail() {
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault()
-    updateMutation.mutate(editForm, { onSuccess: () => setEditMode(false) })
+    updateMutation.mutate(
+      {
+        ...editForm,
+        category: editForm.category || null,
+        image_url: editForm.image_url || null,
+        tags: editForm.tags
+          .split(',')
+          .map((tag) => tag.trim())
+          .filter(Boolean),
+      },
+      { onSuccess: () => setEditMode(false) }
+    )
   }
 
   const handleDelete = () => {
@@ -96,6 +118,18 @@ export default function ProductDetail() {
             ← Back
           </button>
           <h1 className="text-2xl font-bold text-gray-900">{product.name}</h1>
+          {product.category && <p className="text-sm text-gray-600 mt-1">Category: {product.category}</p>}
+          {product.tags.length > 0 && (
+            <p className="text-xs text-gray-500 mt-1">Tags: {product.tags.join(', ')}</p>
+          )}
+          {product.image_url && (
+            <img
+              src={product.image_url}
+              alt={product.name}
+              className="mt-3 w-full max-w-md h-48 object-cover rounded-lg border border-gray-200"
+              loading="lazy"
+            />
+          )}
           <a
             href={product.url}
             target="_blank"
@@ -135,9 +169,9 @@ export default function ProductDetail() {
           className="bg-gray-50 rounded-xl border border-gray-200 p-5 space-y-4"
         >
           <h2 className="font-semibold text-gray-800">Edit product</h2>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs font-medium text-gray-600 mb-1 block">Name</label>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-medium text-gray-600 mb-1 block">Name</label>
               <input
                 type="text"
                 value={editForm.name}
@@ -145,10 +179,10 @@ export default function ProductDetail() {
                 className="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
             </div>
-            <div>
-              <label className="text-xs font-medium text-gray-600 mb-1 block">
-                Check interval (min)
-              </label>
+              <div>
+                <label className="text-xs font-medium text-gray-600 mb-1 block">
+                  Check interval (min)
+                </label>
               <input
                 type="number"
                 min={1}
@@ -159,6 +193,24 @@ export default function ProductDetail() {
                     check_interval_minutes: parseInt(e.target.value) || 30,
                   })
                 }
+                className="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-gray-600 mb-1 block">Category</label>
+              <input
+                type="text"
+                value={editForm.category}
+                onChange={(e) => setEditForm({ ...editForm, category: e.target.value })}
+                className="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-gray-600 mb-1 block">Tags</label>
+              <input
+                type="text"
+                value={editForm.tags}
+                onChange={(e) => setEditForm({ ...editForm, tags: e.target.value })}
                 className="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
             </div>
@@ -178,6 +230,15 @@ export default function ProductDetail() {
                 value={editForm.selector}
                 onChange={(e) => setEditForm({ ...editForm, selector: e.target.value })}
                 className="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
+            <div className="col-span-2">
+              <label className="text-xs font-medium text-gray-600 mb-1 block">Image URL</label>
+              <input
+                type="url"
+                value={editForm.image_url}
+                onChange={(e) => setEditForm({ ...editForm, image_url: e.target.value })}
+                className="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
             </div>
           </div>
@@ -216,9 +277,7 @@ export default function ProductDetail() {
       <div className="grid grid-cols-3 gap-4">
         <div className="bg-white rounded-xl border border-gray-200 p-4">
           <p className="text-xs text-gray-400">Current price</p>
-          <p className="text-3xl font-bold text-indigo-600">
-            {product.latest_price ? `€ ${parseFloat(product.latest_price).toFixed(2)}` : '—'}
-          </p>
+          <p className="text-3xl font-bold text-indigo-600">{formatPrice(product.latest_price)}</p>
         </div>
         <div className="bg-white rounded-xl border border-gray-200 p-4">
           <p className="text-xs text-gray-400">All-time low</p>
@@ -229,8 +288,30 @@ export default function ProductDetail() {
           </p>
         </div>
         <div className="bg-white rounded-xl border border-gray-200 p-4">
-          <p className="text-xs text-gray-400">Data points</p>
-          <p className="text-2xl font-bold text-gray-700">{prices.length}</p>
+          <p className="text-xs text-gray-400">Last change</p>
+          <p className="text-2xl font-bold text-gray-700">
+            {formatPercent(product.last_price_change_percent)}
+          </p>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-xl border border-gray-200 p-5">
+        <h2 className="font-semibold text-gray-800 mb-4">Statistics</h2>
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
+          <div>Average: <span className="font-semibold">{formatPrice(stats?.average_price ?? null)}</span></div>
+          <div>Current: <span className="font-semibold">{formatPrice(stats?.current_price ?? null)}</span></div>
+          <div>Data points: <span className="font-semibold">{stats?.data_points ?? 0}</span></div>
+          <div>
+            Lowest: <span className="font-semibold">{formatPrice(stats?.lowest_price ?? null)}</span> (
+            {formatDate(stats?.lowest_price_at ?? null, settings?.date_format)})
+          </div>
+          <div>
+            Highest: <span className="font-semibold">{formatPrice(stats?.highest_price ?? null)}</span> (
+            {formatDate(stats?.highest_price_at ?? null, settings?.date_format)})
+          </div>
+          <div>
+            Total change: <span className="font-semibold">{formatPercent(stats?.total_change_percent ?? null)}</span>
+          </div>
         </div>
       </div>
 

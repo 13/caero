@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     pg_password: str = Field(default="")
 
     # Auth
-    single_user_mode: bool = Field(default=True)
+    single_user_mode: bool = Field(default=False)
     secret_key: str = Field(default="change-me-in-production-please-use-a-long-random-string")
     access_token_expire_minutes: int = Field(default=60 * 24 * 7)  # 7 days
 

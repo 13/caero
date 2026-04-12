@@ -1,11 +1,12 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useLogin, useRegister } from '../api/hooks'
+import { useLogin, useRegister, useRegisterEnabled } from '../api/hooks'
 
 export default function Login() {
   const navigate = useNavigate()
   const loginMutation = useLogin()
   const registerMutation = useRegister()
+  const { data: registerStatus } = useRegisterEnabled()
   const [mode, setMode] = useState<'login' | 'register'>('login')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
@@ -15,6 +16,7 @@ export default function Login() {
     if (mode === 'login') {
       loginMutation.mutate({ username, password }, { onSuccess: () => navigate('/') })
     } else {
+      if (!registerStatus?.enabled) return
       registerMutation.mutate(
         { username, password },
         { onSuccess: () => setMode('login') }
@@ -72,13 +74,19 @@ export default function Login() {
         <p className="text-center text-sm text-gray-500 mt-4">
           {mode === 'login' ? (
             <>
-              No account?{' '}
-              <button
-                onClick={() => setMode('register')}
-                className="text-indigo-500 hover:underline"
-              >
-                Register
-              </button>
+              {registerStatus?.enabled ? (
+                <>
+                  No account?{' '}
+                  <button
+                    onClick={() => setMode('register')}
+                    className="text-indigo-500 hover:underline"
+                  >
+                    Register
+                  </button>
+                </>
+              ) : (
+                'Registration disabled'
+              )}
             </>
           ) : (
             <>

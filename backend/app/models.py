@@ -23,6 +23,7 @@ class User(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     username: Mapped[str] = mapped_column(String(64), unique=True, nullable=False, index=True)
     hashed_password: Mapped[str] = mapped_column(String(256), nullable=False)
+    is_admin: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -36,6 +37,9 @@ class Product(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
     name: Mapped[str] = mapped_column(String(256), nullable=False)
+    category: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    tags: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    image_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     url: Mapped[str] = mapped_column(Text, nullable=False)
     selector: Mapped[str] = mapped_column(String(256), nullable=False)
     check_interval_minutes: Mapped[int] = mapped_column(Integer, default=30)
@@ -93,6 +97,8 @@ class AppSettings(Base):
     pg_database: Mapped[str] = mapped_column(String(256), default="")
     pg_user: Mapped[str] = mapped_column(String(256), default="")
     pg_password: Mapped[str] = mapped_column(String(256), default="")
+    allow_registration: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    date_format: Mapped[str] = mapped_column(String(32), default="DD.MM.YYYY", nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
