@@ -72,8 +72,8 @@ export default function Dashboard() {
 
     if (sortBy === 'last_change_percent') {
       items.sort((a, b) => {
-        const aChange = a.last_price_change_percent ? parseFloat(a.last_price_change_percent) : null
-        const bChange = b.last_price_change_percent ? parseFloat(b.last_price_change_percent) : null
+        const aChange = a.last_price_change_percent ? Math.abs(parseFloat(a.last_price_change_percent)) : null
+        const bChange = b.last_price_change_percent ? Math.abs(parseFloat(b.last_price_change_percent)) : null
         return compareNullableNumbers(aChange, bChange) * direction
       })
     }
@@ -199,7 +199,7 @@ export default function Dashboard() {
                     <th className="text-left px-3 py-2" aria-sort={ariaSortFor('name')}>
                       <button
                         onClick={() => handleSort('name')}
-                        aria-label={`Sort by name (${ariaSortFor('name')})`}
+                        aria-label="Sort by name"
                         className="inline-flex items-center gap-1 hover:text-indigo-600"
                       >
                         Name <span>{sortIndicator('name')}</span>
@@ -208,7 +208,7 @@ export default function Dashboard() {
                     <th className="text-left px-3 py-2" aria-sort={ariaSortFor('category')}>
                       <button
                         onClick={() => handleSort('category')}
-                        aria-label={`Sort by category (${ariaSortFor('category')})`}
+                        aria-label="Sort by category"
                         className="inline-flex items-center gap-1 hover:text-indigo-600"
                       >
                         Category <span>{sortIndicator('category')}</span>
@@ -217,7 +217,7 @@ export default function Dashboard() {
                     <th className="text-left px-3 py-2" aria-sort={ariaSortFor('latest_price')}>
                       <button
                         onClick={() => handleSort('latest_price')}
-                        aria-label={`Sort by price (${ariaSortFor('latest_price')})`}
+                        aria-label="Sort by price"
                         className="inline-flex items-center gap-1 hover:text-indigo-600"
                       >
                         Price <span>{sortIndicator('latest_price')}</span>
@@ -226,7 +226,7 @@ export default function Dashboard() {
                     <th className="text-left px-3 py-2" aria-sort={ariaSortFor('last_change_percent')}>
                       <button
                         onClick={() => handleSort('last_change_percent')}
-                        aria-label={`Sort by last change (${ariaSortFor('last_change_percent')})`}
+                        aria-label="Sort by last change"
                         className="inline-flex items-center gap-1 hover:text-indigo-600"
                       >
                         Last change <span>{sortIndicator('last_change_percent')}</span>
@@ -235,7 +235,7 @@ export default function Dashboard() {
                     <th className="text-left px-3 py-2" aria-sort={ariaSortFor('last_change_date')}>
                       <button
                         onClick={() => handleSort('last_change_date')}
-                        aria-label={`Sort by date (${ariaSortFor('last_change_date')})`}
+                        aria-label="Sort by date"
                         className="inline-flex items-center gap-1 hover:text-indigo-600"
                       >
                         Date <span>{sortIndicator('last_change_date')}</span>
