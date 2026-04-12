@@ -228,6 +228,8 @@ async def import_data(
         )
 
     for row in payload.price_history:
+        if row.get("price") is None:
+            continue
         db.add(
             PriceHistory(
                 id=row["id"],

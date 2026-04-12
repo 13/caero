@@ -49,6 +49,7 @@ export default function Setup() {
   const [newUserPassword, setNewUserPassword] = useState('')
   const [newUserAdmin, setNewUserAdmin] = useState(false)
   const [resetPasswordByUserId, setResetPasswordByUserId] = useState<Record<number, string>>({})
+  const [importError, setImportError] = useState<string | null>(null)
 
   useEffect(() => {
     if (currentSettings) {
@@ -117,9 +118,14 @@ export default function Setup() {
   const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
-    const content = await file.text()
-    const parsed = JSON.parse(content)
-    importDataMutation.mutate(parsed)
+    try {
+      const content = await file.text()
+      const parsed = JSON.parse(content)
+      setImportError(null)
+      importDataMutation.mutate(parsed)
+    } catch {
+      setImportError('Invalid JSON file')
+    }
     e.target.value = ''
   }
 
@@ -282,6 +288,7 @@ export default function Setup() {
                 />
               </label>
             </div>
+            {importError && <p className="text-sm text-red-600">{importError}</p>}
           </div>
         )}
 
@@ -378,13 +385,14 @@ export default function Setup() {
                     />
                     <button
                       type="button"
+                      disabled={!resetPasswordByUserId[user.id]?.trim()}
                       onClick={() =>
                         adminPasswordMutation.mutate({
                           userId: user.id,
                           body: { new_password: resetPasswordByUserId[user.id] ?? '' },
                         })
                       }
-                      className="px-3 py-1 rounded-lg bg-gray-100 text-gray-700 text-sm"
+                      className="px-3 py-1 rounded-lg bg-gray-100 text-gray-700 text-sm disabled:opacity-50"
                     >
                       Set password
                     </button>
