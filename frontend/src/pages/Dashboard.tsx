@@ -6,6 +6,13 @@ import ProductCard from '../components/ProductCard'
 
 type SortBy = 'name' | 'category' | 'latest_price' | 'last_change_percent' | 'last_change_date'
 
+const compareNullableNumbers = (a: number | null, b: number | null) => {
+  if (a === null && b === null) return 0
+  if (a === null) return 1
+  if (b === null) return -1
+  return a - b
+}
+
 export default function Dashboard() {
   const { data: products, isLoading, error } = useProducts()
   const { data: settings } = useSettings()
@@ -46,13 +53,6 @@ export default function Dashboard() {
   const sortedProducts = useMemo(() => {
     const items = [...filteredProducts]
     const direction = sortDirection === 'asc' ? 1 : -1
-
-    const compareNullableNumbers = (a: number | null, b: number | null) => {
-      if (a === null && b === null) return 0
-      if (a === null) return 1
-      if (b === null) return -1
-      return a - b
-    }
 
     if (sortBy === 'name') {
       items.sort((a, b) => a.name.localeCompare(b.name) * direction)
@@ -138,6 +138,7 @@ export default function Dashboard() {
         </select>
         <button
           onClick={() => setSortDirection((d) => (d === 'asc' ? 'desc' : 'asc'))}
+          aria-label="Toggle sort direction"
           className="px-3 py-1.5 text-sm rounded-lg bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-200"
         >
           {sortDirection === 'asc' ? 'Ascending' : 'Descending'}
