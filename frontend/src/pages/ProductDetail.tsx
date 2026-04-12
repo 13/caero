@@ -47,6 +47,7 @@ export default function ProductDetail() {
   const [editForm, setEditForm] = useState({
     name: '',
     category: '',
+    memo: '',
     tags: '',
     image_url: '',
     url: '',
@@ -68,6 +69,7 @@ export default function ProductDetail() {
         setEditForm({
           name: product.name,
           category: product.category ?? '',
+          memo: product.memo ?? '',
           tags: product.tags.join(', '),
           image_url: product.image_url ?? '',
           url: product.url,
@@ -85,6 +87,7 @@ export default function ProductDetail() {
       {
         ...editForm,
         category: editForm.category || null,
+        memo: editForm.memo || null,
         image_url: editForm.image_url || null,
         tags: editForm.tags
           .split(',')
@@ -136,6 +139,11 @@ export default function ProductDetail() {
           </button>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">{product.name}</h1>
           {product.category && <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Category: {product.category}</p>}
+          {product.memo && (
+            <p className="text-sm text-gray-600 dark:text-gray-400 mt-2 whitespace-pre-wrap">
+              {product.memo}
+            </p>
+          )}
           {product.tags.length > 0 && (
             <div className="mt-2 flex flex-wrap gap-1.5">
               {product.tags.map((tag) => (
@@ -239,6 +247,15 @@ export default function ProductDetail() {
                 type="text"
                 value={editForm.tags}
                 onChange={(e) => setEditForm({ ...editForm, tags: e.target.value })}
+                className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1 block">Memo</label>
+              <textarea
+                value={editForm.memo}
+                onChange={(e) => setEditForm({ ...editForm, memo: e.target.value })}
+                rows={4}
                 className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
             </div>

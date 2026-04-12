@@ -38,6 +38,7 @@ class Product(Base):
     user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
     name: Mapped[str] = mapped_column(String(256), nullable=False)
     category: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    memo: Mapped[str | None] = mapped_column(Text, nullable=True)
     tags: Mapped[str] = mapped_column(Text, default="", nullable=False)
     image_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     url: Mapped[str] = mapped_column(Text, nullable=False)

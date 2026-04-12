@@ -36,6 +36,7 @@ class LoginRequest(BaseModel):
 class ProductCreate(BaseModel):
     name: str = Field(min_length=1, max_length=256)
     category: str | None = Field(default=None, max_length=128)
+    memo: str | None = None
     tags: list[str] = Field(default_factory=list)
     image_url: str | None = None
     url: str = Field(min_length=1)
@@ -58,6 +59,7 @@ class ProductCreate(BaseModel):
 class ProductUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=256)
     category: str | None = Field(default=None, max_length=128)
+    memo: str | None = None
     tags: list[str] | None = None
     image_url: str | None = None
     url: str | None = None
@@ -82,6 +84,7 @@ class ProductOut(BaseModel):
     user_id: int
     name: str
     category: str | None = None
+    memo: str | None = None
     tags: list[str] = Field(default_factory=list)
     image_url: str | None = None
     url: str

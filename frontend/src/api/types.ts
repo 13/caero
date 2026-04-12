@@ -15,6 +15,7 @@ export interface Product {
   user_id: number
   name: string
   category: string | null
+  memo: string | null
   tags: string[]
   image_url: string | null
   url: string
@@ -31,6 +32,7 @@ export interface Product {
 export interface ProductCreate {
   name: string
   category?: string | null
+  memo?: string | null
   tags?: string[]
   image_url?: string | null
   url: string
@@ -42,6 +44,7 @@ export interface ProductCreate {
 export interface ProductUpdate {
   name?: string
   category?: string | null
+  memo?: string | null
   tags?: string[]
   image_url?: string | null
   url?: string
