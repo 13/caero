@@ -5,19 +5,21 @@ import logging
 from decimal import Decimal
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.models import Alert, AppSettings, PriceHistory, Product, User
 from app.routers.auth import require_admin, require_user
+from app.scheduler import add_product_job, remove_product_job
 from app.schemas import (
     AppSettingsIn,
     AppSettingsOut,
     DataExportPayload,
     TestDbRequest,
     TestDbResponse,
+    UserDataExportPayload,
 )
 
 logger = logging.getLogger(__name__)
@@ -109,6 +111,19 @@ def _parse_datetime(value: str | None):
         return None
 
 
+async def _list_user_products(db: AsyncSession, user_id: int) -> list[Product]:
+    result = await db.execute(select(Product).where(Product.user_id == user_id))
+    return result.scalars().all()
+
+
+async def _delete_products(products: list[Product], db: AsyncSession) -> int:
+    for product in products:
+        remove_product_job(product.id)
+        await db.delete(product)
+    await db.flush()
+    return len(products)
+
+
 @router.get("/export", response_model=DataExportPayload)
 async def export_data(
     db: AsyncSession = Depends(get_db),
@@ -183,6 +198,63 @@ async def export_data(
     )
 
 
+@router.get("/export/mine", response_model=UserDataExportPayload)
+async def export_my_data(
+    user: User = Depends(require_user),
+    db: AsyncSession = Depends(get_db),
+) -> UserDataExportPayload:
+    products = await _list_user_products(db, user.id)
+    product_ids = [product.id for product in products]
+
+    if product_ids:
+        price_history = (
+            await db.execute(select(PriceHistory).where(PriceHistory.product_id.in_(product_ids)))
+        ).scalars().all()
+        alerts = (await db.execute(select(Alert).where(Alert.product_id.in_(product_ids)))).scalars().all()
+    else:
+        price_history = []
+        alerts = []
+
+    return UserDataExportPayload(
+        products=[
+            {
+                "id": product.id,
+                "name": product.name,
+                "category": product.category,
+                "tags": product.tags,
+                "image_url": product.image_url,
+                "url": product.url,
+                "selector": product.selector,
+                "check_interval_minutes": product.check_interval_minutes,
+                "active": product.active,
+                "created_at": product.created_at.isoformat() if product.created_at else None,
+            }
+            for product in products
+        ],
+        price_history=[
+            {
+                "id": row.id,
+                "product_id": row.product_id,
+                "price": _serialize_decimal(row.price),
+                "currency": row.currency,
+                "scraped_at": row.scraped_at.isoformat() if row.scraped_at else None,
+            }
+            for row in price_history
+        ],
+        alerts=[
+            {
+                "id": alert.id,
+                "product_id": alert.product_id,
+                "condition": alert.condition,
+                "threshold_price": _serialize_decimal(alert.threshold_price),
+                "email": alert.email,
+                "active": alert.active,
+            }
+            for alert in alerts
+        ],
+    )
+
+
 @router.post("/import")
 async def import_data(
     payload: DataExportPayload,
@@ -190,6 +262,10 @@ async def import_data(
     _admin: User = Depends(require_admin),
 ) -> dict[str, str]:
     skipped_price_rows = 0
+    existing_product_ids = (await db.execute(select(Product.id))).scalars().all()
+    for product_id in existing_product_ids:
+        remove_product_job(product_id)
+
     await db.execute(Alert.__table__.delete())
     await db.execute(PriceHistory.__table__.delete())
     await db.execute(Product.__table__.delete())
@@ -265,6 +341,130 @@ async def import_data(
 
     await db.flush()
     await db.commit()
+
+    imported_products = (await db.execute(select(Product))).scalars().all()
+    for product in imported_products:
+        if product.active:
+            add_product_job(product)
+
     if skipped_price_rows:
         logger.warning("Skipped %s imported price history row(s) with null price", skipped_price_rows)
     return {"message": f"Data imported (skipped {skipped_price_rows} invalid price rows)"}
+
+
+@router.delete("/products/mine", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_my_products(
+    user: User = Depends(require_user),
+    db: AsyncSession = Depends(get_db),
+) -> None:
+    products = await _list_user_products(db, user.id)
+    await _delete_products(products, db)
+    await db.commit()
+
+
+@router.delete("/users/{user_id}/products")
+async def admin_delete_user_products(
+    user_id: int,
+    _admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, str]:
+    target = await db.get(User, user_id)
+    if target is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    products = await _list_user_products(db, target.id)
+    deleted = await _delete_products(products, db)
+    await db.commit()
+    return {"message": f"Deleted {deleted} product(s) for user {target.username}"}
+
+
+@router.post("/import/mine")
+async def import_my_data(
+    payload: UserDataExportPayload,
+    user: User = Depends(require_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, str]:
+    products = await _list_user_products(db, user.id)
+    await _delete_products(products, db)
+
+    product_id_map: dict[int, int] = {}
+    skipped_price_rows = 0
+
+    for product in payload.products:
+        tags_value = product.get("tags", [])
+        if isinstance(tags_value, list):
+            tags_value = ",".join(str(tag).strip() for tag in tags_value if str(tag).strip())
+        elif tags_value is None:
+            tags_value = ""
+        else:
+            tags_value = str(tags_value)
+
+        new_product = Product(
+            user_id=user.id,
+            name=product["name"],
+            category=product.get("category"),
+            tags=tags_value,
+            image_url=product.get("image_url"),
+            url=product["url"],
+            selector=product["selector"],
+            check_interval_minutes=product.get("check_interval_minutes", 30),
+            active=product.get("active", True),
+            created_at=_parse_datetime(product.get("created_at")),
+        )
+        db.add(new_product)
+        await db.flush()
+
+        old_product_id = product.get("id")
+        if isinstance(old_product_id, int):
+            product_id_map[old_product_id] = new_product.id
+
+    for row in payload.price_history:
+        old_product_id = row.get("product_id")
+        if not isinstance(old_product_id, int):
+            continue
+        new_product_id = product_id_map.get(old_product_id)
+        if not new_product_id:
+            continue
+        if row.get("price") is None:
+            skipped_price_rows += 1
+            continue
+        db.add(
+            PriceHistory(
+                product_id=new_product_id,
+                price=Decimal(row["price"]),
+                currency=row.get("currency", "EUR"),
+                scraped_at=_parse_datetime(row.get("scraped_at")),
+            )
+        )
+
+    for alert in payload.alerts:
+        old_product_id = alert.get("product_id")
+        if not isinstance(old_product_id, int):
+            continue
+        new_product_id = product_id_map.get(old_product_id)
+        if not new_product_id:
+            continue
+        db.add(
+            Alert(
+                product_id=new_product_id,
+                condition=alert["condition"],
+                threshold_price=Decimal(alert["threshold_price"])
+                if alert.get("threshold_price")
+                else None,
+                email=alert["email"],
+                active=alert.get("active", True),
+            )
+        )
+
+    await db.flush()
+    await db.commit()
+
+    imported_products = await _list_user_products(db, user.id)
+    for product in imported_products:
+        if product.active:
+            add_product_job(product)
+
+    if skipped_price_rows:
+        logger.warning(
+            "Skipped %s imported user price history row(s) with null price", skipped_price_rows
+        )
+    return {"message": f"My data imported (skipped {skipped_price_rows} invalid price rows)"}
