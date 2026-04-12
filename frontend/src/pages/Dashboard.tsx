@@ -137,7 +137,7 @@ export default function Dashboard() {
         </select>
         <button
           onClick={() => setSortDirection((d) => (d === 'asc' ? 'desc' : 'asc'))}
-          aria-label={`Sort direction: ${sortDirection === 'asc' ? 'ascending' : 'descending'}`}
+          aria-label={sortDirection === 'asc' ? 'Change to descending order' : 'Change to ascending order'}
           className="px-3 py-1.5 text-sm rounded-lg bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-200"
         >
           {sortDirection === 'asc' ? (
