@@ -4,34 +4,85 @@ import { useProducts, useSettings } from '../api/hooks'
 import { formatDate, formatPercent, formatPrice } from '../utils/format'
 import ProductCard from '../components/ProductCard'
 
+type SortBy = 'name' | 'category' | 'latest_price' | 'last_change_percent' | 'last_change_date'
+
 export default function Dashboard() {
   const { data: products, isLoading, error } = useProducts()
   const { data: settings } = useSettings()
   const [view, setView] = useState<'grid' | 'list'>('grid')
-  const [sortBy, setSortBy] = useState<'name' | 'category' | 'last_change_percent' | 'last_change_date'>(
-    'name'
-  )
+  const [sortBy, setSortBy] = useState<SortBy>('name')
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
+  const [searchTerm, setSearchTerm] = useState('')
+
+  const filteredProducts = useMemo(() => {
+    if (!products) return []
+    const query = searchTerm.trim().toLowerCase()
+    if (!query) return products
+    return products.filter((p) => {
+      const haystack = [p.name, p.category ?? '', p.url, ...p.tags].join(' ').toLowerCase()
+      return haystack.includes(query)
+    })
+  }, [products, searchTerm])
+
+  const handleSort = (nextSortBy: SortBy) => {
+    if (sortBy === nextSortBy) {
+      setSortDirection((current) => (current === 'asc' ? 'desc' : 'asc'))
+      return
+    }
+    setSortBy(nextSortBy)
+    setSortDirection('asc')
+  }
+
+  const sortIndicator = (key: SortBy) => {
+    if (sortBy !== key) return ''
+    return sortDirection === 'asc' ? '↑' : '↓'
+  }
 
   const sortedProducts = useMemo(() => {
-    if (!products) return []
-    const items = [...products]
-    if (sortBy === 'name') items.sort((a, b) => a.name.localeCompare(b.name))
-    if (sortBy === 'category')
-      items.sort((a, b) => (a.category ?? '').localeCompare(b.category ?? ''))
-    if (sortBy === 'last_change_percent')
-      items.sort(
-        (a, b) =>
-          Math.abs(parseFloat(b.last_price_change_percent ?? '0')) -
-          Math.abs(parseFloat(a.last_price_change_percent ?? '0'))
-      )
-    if (sortBy === 'last_change_date')
-      items.sort(
-        (a, b) =>
-          new Date(b.last_price_change_at ?? 0).getTime() -
-          new Date(a.last_price_change_at ?? 0).getTime()
-      )
+    const items = [...filteredProducts]
+    const direction = sortDirection === 'asc' ? 1 : -1
+
+    const compareNullableNumbers = (a: number | null, b: number | null) => {
+      if (a === null && b === null) return 0
+      if (a === null) return 1
+      if (b === null) return -1
+      return a - b
+    }
+
+    if (sortBy === 'name') {
+      items.sort((a, b) => a.name.localeCompare(b.name) * direction)
+    }
+
+    if (sortBy === 'category') {
+      items.sort((a, b) => (a.category ?? '').localeCompare(b.category ?? '') * direction)
+    }
+
+    if (sortBy === 'latest_price') {
+      items.sort((a, b) => {
+        const aPrice = a.latest_price ? parseFloat(a.latest_price) : null
+        const bPrice = b.latest_price ? parseFloat(b.latest_price) : null
+        return compareNullableNumbers(aPrice, bPrice) * direction
+      })
+    }
+
+    if (sortBy === 'last_change_percent') {
+      items.sort((a, b) => {
+        const aChange = a.last_price_change_percent ? parseFloat(a.last_price_change_percent) : null
+        const bChange = b.last_price_change_percent ? parseFloat(b.last_price_change_percent) : null
+        return compareNullableNumbers(aChange, bChange) * direction
+      })
+    }
+
+    if (sortBy === 'last_change_date') {
+      items.sort((a, b) => {
+        const aDate = a.last_price_change_at ? new Date(a.last_price_change_at).getTime() : null
+        const bDate = b.last_price_change_at ? new Date(b.last_price_change_at).getTime() : null
+        return compareNullableNumbers(aDate, bDate) * direction
+      })
+    }
+
     return items
-  }, [products, sortBy])
+  }, [filteredProducts, sortBy, sortDirection])
 
   if (isLoading) {
     return (
@@ -71,14 +122,27 @@ export default function Dashboard() {
       <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-3 mb-4 flex flex-wrap items-center gap-3">
         <select
           value={sortBy}
-          onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+          onChange={(e) => handleSort(e.target.value as SortBy)}
           className="rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 px-2 py-1.5 text-sm"
         >
           <option value="name">Sort by name</option>
           <option value="category">Sort by category</option>
+          <option value="latest_price">Sort by price</option>
           <option value="last_change_percent">Sort by last price change %</option>
           <option value="last_change_date">Sort by last price change date</option>
         </select>
+        <button
+          onClick={() => setSortDirection((d) => (d === 'asc' ? 'desc' : 'asc'))}
+          className="px-3 py-1.5 text-sm rounded-lg bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-200"
+        >
+          {sortDirection === 'asc' ? 'Ascending' : 'Descending'}
+        </button>
+        <input
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          placeholder="Search products..."
+          className="flex-1 min-w-[180px] rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 px-3 py-1.5 text-sm"
+        />
         <button
           onClick={() => setView('grid')}
           className={`px-3 py-1.5 text-sm rounded-lg ${
@@ -126,11 +190,31 @@ export default function Dashboard() {
                 <table className="w-full text-sm min-w-[640px]">
                   <thead className="bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-300">
                   <tr>
-                    <th className="text-left px-3 py-2">Name</th>
-                    <th className="text-left px-3 py-2">Category</th>
-                    <th className="text-left px-3 py-2">Price</th>
-                    <th className="text-left px-3 py-2">Last change</th>
-                    <th className="text-left px-3 py-2">Date</th>
+                    <th className="text-left px-3 py-2">
+                      <button onClick={() => handleSort('name')} className="inline-flex items-center gap-1 hover:text-indigo-600">
+                        Name <span>{sortIndicator('name')}</span>
+                      </button>
+                    </th>
+                    <th className="text-left px-3 py-2">
+                      <button onClick={() => handleSort('category')} className="inline-flex items-center gap-1 hover:text-indigo-600">
+                        Category <span>{sortIndicator('category')}</span>
+                      </button>
+                    </th>
+                    <th className="text-left px-3 py-2">
+                      <button onClick={() => handleSort('latest_price')} className="inline-flex items-center gap-1 hover:text-indigo-600">
+                        Price <span>{sortIndicator('latest_price')}</span>
+                      </button>
+                    </th>
+                    <th className="text-left px-3 py-2">
+                      <button onClick={() => handleSort('last_change_percent')} className="inline-flex items-center gap-1 hover:text-indigo-600">
+                        Last change <span>{sortIndicator('last_change_percent')}</span>
+                      </button>
+                    </th>
+                    <th className="text-left px-3 py-2">
+                      <button onClick={() => handleSort('last_change_date')} className="inline-flex items-center gap-1 hover:text-indigo-600">
+                        Date <span>{sortIndicator('last_change_date')}</span>
+                      </button>
+                    </th>
                   </tr>
                 </thead>
                   <tbody>
