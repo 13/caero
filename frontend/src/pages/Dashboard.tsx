@@ -141,8 +141,7 @@ export default function Dashboard() {
           aria-label={`Sort direction: ${sortDirection === 'asc' ? 'ascending' : 'descending'}`}
           className="px-3 py-1.5 text-sm rounded-lg bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-200"
         >
-          <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
-            <title>{sortDirection === 'asc' ? 'Ascending' : 'Descending'}</title>
+          <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
             {sortDirection === 'asc' ? <path d="M12 5v14M6 11l6-6 6 6" /> : <path d="M12 19V5M6 13l6 6 6-6" />}
           </svg>
         </button>
@@ -162,8 +161,7 @@ export default function Dashboard() {
               : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'
           }`}
         >
-          <svg viewBox="0 0 24 24" className="h-4 w-4" fill="currentColor">
-            <title>Grid view</title>
+          <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4" fill="currentColor">
             <rect x="4" y="4" width="7" height="7" rx="1" />
             <rect x="13" y="4" width="7" height="7" rx="1" />
             <rect x="4" y="13" width="7" height="7" rx="1" />
@@ -179,8 +177,7 @@ export default function Dashboard() {
               : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'
           }`}
         >
-          <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
-            <title>List view</title>
+          <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M5 7h14M5 12h14M5 17h14" />
           </svg>
         </button>
