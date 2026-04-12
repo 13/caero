@@ -7,6 +7,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
+import { useMemo } from 'react'
 import { useSettings } from '../api/hooks'
 import type { PriceHistory } from '../api/types'
 import { localeFromDateFormat } from '../utils/format'
@@ -19,7 +20,10 @@ interface PriceChartProps {
 export default function PriceChart({ data, currency = 'EUR' }: PriceChartProps) {
   const { data: settings } = useSettings()
   const locale = localeFromDateFormat(settings?.date_format)
-  const currencyCode = data.find((item) => item.currency)?.currency || currency
+  const currencyCode = useMemo(
+    () => data.find((item) => item.currency)?.currency || currency,
+    [currency, data]
+  )
 
   const formatCurrency = (value: number) => {
     try {
@@ -42,10 +46,14 @@ export default function PriceChart({ data, currency = 'EUR' }: PriceChartProps) 
     }
   }
 
-  const chartData = data.map((d) => ({
-    date: new Date(d.scraped_at).getTime(),
-    price: parseFloat(d.price),
-  }))
+  const chartData = useMemo(
+    () =>
+      data.map((d) => ({
+        date: new Date(d.scraped_at).getTime(),
+        price: parseFloat(d.price),
+      })),
+    [data]
+  )
 
   if (chartData.length === 0) {
     return (
