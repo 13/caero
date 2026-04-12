@@ -262,4 +262,5 @@ async def import_data(
         )
 
     await db.flush()
+    await db.commit()
     return {"message": "Data imported"}

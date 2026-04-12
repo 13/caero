@@ -65,7 +65,7 @@ async def _to_product_out(product: Product, db: AsyncSession) -> ProductOut:
     previous_price = latest_two[1].price if len(latest_two) > 1 else None
     last_change_percent = None
     last_change_at = latest_two[0].scraped_at if len(latest_two) > 1 else None
-    if latest_price is not None and previous_price is not None and previous_price != 0:
+    if latest_price is not None and previous_price is not None and previous_price != Decimal(0):
         last_change_percent = ((latest_price - previous_price) / previous_price) * Decimal(100)
         last_change_percent = last_change_percent.quantize(Decimal("0.01"))
 
@@ -214,14 +214,14 @@ async def get_product_statistics(
     previous = prices[-2] if len(prices) > 1 else None
 
     total_change_percent = None
-    if first.price != 0:
+    if first.price != Decimal(0):
         total_change_percent = (((current.price - first.price) / first.price) * Decimal(100)).quantize(
             Decimal("0.01")
         )
 
     last_change_percent = None
     last_change_at = None
-    if previous and previous.price != 0:
+    if previous and previous.price != Decimal(0):
         last_change_percent = (((current.price - previous.price) / previous.price) * Decimal(100)).quantize(
             Decimal("0.01")
         )
