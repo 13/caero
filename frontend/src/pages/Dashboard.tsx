@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { ArrowDown, ArrowUp, Grid2x2, List, Plus } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useProducts, useSettings } from '../api/hooks'
 import { formatDate, formatPercent, formatPrice } from '../utils/format'
@@ -118,9 +119,7 @@ export default function Dashboard() {
           to="/add"
           className="inline-flex items-center gap-1.5 bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors"
         >
-          <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M12 5v14M5 12h14" />
-          </svg>
+          <Plus aria-hidden="true" className="h-4 w-4" />
           Add
         </Link>
       </div>
@@ -138,10 +137,14 @@ export default function Dashboard() {
         </select>
         <button
           onClick={() => setSortDirection((d) => (d === 'asc' ? 'desc' : 'asc'))}
-          aria-label="Toggle sort direction"
+          aria-label={sortDirection === 'asc' ? 'Change to descending order' : 'Change to ascending order'}
           className="px-3 py-1.5 text-sm rounded-lg bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-200"
         >
-          {sortDirection === 'asc' ? 'Ascending' : 'Descending'}
+          {sortDirection === 'asc' ? (
+            <ArrowUp aria-hidden="true" className="h-4 w-4" />
+          ) : (
+            <ArrowDown aria-hidden="true" className="h-4 w-4" />
+          )}
         </button>
         <input
           value={searchTerm}
@@ -152,23 +155,25 @@ export default function Dashboard() {
         />
         <button
           onClick={() => setView('grid')}
+          aria-label="Grid view"
           className={`px-3 py-1.5 text-sm rounded-lg ${
             view === 'grid'
               ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-200'
               : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'
           }`}
         >
-          Grid
+          <Grid2x2 aria-hidden="true" className="h-4 w-4" />
         </button>
         <button
           onClick={() => setView('list')}
+          aria-label="List view"
           className={`px-3 py-1.5 text-sm rounded-lg ${
             view === 'list'
               ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-200'
               : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'
           }`}
         >
-          List
+          <List aria-hidden="true" className="h-4 w-4" />
         </button>
       </div>
 

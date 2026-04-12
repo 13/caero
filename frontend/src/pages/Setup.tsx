@@ -33,6 +33,10 @@ function downloadJson(data: unknown, filename: string) {
   URL.revokeObjectURL(url)
 }
 
+function exportDateSuffix() {
+  return new Date().toISOString().slice(0, 10)
+}
+
 export default function Setup() {
   const { data: currentSettings, isLoading } = useSettings()
   const { data: me } = useMe()
@@ -204,7 +208,7 @@ export default function Setup() {
               type="button"
               onClick={() =>
                 exportMyDataMutation.mutate(undefined, {
-                  onSuccess: (data) => downloadJson(data, 'caero-my-products-export.json'),
+                  onSuccess: (data) => downloadJson(data, `caero-my-products-export-${exportDateSuffix()}.json`),
                 })
               }
               disabled={exportMyDataMutation.isPending}
@@ -396,7 +400,7 @@ export default function Setup() {
                 type="button"
                 onClick={() =>
                   exportDataMutation.mutate(undefined, {
-                    onSuccess: (data) => downloadJson(data, 'caero-export-all.json'),
+                    onSuccess: (data) => downloadJson(data, `caero-export-all-${exportDateSuffix()}.json`),
                   })
                 }
                 disabled={exportDataMutation.isPending}

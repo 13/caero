@@ -6,6 +6,40 @@ zero price tracker
   <img src="assets/screenshot.png" width="640" />
 </p>
 
+## Features
+
+- Product tracking with:
+  - URL + CSS selector based price extraction
+  - optional category, memo, tags, and product image
+  - per-product check interval and enable/disable toggle
+- Dashboard with:
+  - grid and list views
+  - search (name, category, memo, URL, tags)
+  - sorting by name, category, price, last change %, and last change date
+- Product detail page with:
+  - current price, all-time low, and last change summary
+  - historical price chart
+  - statistics (average/current/lowest/highest/total change/data points)
+- Alerts:
+  - conditions: below threshold, lowered, changed, any change
+  - channels: email and Telegram
+  - per-alert activate/deactivate, edit, and delete
+- Manual “check now” and automatic scheduled price checks
+- Data portability:
+  - user export/import for own product data
+  - admin export/import for full system data
+- User features:
+  - login and password change
+  - delete all own products (danger zone)
+- Admin features:
+  - system settings (SQLite/PostgreSQL, date format)
+  - notification settings (SMTP + Telegram) with test actions
+  - user management (create users, reset passwords, delete users, delete user products)
+  - toggle self-registration
+- Self-hosted deployment options:
+  - Docker Compose
+  - local backend + frontend development mode
+
 ## Run with Docker (recommended)
 
 1. Copy environment file:
