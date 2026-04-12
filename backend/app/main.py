@@ -90,6 +90,11 @@ if assets_dir.exists():
 # ── SPA fallback ──────────────────────────────────────────────────────────────
 @app.get("/{full_path:path}", include_in_schema=False)
 async def spa_fallback(full_path: str):
+    if full_path:
+        candidate = (STATIC_DIR / full_path).resolve()
+        if candidate.is_file() and candidate.is_relative_to(STATIC_DIR.resolve()):
+            return FileResponse(candidate)
+
     index = STATIC_DIR / "index.html"
     if index.exists():
         return FileResponse(index)
