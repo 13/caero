@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
 import type { Product } from '../api/types'
 import { useCheckProduct, useDeleteProduct, useSettings } from '../api/hooks'
-import { formatDate, formatPercent, formatPrice } from '../utils/format'
+import { formatDate, formatIntervalHours, formatPercent, formatPrice } from '../utils/format'
 import { getTagColorClass } from '../utils/tags'
 
 interface ProductCardProps {
@@ -12,7 +12,7 @@ export default function ProductCard({ product }: ProductCardProps) {
   const deleteMutation = useDeleteProduct()
   const checkMutation = useCheckProduct()
   const { data: settings } = useSettings()
-  const checkIntervalHours = (product.check_interval_minutes / 60).toFixed(1).replace(/\.0$/, '')
+  const checkIntervalHours = formatIntervalHours(product.check_interval_minutes)
 
   const handleDelete = () => {
     if (confirm(`Delete "${product.name}"?`)) {
