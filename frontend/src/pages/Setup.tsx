@@ -261,7 +261,7 @@ export default function Setup() {
                   <div className="flex gap-2 mt-3">
                     <button
                       type="button"
-                      onClick={saveSettings}
+                      onClick={() => saveSettings()}
                       className="bg-amber-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-amber-700"
                     >
                       Switch anyway
