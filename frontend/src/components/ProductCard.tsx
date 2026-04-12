@@ -26,55 +26,57 @@ export default function ProductCard({ product }: ProductCardProps) {
 
   return (
     <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-4 flex flex-col gap-3">
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex-1 min-w-0">
-          {product.image_url && (
+      <div className="flex-1 min-w-0">
+        {product.image_url && (
+          <div className="w-full min-h-[150px] max-h-[150px] flex items-center justify-center rounded-lg mb-2 border border-gray-200 dark:border-gray-800">
             <img
               src={product.image_url}
               alt={product.name}
-              className="w-full h-auto max-h-64 object-contain rounded-lg mb-2 border border-gray-200 dark:border-gray-800"
+              className="w-full h-full object-contain"
               loading="lazy"
             />
-          )}
+          </div>
+        )}
+        <div className="flex items-start justify-between gap-2">
           <Link
             to={`/products/${product.id}`}
             className="text-lg font-semibold text-gray-900 dark:text-gray-100 hover:text-indigo-600 truncate block"
           >
             {product.name}
           </Link>
-          {product.category && (
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Category: {product.category}</p>
-          )}
-          {product.tags.length > 0 && (
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {product.tags.map((tag) => (
-                <span
-                  key={tag}
-                  className={`text-xs px-2 py-0.5 rounded-full font-medium ${getTagColorClass(tag)}`}
-                >
-                  {tag}
-                </span>
-              ))}
-            </div>
-          )}
-          <a
-            href={product.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-xs text-gray-400 dark:text-gray-500 hover:text-indigo-500 truncate block"
+          <span
+            className={`shrink-0 px-2 py-0.5 rounded-full text-xs font-medium ${
+                product.active
+                  ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300'
+                  : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-300'
+            }`}
           >
-            {product.url}
-          </a>
+            {product.active ? 'Active' : 'Paused'}
+          </span>
         </div>
-        <span
-          className={`shrink-0 px-2 py-0.5 rounded-full text-xs font-medium ${
-              product.active
-                ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300'
-                : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-300'
-          }`}
+        {product.category && (
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Category: {product.category}</p>
+        )}
+        {product.tags.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {product.tags.map((tag) => (
+              <span
+                key={tag}
+                className={`text-xs px-2 py-0.5 rounded-full font-medium ${getTagColorClass(tag)}`}
+              >
+                {tag}
+              </span>
+            ))}
+          </div>
+        )}
+        <a
+          href={product.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-xs text-gray-400 dark:text-gray-500 hover:text-indigo-500 truncate block"
         >
-          {product.active ? 'Active' : 'Paused'}
-        </span>
+          {product.url}
+        </a>
       </div>
 
       <div className="flex items-center gap-4">
