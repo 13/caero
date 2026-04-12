@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useLogin, useRegister, useRegisterEnabled } from '../api/hooks'
 import CaeroBrand from '../components/CaeroBrand'
-import { APP_TAGLINE } from '../constants/appInfo'
 
 export default function Login() {
   const navigate = useNavigate()
@@ -32,7 +31,7 @@ export default function Login() {
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950 px-4">
       <div className="w-full max-w-sm bg-white dark:bg-gray-900 rounded-2xl shadow-lg p-8 border border-gray-200 dark:border-gray-800">
         <div className="text-center mb-6">
-          <CaeroBrand subtitle={APP_TAGLINE} className="justify-center" />
+          <CaeroBrand showText={false} logoSizeClassName="h-16 w-16 sm:h-20 sm:w-20" className="justify-center" />
         </div>
 
         {error && (

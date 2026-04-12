@@ -19,7 +19,7 @@ import {
 import type { AppSettings } from '../api/types'
 import CaeroBrand from '../components/CaeroBrand'
 import DbSelector from '../components/DbSelector'
-import { APP_DESCRIPTION, APP_TAGLINE, APP_VERSION } from '../constants/appInfo'
+import { APP_DESCRIPTION, APP_VERSION } from '../constants/appInfo'
 
 function downloadJson(data: unknown, filename: string) {
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
@@ -485,8 +485,13 @@ export default function Setup() {
 
       <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5 space-y-2">
         <h2 className="font-semibold text-gray-800 dark:text-gray-100">About</h2>
-        <CaeroBrand subtitle={APP_TAGLINE} logoAriaHidden={false} />
-        <p className="text-sm text-gray-600 dark:text-gray-300">{APP_DESCRIPTION}</p>
+        <CaeroBrand
+          showText={false}
+          logoAriaHidden={false}
+          logoSizeClassName="h-20 w-20"
+          className="w-full justify-center"
+        />
+        <p className="text-sm text-gray-600 dark:text-gray-300 text-center">{APP_DESCRIPTION}</p>
         <p className="text-sm text-gray-600 dark:text-gray-300">Version: v{APP_VERSION}</p>
       </div>
 
