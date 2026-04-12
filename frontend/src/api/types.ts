@@ -63,14 +63,16 @@ export interface Alert {
   product_id: number
   condition: 'below' | 'changed' | 'any_change'
   threshold_price: string | null
-  email: string
+  email: string | null
+  telegram_chat_id: string | null
   active: boolean
 }
 
 export interface AlertCreate {
   condition: 'below' | 'changed' | 'any_change'
   threshold_price?: string | null
-  email: string
+  email?: string | null
+  telegram_chat_id?: string | null
   active?: boolean
 }
 

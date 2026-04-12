@@ -58,7 +58,8 @@ export default function ProductDetail() {
   const [alertForm, setAlertForm] = useState<AlertCreate>({
     condition: 'below',
     threshold_price: null,
-    email: '',
+    email: null,
+    telegram_chat_id: null,
     active: true,
   })
 
@@ -104,7 +105,13 @@ export default function ProductDetail() {
     e.preventDefault()
     createAlertMutation.mutate(alertForm, {
       onSuccess: () =>
-        setAlertForm({ condition: 'below', threshold_price: null, email: '', active: true }),
+        setAlertForm({
+          condition: 'below',
+          threshold_price: null,
+          email: null,
+          telegram_chat_id: null,
+          active: true,
+        }),
     })
   }
 
@@ -362,7 +369,9 @@ export default function ProductDetail() {
                       € {parseFloat(alert.threshold_price).toFixed(2)}
                     </span>
                   )}
-                  <span className="text-gray-400 dark:text-gray-500 ml-2">→ {alert.email}</span>
+                  <span className="text-gray-400 dark:text-gray-500 ml-2">
+                    → {[alert.email, alert.telegram_chat_id ? `tg:${alert.telegram_chat_id}` : null].filter(Boolean).join(' • ')}
+                  </span>
                 </div>
                 <button
                   onClick={() => deleteAlertMutation.mutate(alert.id)}
@@ -413,13 +422,37 @@ export default function ProductDetail() {
           <div className="sm:col-span-2">
             <label className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1 block">Email</label>
             <input
-              required
               type="email"
-              value={alertForm.email}
-              onChange={(e) => setAlertForm({ ...alertForm, email: e.target.value })}
+              value={alertForm.email ?? ''}
+              onChange={(e) =>
+                setAlertForm({
+                  ...alertForm,
+                  email: e.target.value.trim() ? e.target.value : null,
+                })
+              }
               placeholder="you@example.com"
               className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
+          </div>
+          <div className="sm:col-span-2">
+            <label className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1 block">
+              Telegram chat ID
+            </label>
+            <input
+              type="text"
+              value={alertForm.telegram_chat_id ?? ''}
+              onChange={(e) =>
+                setAlertForm({
+                  ...alertForm,
+                  telegram_chat_id: e.target.value.trim() ? e.target.value : null,
+                })
+              }
+              placeholder="123456789"
+              className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              Provide email, Telegram chat ID, or both.
+            </p>
           </div>
           <div className="sm:col-span-2">
             <button

@@ -31,6 +31,7 @@ class Settings(BaseSettings):
     smtp_password: str = Field(default="")
     smtp_from: str = Field(default="caero@localhost")
     smtp_tls: bool = Field(default=True)
+    telegram_bot_token: str = Field(default="")
 
     @property
     def database_url(self) -> str:

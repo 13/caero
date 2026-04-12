@@ -2,7 +2,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 # ── Users ────────────────────────────────────────────────────────────────────
@@ -117,8 +117,17 @@ AlertCondition = Literal["below", "changed", "any_change"]
 class AlertCreate(BaseModel):
     condition: AlertCondition
     threshold_price: Decimal | None = None
-    email: str
+    email: str | None = None
+    telegram_chat_id: str | None = None
     active: bool = True
+
+    @model_validator(mode="after")
+    def validate_recipient(self) -> "AlertCreate":
+        if not (self.email and self.email.strip()) and not (
+            self.telegram_chat_id and self.telegram_chat_id.strip()
+        ):
+            raise ValueError("at least one recipient is required: email or telegram_chat_id")
+        return self
 
 
 class AlertOut(BaseModel):
@@ -126,7 +135,8 @@ class AlertOut(BaseModel):
     product_id: int
     condition: str
     threshold_price: Decimal | None
-    email: str
+    email: str | None
+    telegram_chat_id: str | None
     active: bool
 
     model_config = {"from_attributes": True}

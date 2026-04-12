@@ -80,7 +80,8 @@ class Alert(Base):
         Enum("below", "changed", "any_change", name="alert_condition"), nullable=False
     )
     threshold_price: Mapped[Decimal | None] = mapped_column(Numeric(10, 2), nullable=True)
-    email: Mapped[str] = mapped_column(String(256), nullable=False)
+    email: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    telegram_chat_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     active: Mapped[bool] = mapped_column(Boolean, default=True)
 
     product: Mapped["Product"] = relationship("Product", back_populates="alerts")

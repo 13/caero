@@ -192,6 +192,7 @@ async def export_data(
                 "condition": alert.condition,
                 "threshold_price": _serialize_decimal(alert.threshold_price),
                 "email": alert.email,
+                "telegram_chat_id": alert.telegram_chat_id,
                 "active": alert.active,
             }
             for alert in alerts
@@ -249,6 +250,7 @@ async def export_my_data(
                 "condition": alert.condition,
                 "threshold_price": _serialize_decimal(alert.threshold_price),
                 "email": alert.email,
+                "telegram_chat_id": alert.telegram_chat_id,
                 "active": alert.active,
             }
             for alert in alerts
@@ -335,7 +337,8 @@ async def import_data(
                 threshold_price=Decimal(alert["threshold_price"])
                 if alert.get("threshold_price")
                 else None,
-                email=alert["email"],
+                email=alert.get("email"),
+                telegram_chat_id=alert.get("telegram_chat_id"),
                 active=alert.get("active", True),
             )
         )
@@ -451,7 +454,8 @@ async def import_my_data(
                 threshold_price=Decimal(alert["threshold_price"])
                 if alert.get("threshold_price")
                 else None,
-                email=alert["email"],
+                email=alert.get("email"),
+                telegram_chat_id=alert.get("telegram_chat_id"),
                 active=alert.get("active", True),
             )
         )

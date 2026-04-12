@@ -70,6 +70,7 @@ async def scrape_and_record(product_id: int) -> None:
             if triggered:
                 send_alert(
                     to_email=alert.email,
+                    telegram_chat_id=alert.telegram_chat_id,
                     product_name=product.name,
                     product_url=product.url,
                     condition=alert.condition,
