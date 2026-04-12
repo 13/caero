@@ -23,9 +23,10 @@ function resolveInitialTheme(): Theme {
 function NavBar({ theme, onToggleTheme }: { theme: Theme; onToggleTheme: () => void }) {
   const location = useLocation()
 
-  const navLink = (to: string, label: string) => (
+  const navLink = (to: string, label: string, ariaLabel?: string) => (
     <Link
       to={to}
+      aria-label={ariaLabel}
       className={`text-sm font-medium px-3 py-1.5 rounded-lg transition-colors ${
         location.pathname === to
           ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-200'
@@ -44,17 +45,7 @@ function NavBar({ theme, onToggleTheme }: { theme: Theme; onToggleTheme: () => v
         </Link>
         <div className="flex w-full sm:w-auto items-center justify-end flex-wrap gap-1">
           {navLink('/', 'Dashboard')}
-          <Link
-            to="/add"
-            aria-label="Add product"
-            className={`text-sm font-medium px-3 py-1.5 rounded-lg transition-colors ${
-              location.pathname === '/add'
-                ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-200'
-                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100 dark:text-gray-300 dark:hover:text-gray-100 dark:hover:bg-gray-800'
-            }`}
-          >
-            + Add
-          </Link>
+          {navLink('/add', '+ Add', 'Add product')}
           <Link
             to="/setup"
             title="Settings"
