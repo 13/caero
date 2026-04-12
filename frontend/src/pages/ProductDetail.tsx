@@ -160,7 +160,7 @@ export default function ProductDetail() {
             <img
               src={product.image_url}
               alt={product.name}
-              className="mt-3 mx-auto w-full max-w-[12rem] h-auto max-h-[12rem] object-contain rounded-lg border border-gray-200 dark:border-gray-800"
+              className="mt-3 mx-auto block w-full max-w-[12rem] h-auto max-h-[12rem] object-contain rounded-lg border border-gray-200 dark:border-gray-800"
               loading="lazy"
             />
           )}
