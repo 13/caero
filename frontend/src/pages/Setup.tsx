@@ -14,6 +14,7 @@ import {
 } from '../api/hooks'
 import type { AppSettings } from '../api/types'
 import DbSelector from '../components/DbSelector'
+import { APP_NAME, APP_TAGLINE, APP_VERSION } from '../constants/appInfo'
 
 export default function Setup() {
   const { data: currentSettings, isLoading } = useSettings()
@@ -402,6 +403,17 @@ export default function Setup() {
             </ul>
           </div>
         )}
+
+        <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5 space-y-2">
+          <h2 className="font-semibold text-gray-800 dark:text-gray-100">About</h2>
+          <p className="text-sm text-gray-600 dark:text-gray-300">
+            {APP_NAME} — {APP_TAGLINE}
+          </p>
+          <p className="text-sm text-gray-600 dark:text-gray-300">Version: v{APP_VERSION}</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            Self-hosted app for tracking product price changes.
+          </p>
+        </div>
 
         {/* Save */}
         {saveMutation.error && (
