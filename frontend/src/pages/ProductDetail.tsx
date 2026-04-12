@@ -184,22 +184,24 @@ export default function ProductDetail() {
               ))}
             </div>
           )}
-          {product.image_url && (
-            <img
-              src={product.image_url}
-              alt={product.name}
-              className="mt-3 mx-auto block w-full max-w-[12rem] h-auto max-h-[12rem] object-contain rounded-lg border border-gray-200 dark:border-gray-800"
-              loading="lazy"
-            />
-          )}
-          <a
-            href={product.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-sm text-indigo-500 hover:underline truncate block max-w-md"
-          >
-            {product.url}
-          </a>
+          <div className="mt-3 flex flex-col items-center gap-2">
+            {product.image_url && (
+              <img
+                src={product.image_url}
+                alt={product.name}
+                className="block w-full max-w-[12rem] h-auto max-h-[12rem] object-contain rounded-lg border border-gray-200 dark:border-gray-800"
+                loading="lazy"
+              />
+            )}
+            <a
+              href={product.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm text-indigo-500 hover:underline block max-w-md text-center break-all"
+            >
+              {product.url}
+            </a>
+          </div>
         </div>
          <div className="flex flex-wrap gap-2">
           <button
