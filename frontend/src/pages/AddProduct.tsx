@@ -8,6 +8,9 @@ export default function AddProduct() {
 
   const [form, setForm] = useState({
     name: '',
+    category: '',
+    tags: '',
+    image_url: '',
     url: '',
     selector: '',
     check_interval_minutes: 30,
@@ -16,9 +19,20 @@ export default function AddProduct() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    createMutation.mutate(form, {
+    createMutation.mutate(
+      {
+        ...form,
+        category: form.category || null,
+        image_url: form.image_url || null,
+        tags: form.tags
+          .split(',')
+          .map((tag) => tag.trim())
+          .filter(Boolean),
+      },
+      {
       onSuccess: (product) => navigate(`/products/${product.id}`),
-    })
+      }
+    )
   }
 
   return (
@@ -42,6 +56,39 @@ export default function AddProduct() {
             value={form.name}
             onChange={(e) => setForm({ ...form, name: e.target.value })}
             placeholder="e.g. Sony WH-1000XM5"
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+          <input
+            type="text"
+            value={form.category}
+            onChange={(e) => setForm({ ...form, category: e.target.value })}
+            placeholder="e.g. Electronics"
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Tags</label>
+          <input
+            type="text"
+            value={form.tags}
+            onChange={(e) => setForm({ ...form, tags: e.target.value })}
+            placeholder="comma,separated,tags"
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Image URL</label>
+          <input
+            type="url"
+            value={form.image_url}
+            onChange={(e) => setForm({ ...form, image_url: e.target.value })}
+            placeholder="https://example.com/image.jpg"
             className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
           />
         </div>

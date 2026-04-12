@@ -1,12 +1,32 @@
 import { useState, useEffect } from 'react'
-import { useSettings, useSaveSettings, useTestDb } from '../api/hooks'
+import {
+  useAdminChangeUserPassword,
+  useChangePassword,
+  useCreateUser,
+  useDeleteUser,
+  useExportData,
+  useImportData,
+  useMe,
+  useSettings,
+  useSaveSettings,
+  useTestDb,
+  useUsers,
+} from '../api/hooks'
 import type { AppSettings } from '../api/types'
 import DbSelector from '../components/DbSelector'
 
 export default function Setup() {
   const { data: currentSettings, isLoading } = useSettings()
+  const { data: me } = useMe()
+  const { data: users = [] } = useUsers(!!me?.is_admin)
   const saveMutation = useSaveSettings()
   const testDbMutation = useTestDb()
+  const changePasswordMutation = useChangePassword()
+  const createUserMutation = useCreateUser()
+  const deleteUserMutation = useDeleteUser()
+  const adminPasswordMutation = useAdminChangeUserPassword()
+  const exportDataMutation = useExportData()
+  const importDataMutation = useImportData()
 
   const [form, setForm] = useState<AppSettings>({
     db_type: 'sqlite',
@@ -16,11 +36,20 @@ export default function Setup() {
     pg_database: '',
     pg_user: '',
     pg_password: '',
+    allow_registration: true,
+    date_format: 'DD.MM.YYYY',
     updated_at: null,
   })
 
   const [saved, setSaved] = useState(false)
   const [switchWarning, setSwitchWarning] = useState(false)
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [newUserName, setNewUserName] = useState('')
+  const [newUserPassword, setNewUserPassword] = useState('')
+  const [newUserAdmin, setNewUserAdmin] = useState(false)
+  const [resetPasswordByUserId, setResetPasswordByUserId] = useState<Record<number, string>>({})
+  const [importError, setImportError] = useState<string | null>(null)
 
   useEffect(() => {
     if (currentSettings) {
@@ -59,6 +88,47 @@ export default function Setup() {
     })
   }
 
+  const handlePasswordChange = (e: React.FormEvent) => {
+    e.preventDefault()
+    changePasswordMutation.mutate(
+      { current_password: currentPassword, new_password: newPassword },
+      {
+        onSuccess: () => {
+          setCurrentPassword('')
+          setNewPassword('')
+        },
+      }
+    )
+  }
+
+  const handleExport = () => {
+    exportDataMutation.mutate(undefined, {
+      onSuccess: (data) => {
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = 'caero-export.json'
+        a.click()
+        URL.revokeObjectURL(url)
+      },
+    })
+  }
+
+  const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    try {
+      const content = await file.text()
+      const parsed = JSON.parse(content)
+      setImportError(null)
+      importDataMutation.mutate(parsed)
+    } catch {
+      setImportError('Invalid JSON file')
+    }
+    e.target.value = ''
+  }
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -77,6 +147,38 @@ export default function Setup() {
         <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
           <h2 className="font-semibold text-gray-800">Database</h2>
           <DbSelector value={form} onChange={setForm} />
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Date format</label>
+            <select
+              value={form.date_format}
+              onChange={(e) =>
+                setForm({
+                  ...form,
+                  date_format: e.target.value as AppSettings['date_format'],
+                })
+              }
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            >
+              <option value="DD.MM.YYYY">DD.MM.YYYY (German default)</option>
+              <option value="DD/MM/YYYY">DD/MM/YYYY</option>
+              <option value="MM/DD/YYYY">MM/DD/YYYY</option>
+              <option value="YYYY-MM-DD">YYYY-MM-DD</option>
+            </select>
+          </div>
+          {me?.is_admin && (
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="allow_registration"
+                checked={form.allow_registration}
+                onChange={(e) => setForm({ ...form, allow_registration: e.target.checked })}
+                className="rounded text-indigo-600"
+              />
+              <label htmlFor="allow_registration" className="text-sm text-gray-700">
+                Allow registration of new users
+              </label>
+            </div>
+          )}
 
           {/* Switch warning */}
           {switchWarning && (
@@ -130,6 +232,176 @@ export default function Setup() {
             )}
           </div>
         </div>
+
+        <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
+          <h2 className="font-semibold text-gray-800">Change password</h2>
+          <form onSubmit={handlePasswordChange} className="grid sm:grid-cols-3 gap-3 items-end">
+            <div>
+              <label className="text-xs font-medium text-gray-600 mb-1 block">Current password</label>
+              <input
+                type="password"
+                required
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-gray-600 mb-1 block">New password</label>
+              <input
+                type="password"
+                required
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={changePasswordMutation.isPending}
+              className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50"
+            >
+              Change password
+            </button>
+          </form>
+        </div>
+
+        {me?.is_admin && (
+          <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
+            <h2 className="font-semibold text-gray-800">Import / Export</h2>
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={handleExport}
+                disabled={exportDataMutation.isPending}
+                className="px-4 py-2 rounded-lg border border-gray-300 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              >
+                Export all data
+              </button>
+              <label className="px-4 py-2 rounded-lg border border-gray-300 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer">
+                Import all data
+                <input
+                  type="file"
+                  accept="application/json"
+                  onChange={handleImportFile}
+                  className="hidden"
+                />
+              </label>
+            </div>
+            {importError && <p className="text-sm text-red-600">{importError}</p>}
+          </div>
+        )}
+
+        {me?.is_admin && (
+          <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
+            <h2 className="font-semibold text-gray-800">User management (admin)</h2>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault()
+                createUserMutation.mutate(
+                  {
+                    username: newUserName,
+                    password: newUserPassword,
+                    is_admin: newUserAdmin,
+                  },
+                  {
+                    onSuccess: () => {
+                      setNewUserName('')
+                      setNewUserPassword('')
+                      setNewUserAdmin(false)
+                    },
+                  }
+                )
+              }}
+              className="grid sm:grid-cols-4 gap-3 items-end"
+            >
+              <div>
+                <label className="text-xs font-medium text-gray-600 mb-1 block">Username</label>
+                <input
+                  required
+                  value={newUserName}
+                  onChange={(e) => setNewUserName(e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-600 mb-1 block">Password</label>
+                <input
+                  required
+                  type="password"
+                  value={newUserPassword}
+                  onChange={(e) => setNewUserPassword(e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                />
+              </div>
+              <label className="flex items-center gap-2 text-sm text-gray-700 pb-2">
+                <input
+                  type="checkbox"
+                  checked={newUserAdmin}
+                  onChange={(e) => setNewUserAdmin(e.target.checked)}
+                />
+                Admin
+              </label>
+              <button
+                type="submit"
+                disabled={createUserMutation.isPending}
+                className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50"
+              >
+                Add user
+              </button>
+            </form>
+
+            <ul className="space-y-2">
+              {users.map((user) => (
+                <li
+                  key={user.id}
+                  className="border border-gray-200 rounded-lg px-3 py-2 flex flex-col gap-2"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-gray-800">
+                      {user.username} {user.is_admin ? '(admin)' : ''}
+                    </span>
+                    <button
+                      type="button"
+                      disabled={user.id === me.id || deleteUserMutation.isPending}
+                      onClick={() => deleteUserMutation.mutate(user.id)}
+                      className="text-red-600 text-sm disabled:opacity-50"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                  <div className="flex gap-2">
+                    <input
+                      type="password"
+                      placeholder="New password"
+                      value={resetPasswordByUserId[user.id] ?? ''}
+                      onChange={(e) =>
+                        setResetPasswordByUserId({
+                          ...resetPasswordByUserId,
+                          [user.id]: e.target.value,
+                        })
+                      }
+                      className="rounded-lg border border-gray-300 px-2 py-1 text-sm flex-1"
+                    />
+                    <button
+                      type="button"
+                      disabled={!resetPasswordByUserId[user.id]?.trim()}
+                      onClick={() =>
+                        adminPasswordMutation.mutate({
+                          userId: user.id,
+                          body: { new_password: resetPasswordByUserId[user.id] ?? '' },
+                        })
+                      }
+                      className="px-3 py-1 rounded-lg bg-gray-100 text-gray-700 text-sm disabled:opacity-50"
+                    >
+                      Set password
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         {/* Save */}
         {saveMutation.error && (

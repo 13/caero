@@ -1,13 +1,18 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import apiFetch from './client'
 import type {
+  AdminUserCreate,
+  AdminUserPasswordUpdate,
   Alert,
   AlertCreate,
   AppSettings,
   CheckResult,
+  ChangePasswordRequest,
+  DataExportPayload,
   PriceHistory,
   Product,
   ProductCreate,
+  ProductStatistics,
   ProductUpdate,
   TestDbRequest,
   TestDbResponse,
@@ -45,6 +50,10 @@ export function useLogin() {
   })
 }
 
+export function logoutClient() {
+  localStorage.removeItem('token')
+}
+
 export function useRegister() {
   return useMutation<User, Error, { username: string; password: string }>({
     mutationFn: (body) =>
@@ -52,6 +61,14 @@ export function useRegister() {
         method: 'POST',
         body: JSON.stringify(body),
       }),
+  })
+}
+
+export function useRegisterEnabled() {
+  return useQuery<{ enabled: boolean }>({
+    queryKey: ['register-enabled'],
+    queryFn: () => apiFetch<{ enabled: boolean }>('/api/auth/register-enabled'),
+    retry: false,
   })
 }
 
@@ -97,6 +114,13 @@ export function useDeleteProduct() {
   return useMutation<void, Error, number>({
     mutationFn: (id) => apiFetch<void>(`/api/products/${id}`, { method: 'DELETE' }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['products'] }),
+  })
+}
+
+export function useProductStats(id: number) {
+  return useQuery<ProductStatistics>({
+    queryKey: ['product-stats', id],
+    queryFn: () => apiFetch<ProductStatistics>(`/api/products/${id}/stats`),
   })
 }
 
@@ -181,5 +205,73 @@ export function useTestDb() {
         method: 'POST',
         body: JSON.stringify(body),
       }),
+  })
+}
+
+export function useChangePassword() {
+  return useMutation<{ message: string }, Error, ChangePasswordRequest>({
+    mutationFn: (body) =>
+      apiFetch<{ message: string }>('/api/auth/change-password', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+  })
+}
+
+export function useUsers(enabled = true) {
+  return useQuery<User[]>({
+    queryKey: ['users'],
+    queryFn: () => apiFetch<User[]>('/api/auth/users'),
+    enabled,
+  })
+}
+
+export function useCreateUser() {
+  const qc = useQueryClient()
+  return useMutation<User, Error, AdminUserCreate>({
+    mutationFn: (body) =>
+      apiFetch<User>('/api/auth/users', { method: 'POST', body: JSON.stringify(body) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['users'] }),
+  })
+}
+
+export function useAdminChangeUserPassword() {
+  return useMutation<{ message: string }, Error, { userId: number; body: AdminUserPasswordUpdate }>({
+    mutationFn: ({ userId, body }) =>
+      apiFetch<{ message: string }>(`/api/auth/users/${userId}/password`, {
+        method: 'PATCH',
+        body: JSON.stringify(body),
+      }),
+  })
+}
+
+export function useDeleteUser() {
+  const qc = useQueryClient()
+  return useMutation<void, Error, number>({
+    mutationFn: (userId) => apiFetch<void>(`/api/auth/users/${userId}`, { method: 'DELETE' }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['users'] }),
+  })
+}
+
+export function useExportData() {
+  return useMutation<DataExportPayload, Error, void>({
+    mutationFn: () => apiFetch<DataExportPayload>('/api/settings/export'),
+  })
+}
+
+export function useImportData() {
+  const qc = useQueryClient()
+  return useMutation<{ message: string }, Error, DataExportPayload>({
+    mutationFn: (body) =>
+      apiFetch<{ message: string }>('/api/settings/import', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['settings'] })
+      qc.invalidateQueries({ queryKey: ['products'] })
+      qc.invalidateQueries({ queryKey: ['users'] })
+      qc.invalidateQueries({ queryKey: ['me'] })
+    },
   })
 }

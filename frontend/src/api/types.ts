@@ -1,6 +1,7 @@
 export interface User {
   id: number
   username: string
+  is_admin: boolean
   created_at: string
 }
 
@@ -13,16 +14,25 @@ export interface Product {
   id: number
   user_id: number
   name: string
+  category: string | null
+  tags: string[]
+  image_url: string | null
   url: string
   selector: string
   check_interval_minutes: number
   active: boolean
   created_at: string
   latest_price: string | null
+  previous_price: string | null
+  last_price_change_percent: string | null
+  last_price_change_at: string | null
 }
 
 export interface ProductCreate {
   name: string
+  category?: string | null
+  tags?: string[]
+  image_url?: string | null
   url: string
   selector: string
   check_interval_minutes?: number
@@ -31,6 +41,9 @@ export interface ProductCreate {
 
 export interface ProductUpdate {
   name?: string
+  category?: string | null
+  tags?: string[]
+  image_url?: string | null
   url?: string
   selector?: string
   check_interval_minutes?: number
@@ -69,6 +82,8 @@ export interface AppSettings {
   pg_database: string
   pg_user: string
   pg_password: string
+  allow_registration: boolean
+  date_format: 'DD.MM.YYYY' | 'DD/MM/YYYY' | 'MM/DD/YYYY' | 'YYYY-MM-DD'
   updated_at: string | null
 }
 
@@ -91,4 +106,40 @@ export interface CheckResult {
   product_id: number
   price: string | null
   error: string | null
+}
+
+export interface ProductStatistics {
+  average_price: string | null
+  lowest_price: string | null
+  lowest_price_at: string | null
+  highest_price: string | null
+  highest_price_at: string | null
+  current_price: string | null
+  total_change_percent: string | null
+  last_change_percent: string | null
+  last_change_at: string | null
+  data_points: number
+}
+
+export interface ChangePasswordRequest {
+  current_password: string
+  new_password: string
+}
+
+export interface AdminUserCreate {
+  username: string
+  password: string
+  is_admin?: boolean
+}
+
+export interface AdminUserPasswordUpdate {
+  new_password: string
+}
+
+export interface DataExportPayload {
+  app_settings: Record<string, unknown>
+  users: Record<string, unknown>[]
+  products: Record<string, unknown>[]
+  price_history: Record<string, unknown>[]
+  alerts: Record<string, unknown>[]
 }

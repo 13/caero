@@ -3,14 +3,21 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import create_access_token, hash_password, verify_password
 from app.config import settings
 from app.database import get_db
-from app.models import User
-from app.schemas import Token, UserCreate, UserOut
+from app.models import AppSettings, User
+from app.schemas import (
+    AdminUserCreate,
+    AdminUserPasswordUpdate,
+    ChangePasswordRequest,
+    Token,
+    UserCreate,
+    UserOut,
+)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -52,16 +59,43 @@ async def require_user(
     return user
 
 
+async def require_admin(user: User = Depends(require_user)) -> User:
+    if not user.is_admin:
+        raise HTTPException(status_code=403, detail="Admin access required")
+    return user
+
+
 @router.post("/register", response_model=UserOut, status_code=status.HTTP_201_CREATED)
 async def register(body: UserCreate, db: AsyncSession = Depends(get_db)) -> User:
+    user_count = (await db.execute(select(func.count()).select_from(User))).scalar_one()
+    is_first_user = user_count == 0
+    if not is_first_user:
+        app_settings = await db.get(AppSettings, 1)
+        allow_registration = app_settings.allow_registration if app_settings else True
+        if not allow_registration:
+            raise HTTPException(status_code=403, detail="User registration is disabled")
+
     result = await db.execute(select(User).where(User.username == body.username))
     if result.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="Username already taken")
-    user = User(username=body.username, hashed_password=hash_password(body.password))
+    user = User(
+        username=body.username,
+        hashed_password=hash_password(body.password),
+        is_admin=is_first_user,
+    )
     db.add(user)
     await db.flush()
     await db.refresh(user)
     return user
+
+
+@router.get("/register-enabled")
+async def register_enabled(db: AsyncSession = Depends(get_db)) -> dict[str, bool]:
+    user_count = (await db.execute(select(func.count()).select_from(User))).scalar_one()
+    if user_count == 0:
+        return {"enabled": True}
+    app_settings = await db.get(AppSettings, 1)
+    return {"enabled": app_settings.allow_registration if app_settings else True}
 
 
 @router.post("/login", response_model=Token)
@@ -80,3 +114,76 @@ async def login(
 @router.get("/me", response_model=UserOut)
 async def me(user: User = Depends(require_user)) -> User:
     return user
+
+
+@router.post("/logout")
+async def logout(_user: User = Depends(require_user)) -> dict[str, str]:
+    return {"message": "Logged out"}
+
+
+@router.post("/change-password")
+async def change_password(
+    body: ChangePasswordRequest,
+    user: User = Depends(require_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, str]:
+    if not verify_password(body.current_password, user.hashed_password):
+        raise HTTPException(status_code=400, detail="Current password is incorrect")
+    user.hashed_password = hash_password(body.new_password)
+    await db.flush()
+    return {"message": "Password changed"}
+
+
+@router.get("/users", response_model=list[UserOut])
+async def list_users(_admin: User = Depends(require_admin), db: AsyncSession = Depends(get_db)) -> list[User]:
+    result = await db.execute(select(User).order_by(User.username.asc()))
+    return result.scalars().all()
+
+
+@router.post("/users", response_model=UserOut, status_code=status.HTTP_201_CREATED)
+async def create_user(
+    body: AdminUserCreate,
+    _admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+) -> User:
+    result = await db.execute(select(User).where(User.username == body.username))
+    if result.scalar_one_or_none():
+        raise HTTPException(status_code=400, detail="Username already taken")
+    user = User(
+        username=body.username,
+        hashed_password=hash_password(body.password),
+        is_admin=body.is_admin,
+    )
+    db.add(user)
+    await db.flush()
+    await db.refresh(user)
+    return user
+
+
+@router.patch("/users/{user_id}/password")
+async def admin_change_password(
+    user_id: int,
+    body: AdminUserPasswordUpdate,
+    _admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, str]:
+    target = await db.get(User, user_id)
+    if target is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    target.hashed_password = hash_password(body.new_password)
+    await db.flush()
+    return {"message": "Password updated"}
+
+
+@router.delete("/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_user(
+    user_id: int,
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+) -> None:
+    target = await db.get(User, user_id)
+    if target is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    if target.id == admin.id:
+        raise HTTPException(status_code=400, detail="Admin cannot delete own account")
+    await db.delete(target)

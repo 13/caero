@@ -1,5 +1,5 @@
 import { Link, Route, Routes, useLocation } from 'react-router-dom'
-import { useMe } from './api/hooks'
+import { logoutClient, useMe } from './api/hooks'
 import AddProduct from './pages/AddProduct'
 import Dashboard from './pages/Dashboard'
 import Login from './pages/Login'
@@ -32,6 +32,15 @@ function NavBar() {
           {navLink('/', 'Dashboard')}
           {navLink('/add', 'Add product')}
           {navLink('/setup', 'Settings')}
+          <button
+            onClick={() => {
+              logoutClient()
+              window.location.reload()
+            }}
+            className="text-sm font-medium px-3 py-1.5 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+          >
+            Logout
+          </button>
         </div>
       </div>
     </nav>
