@@ -7,7 +7,7 @@ type CaeroBrandProps = {
 
 export default function CaeroBrand({ subtitle, className = '' }: CaeroBrandProps) {
   return (
-    <div className={`inline-flex items-center gap-2 ${className}`.trim()}>
+    <div className={`inline-flex items-center gap-2 ${className}`}>
       <svg
         aria-hidden="true"
         viewBox="0 0 28 28"
