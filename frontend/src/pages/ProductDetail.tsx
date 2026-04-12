@@ -14,7 +14,16 @@ import {
 } from '../api/hooks'
 import type { AlertCreate } from '../api/types'
 import PriceChart from '../components/PriceChart'
-import { formatDate, formatPercent, formatPrice } from '../utils/format'
+import {
+  CHECK_INTERVAL_HOUR_STEP,
+  MIN_CHECK_INTERVAL_HOURS,
+  DEFAULT_CHECK_INTERVAL_MINUTES,
+  formatDate,
+  formatPercent,
+  formatPrice,
+  intervalMinutesToHours,
+  normalizeIntervalHoursToMinutes,
+} from '../utils/format'
 import { getTagColorClass } from '../utils/tags'
 
 export default function ProductDetail() {
@@ -42,7 +51,7 @@ export default function ProductDetail() {
     image_url: '',
     url: '',
     selector: '',
-    check_interval_minutes: 30,
+    check_interval_minutes: DEFAULT_CHECK_INTERVAL_MINUTES,
     active: true,
   })
 
@@ -191,18 +200,20 @@ export default function ProductDetail() {
             </div>
               <div>
                 <label className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1 block">
-                  Check interval (min)
+                  Check interval (hours)
                 </label>
               <input
                 type="number"
-                min={1}
-                value={editForm.check_interval_minutes}
-                onChange={(e) =>
+                min={MIN_CHECK_INTERVAL_HOURS}
+                step={CHECK_INTERVAL_HOUR_STEP}
+                value={intervalMinutesToHours(editForm.check_interval_minutes)}
+                onChange={(e) => {
+                  const hours = parseFloat(e.target.value)
                   setEditForm({
                     ...editForm,
-                    check_interval_minutes: parseInt(e.target.value) || 30,
+                    check_interval_minutes: normalizeIntervalHoursToMinutes(hours),
                   })
-                }
+                }}
                 className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
             </div>

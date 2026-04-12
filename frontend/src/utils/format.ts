@@ -1,5 +1,10 @@
 type DateFormat = 'DD.MM.YYYY' | 'DD/MM/YYYY' | 'MM/DD/YYYY' | 'YYYY-MM-DD'
 
+export const DEFAULT_CHECK_INTERVAL_MINUTES = 60
+export const MIN_CHECK_INTERVAL_MINUTES = 30
+export const MIN_CHECK_INTERVAL_HOURS = 0.5
+export const CHECK_INTERVAL_HOUR_STEP = 0.5
+
 export function localeFromDateFormat(format?: DateFormat) {
   if (format === 'DD.MM.YYYY') return 'de-DE'
   if (format === 'DD/MM/YYYY') return 'en-GB'
@@ -31,4 +36,17 @@ export function formatDate(value: string | null, format = 'DD.MM.YYYY') {
   if (format === 'MM/DD/YYYY') return `${month}/${day}/${year}`
   if (format === 'YYYY-MM-DD') return `${year}-${month}-${day}`
   return `${day}.${month}.${year}`
+}
+
+export function intervalMinutesToHours(minutes: number) {
+  return minutes / 60
+}
+
+export function normalizeIntervalHoursToMinutes(hours: number) {
+  if (Number.isNaN(hours)) return DEFAULT_CHECK_INTERVAL_MINUTES
+  return Math.max(MIN_CHECK_INTERVAL_MINUTES, Math.round(hours * 60))
+}
+
+export function formatIntervalHours(minutes: number) {
+  return intervalMinutesToHours(minutes).toFixed(1).replace(/\.0$/, '')
 }

@@ -1,6 +1,13 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useCreateProduct } from '../api/hooks'
+import {
+  CHECK_INTERVAL_HOUR_STEP,
+  MIN_CHECK_INTERVAL_HOURS,
+  DEFAULT_CHECK_INTERVAL_MINUTES,
+  intervalMinutesToHours,
+  normalizeIntervalHoursToMinutes,
+} from '../utils/format'
 
 export default function AddProduct() {
   const navigate = useNavigate()
@@ -13,7 +20,7 @@ export default function AddProduct() {
     image_url: '',
     url: '',
     selector: '',
-    check_interval_minutes: 30,
+    check_interval_minutes: DEFAULT_CHECK_INTERVAL_MINUTES,
     active: true,
   })
 
@@ -126,15 +133,20 @@ export default function AddProduct() {
 
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Check interval (minutes)
+            Check interval (hours)
           </label>
           <input
             type="number"
-            min={1}
-            value={form.check_interval_minutes}
-            onChange={(e) =>
-              setForm({ ...form, check_interval_minutes: parseInt(e.target.value) || 30 })
-            }
+            min={MIN_CHECK_INTERVAL_HOURS}
+            step={CHECK_INTERVAL_HOUR_STEP}
+            value={intervalMinutesToHours(form.check_interval_minutes)}
+            onChange={(e) => {
+              const hours = parseFloat(e.target.value)
+              setForm({
+                ...form,
+                check_interval_minutes: normalizeIntervalHoursToMinutes(hours),
+              })
+            }}
             className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
           />
         </div>

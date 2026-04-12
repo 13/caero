@@ -88,9 +88,9 @@ export default function Setup() {
     saveSettings()
   }
 
-  const saveSettings = () => {
+  const saveSettings = (settingsToSave: AppSettings = form) => {
     setSwitchWarning(false)
-    saveMutation.mutate(form, {
+    saveMutation.mutate(settingsToSave, {
       onSuccess: () => {
         setSaved(true)
         setTimeout(() => setSaved(false), 3000)
@@ -261,7 +261,7 @@ export default function Setup() {
                   <div className="flex gap-2 mt-3">
                     <button
                       type="button"
-                      onClick={saveSettings}
+                      onClick={() => saveSettings()}
                       className="bg-amber-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-amber-700"
                     >
                       Switch anyway
@@ -350,7 +350,11 @@ export default function Setup() {
                   type="checkbox"
                   id="allow_registration"
                   checked={form.allow_registration}
-                  onChange={(e) => setForm({ ...form, allow_registration: e.target.checked })}
+                  onChange={(e) => {
+                    const nextForm = { ...form, allow_registration: e.target.checked }
+                    setForm(nextForm)
+                    saveSettings(nextForm)
+                  }}
                   className="rounded text-indigo-600"
                 />
                 Allow registration of new users

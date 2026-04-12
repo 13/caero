@@ -86,7 +86,7 @@ export default function Login() {
                   </button>
                 </>
               ) : (
-                'Registration disabled'
+                null
               )}
             </>
           ) : (
