@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useProducts, useSettings } from '../api/hooks'
-import { formatDate, formatPercent } from '../utils/format'
+import { formatDate, formatPercent, formatPrice } from '../utils/format'
 import ProductCard from '../components/ProductCard'
 
 export default function Dashboard() {
@@ -134,7 +134,7 @@ export default function Dashboard() {
                         </Link>
                       </td>
                       <td className="px-3 py-2">{p.category ?? '—'}</td>
-                      <td className="px-3 py-2">{p.latest_price ? `€ ${p.latest_price}` : '—'}</td>
+                      <td className="px-3 py-2">{formatPrice(p.latest_price)}</td>
                       <td className="px-3 py-2">{formatPercent(p.last_price_change_percent)}</td>
                       <td className="px-3 py-2">
                         {formatDate(p.last_price_change_at, settings?.date_format)}

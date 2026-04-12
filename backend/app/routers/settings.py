@@ -189,6 +189,7 @@ async def import_data(
     db: AsyncSession = Depends(get_db),
     _admin: User = Depends(require_admin),
 ) -> dict[str, str]:
+    skipped_price_rows = 0
     await db.execute(Alert.__table__.delete())
     await db.execute(PriceHistory.__table__.delete())
     await db.execute(Product.__table__.delete())
@@ -236,6 +237,7 @@ async def import_data(
 
     for row in payload.price_history:
         if row.get("price") is None:
+            skipped_price_rows += 1
             continue
         db.add(
             PriceHistory(
@@ -263,4 +265,6 @@ async def import_data(
 
     await db.flush()
     await db.commit()
-    return {"message": "Data imported"}
+    if skipped_price_rows:
+        logger.warning("Skipped %s imported price history row(s) with null price", skipped_price_rows)
+    return {"message": f"Data imported (skipped {skipped_price_rows} invalid price rows)"}
