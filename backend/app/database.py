@@ -1,6 +1,7 @@
 import logging
 
 from sqlalchemy import inspect
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy.schema import CreateColumn
@@ -79,7 +80,7 @@ def _add_missing_columns_for_existing_tables(connection) -> None:
             try:
                 connection.exec_driver_sql(f"ALTER TABLE {table_sql} ADD COLUMN {column_sql}")
                 logger.info("Added missing column %s.%s", table.name, column.name)
-            except Exception as exc:
+            except SQLAlchemyError as exc:
                 logger.warning(
                     "Could not backfill missing column %s.%s: %s",
                     table.name,
