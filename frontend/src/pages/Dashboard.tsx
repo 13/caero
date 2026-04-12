@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { ArrowDown, ArrowUp, Grid2x2, List, Plus } from 'lucide-react'
+import { ArrowDown, ArrowUp, Grid2x2, List, Plus, X } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useProducts, useSettings } from '../api/hooks'
 import { formatDate, formatPercent, formatPrice } from '../utils/format'
@@ -146,13 +146,25 @@ export default function Dashboard() {
             <ArrowDown aria-hidden="true" className="h-4 w-4" />
           )}
         </button>
-        <input
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          placeholder="Search products..."
-          aria-label="Search products by name, category, URL, or tags"
-          className="flex-1 min-w-[180px] rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 px-3 py-1.5 text-sm"
-        />
+        <div className="relative flex-1 min-w-[180px]">
+          <input
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Search products..."
+            aria-label="Search products by name, category, URL, or tags"
+            className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 px-3 py-1.5 pr-8 text-sm"
+          />
+          {searchTerm && (
+            <button
+              type="button"
+              onClick={() => setSearchTerm('')}
+              aria-label="Clear search"
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+            >
+              <X aria-hidden="true" className="h-4 w-4" />
+            </button>
+          )}
+        </div>
         <button
           onClick={() => setView('grid')}
           aria-label="Grid view"
