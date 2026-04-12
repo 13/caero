@@ -66,7 +66,7 @@ function NavBar({ theme, onToggleTheme }: { theme: Theme; onToggleTheme: () => v
             )}
           </button>
         </div>
-        <div className="hidden sm:flex w-full sm:w-auto items-center justify-end flex-wrap gap-1">
+        <div className="hidden sm:flex items-center justify-end flex-wrap gap-1">
           {navLink('/', 'Dashboard')}
           <Link
             to="/add"
