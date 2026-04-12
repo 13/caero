@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import type { Product } from '../api/types'
 import { useCheckProduct, useDeleteProduct, useSettings } from '../api/hooks'
 import { formatDate, formatPercent, formatPrice } from '../utils/format'
+import { getTagColorClass } from '../utils/tags'
 
 interface ProductCardProps {
   product: Product
@@ -30,7 +31,7 @@ export default function ProductCard({ product }: ProductCardProps) {
             <img
               src={product.image_url}
               alt={product.name}
-              className="w-full h-32 object-cover rounded-lg mb-2"
+              className="w-full h-auto max-h-64 object-contain rounded-lg mb-2 border border-gray-200 dark:border-gray-800"
               loading="lazy"
             />
           )}
@@ -44,7 +45,16 @@ export default function ProductCard({ product }: ProductCardProps) {
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Category: {product.category}</p>
           )}
           {product.tags.length > 0 && (
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Tags: {product.tags.join(', ')}</p>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {product.tags.map((tag) => (
+                <span
+                  key={tag}
+                  className={`text-xs px-2 py-0.5 rounded-full font-medium ${getTagColorClass(tag)}`}
+                >
+                  {tag}
+                </span>
+              ))}
+            </div>
           )}
           <a
             href={product.url}

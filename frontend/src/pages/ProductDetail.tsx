@@ -15,6 +15,7 @@ import {
 import type { AlertCreate } from '../api/types'
 import PriceChart from '../components/PriceChart'
 import { formatDate, formatPercent, formatPrice } from '../utils/format'
+import { getTagColorClass } from '../utils/tags'
 
 export default function ProductDetail() {
   const { id } = useParams<{ id: string }>()
@@ -120,15 +121,24 @@ export default function ProductDetail() {
           <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">{product.name}</h1>
           {product.category && <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Category: {product.category}</p>}
           {product.tags.length > 0 && (
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Tags: {product.tags.join(', ')}</p>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {product.tags.map((tag) => (
+                <span
+                  key={tag}
+                  className={`text-xs px-2 py-0.5 rounded-full font-medium ${getTagColorClass(tag)}`}
+                >
+                  {tag}
+                </span>
+              ))}
+            </div>
           )}
           {product.image_url && (
             <img
               src={product.image_url}
-               alt={product.name}
-               className="mt-3 w-full max-w-md h-48 object-cover rounded-lg border border-gray-200 dark:border-gray-800"
-               loading="lazy"
-             />
+              alt={product.name}
+              className="mt-3 w-full max-w-md h-auto max-h-[32rem] object-contain rounded-lg border border-gray-200 dark:border-gray-800"
+              loading="lazy"
+            />
           )}
           <a
             href={product.url}
