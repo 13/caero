@@ -41,7 +41,7 @@ function NavBar({ theme, onToggleTheme }: { theme: Theme; onToggleTheme: () => v
     <nav className="border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 sticky top-0 z-10">
       <div className="max-w-5xl mx-auto px-4 py-2 sm:h-14 flex flex-col sm:flex-row gap-2 sm:items-center sm:justify-between">
         <Link to="/" className="text-lg">
-          <CaeroBrand />
+          <CaeroBrand logoSizeClassName="h-9 w-9" />
         </Link>
         <div className="flex w-full sm:w-auto items-center justify-end flex-wrap gap-1">
           {navLink('/', 'Dashboard')}
