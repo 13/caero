@@ -27,6 +27,14 @@ import {
 } from '../utils/format'
 import { getTagColorClass } from '../utils/tags'
 
+const createDefaultAlertForm = (): AlertCreate => ({
+  condition: 'below',
+  threshold_price: null,
+  email: null,
+  telegram_chat_id: null,
+  active: true,
+})
+
 export default function ProductDetail() {
   const { id } = useParams<{ id: string }>()
   const productId = parseInt(id ?? '0')
@@ -58,21 +66,9 @@ export default function ProductDetail() {
     active: true,
   })
 
-  const [alertForm, setAlertForm] = useState<AlertCreate>({
-    condition: 'below',
-    threshold_price: null,
-    email: null,
-    telegram_chat_id: null,
-    active: true,
-  })
+  const [alertForm, setAlertForm] = useState<AlertCreate>(createDefaultAlertForm)
   const [editingAlertId, setEditingAlertId] = useState<number | null>(null)
-  const [alertEditForm, setAlertEditForm] = useState<AlertCreate>({
-    condition: 'below',
-    threshold_price: null,
-    email: null,
-    telegram_chat_id: null,
-    active: true,
-  })
+  const [alertEditForm, setAlertEditForm] = useState<AlertCreate>(createDefaultAlertForm)
 
   const handleEdit = () => {
     if (product) {
@@ -117,14 +113,7 @@ export default function ProductDetail() {
   const handleAddAlert = (e: React.FormEvent) => {
     e.preventDefault()
     createAlertMutation.mutate(alertForm, {
-      onSuccess: () =>
-        setAlertForm({
-          condition: 'below',
-          threshold_price: null,
-          email: null,
-          telegram_chat_id: null,
-          active: true,
-        }),
+      onSuccess: () => setAlertForm(createDefaultAlertForm()),
     })
   }
 
@@ -621,7 +610,7 @@ export default function ProductDetail() {
             <label className="inline-flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
               <input
                 type="checkbox"
-                checked={alertForm.active ?? true}
+                checked={alertForm.active}
                 onChange={(e) => setAlertForm({ ...alertForm, active: e.target.checked })}
               />
               Active
