@@ -67,8 +67,8 @@ export default function Dashboard() {
 
     if (sortBy === 'last_change_percent') {
       items.sort((a, b) => {
-        const aChange = a.last_price_change_percent ? parseFloat(a.last_price_change_percent) : null
-        const bChange = b.last_price_change_percent ? parseFloat(b.last_price_change_percent) : null
+        const aChange = a.last_price_change_percent ? Math.abs(parseFloat(a.last_price_change_percent)) : null
+        const bChange = b.last_price_change_percent ? Math.abs(parseFloat(b.last_price_change_percent)) : null
         return compareNullableNumbers(aChange, bChange) * direction
       })
     }
