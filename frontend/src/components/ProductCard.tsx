@@ -32,7 +32,7 @@ export default function ProductCard({ product }: ProductCardProps) {
             <img
               src={product.image_url}
               alt={product.name}
-              className="w-full h-full object-contain mx-auto"
+              className="w-full h-full object-contain"
               loading="lazy"
             />
           </div>
