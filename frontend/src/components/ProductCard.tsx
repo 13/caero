@@ -12,6 +12,7 @@ export default function ProductCard({ product }: ProductCardProps) {
   const deleteMutation = useDeleteProduct()
   const checkMutation = useCheckProduct()
   const { data: settings } = useSettings()
+  const checkIntervalHours = (product.check_interval_minutes / 60).toFixed(1).replace(/\.0$/, '')
 
   const handleDelete = () => {
     if (confirm(`Delete "${product.name}"?`)) {
@@ -83,7 +84,7 @@ export default function ProductCard({ product }: ProductCardProps) {
         </div>
         <div>
           <p className="text-xs text-gray-400 dark:text-gray-500">Check interval</p>
-          <p className="text-sm text-gray-700 dark:text-gray-300">{product.check_interval_minutes} min</p>
+          <p className="text-sm text-gray-700 dark:text-gray-300">{checkIntervalHours} h</p>
         </div>
       </div>
       <div className="text-xs text-gray-500 dark:text-gray-400">

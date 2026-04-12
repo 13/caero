@@ -56,6 +56,7 @@ async def save_settings(
         setattr(row, key, value)
     row.updated_at = datetime.now(timezone.utc)
     await db.flush()
+    await db.commit()
     await db.refresh(row)
     return AppSettingsOut.model_validate(row)
 

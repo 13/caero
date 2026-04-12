@@ -13,7 +13,7 @@ export default function AddProduct() {
     image_url: '',
     url: '',
     selector: '',
-    check_interval_minutes: 30,
+    check_interval_minutes: 60,
     active: true,
   })
 
@@ -126,15 +126,20 @@ export default function AddProduct() {
 
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Check interval (minutes)
+            Check interval (hours)
           </label>
           <input
             type="number"
-            min={1}
-            value={form.check_interval_minutes}
-            onChange={(e) =>
-              setForm({ ...form, check_interval_minutes: parseInt(e.target.value) || 30 })
-            }
+            min={0.5}
+            step={0.5}
+            value={form.check_interval_minutes / 60}
+            onChange={(e) => {
+              const hours = parseFloat(e.target.value)
+              setForm({
+                ...form,
+                check_interval_minutes: Number.isNaN(hours) ? 60 : Math.max(1, Math.round(hours * 60)),
+              })
+            }}
             className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
           />
         </div>
