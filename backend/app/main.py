@@ -1,0 +1,99 @@
+"""FastAPI application entry point."""
+from __future__ import annotations
+
+import logging
+from contextlib import asynccontextmanager
+from pathlib import Path
+
+from fastapi import FastAPI
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
+
+from app.database import create_tables
+from app.routers import (
+    alerts_router,
+    auth_router,
+    prices_router,
+    products_router,
+    settings_router,
+)
+from app.scheduler import load_all_jobs, scheduler
+
+logger = logging.getLogger(__name__)
+
+STATIC_DIR = Path(__file__).parent / "static"
+
+
+@asynccontextmanager
+async def lifespan(application: FastAPI):
+    # ── Startup ──────────────────────────────────────────────────────────────
+    # Ensure tables exist
+    await create_tables()
+
+    # Check frontend build
+    if not (STATIC_DIR / "index.html").exists():
+        logger.warning("Frontend not built — run npm run build in /frontend")
+
+    # Launch Playwright browser
+    try:
+        from playwright.async_api import async_playwright
+
+        pw = await async_playwright().start()
+        application.state.playwright = pw
+        application.state.browser = await pw.chromium.launch(headless=True)
+        logger.info("Playwright browser started")
+    except Exception as exc:
+        logger.error("Could not start Playwright browser: %s", exc)
+        application.state.playwright = None
+        application.state.browser = None
+
+    # Start APScheduler and load product jobs
+    scheduler.start()
+    await load_all_jobs()
+
+    yield
+
+    # ── Shutdown ─────────────────────────────────────────────────────────────
+    scheduler.shutdown(wait=False)
+
+    browser = getattr(application.state, "browser", None)
+    if browser:
+        await browser.close()
+
+    pw = getattr(application.state, "playwright", None)
+    if pw:
+        await pw.stop()
+
+    logger.info("Caero shutdown complete")
+
+
+app = FastAPI(
+    title="Caero",
+    description="Self-hosted price tracker",
+    version="0.1.0",
+    lifespan=lifespan,
+)
+
+# ── API routers ───────────────────────────────────────────────────────────────
+app.include_router(auth_router, prefix="/api")
+app.include_router(products_router, prefix="/api")
+app.include_router(prices_router, prefix="/api")
+app.include_router(alerts_router, prefix="/api")
+app.include_router(settings_router, prefix="/api")
+
+# ── Static assets (JS, CSS, images from built frontend) ───────────────────────
+assets_dir = STATIC_DIR / "assets"
+if assets_dir.exists():
+    app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
+
+
+# ── SPA fallback ──────────────────────────────────────────────────────────────
+@app.get("/{full_path:path}", include_in_schema=False)
+async def spa_fallback(full_path: str):
+    index = STATIC_DIR / "index.html"
+    if index.exists():
+        return FileResponse(index)
+    return JSONResponse(
+        {"error": "Frontend not built. Run `npm run build` inside /frontend."},
+        status_code=503,
+    )
