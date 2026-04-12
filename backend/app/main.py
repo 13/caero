@@ -22,7 +22,17 @@ from app.scheduler import load_all_jobs, scheduler
 logger = logging.getLogger(__name__)
 
 STATIC_DIR = Path(__file__).parent / "static"
-STATIC_DIR_RESOLVED = STATIC_DIR.resolve()
+ROOT_STATIC_FILES = {
+    "apple-touch-icon.png",
+    "caero.png",
+    "caero.svg",
+    "favicon-96x96.png",
+    "favicon.ico",
+    "favicon.svg",
+    "site.webmanifest",
+    "web-app-manifest-192x192.png",
+    "web-app-manifest-512x512.png",
+}
 
 
 @asynccontextmanager
@@ -91,13 +101,9 @@ if assets_dir.exists():
 # ── SPA fallback ──────────────────────────────────────────────────────────────
 @app.get("/{full_path:path}", include_in_schema=False)
 async def spa_fallback(full_path: str):
-    if full_path:
-        candidate = (STATIC_DIR_RESOLVED / full_path).resolve()
-        try:
-            candidate.relative_to(STATIC_DIR_RESOLVED)
-        except ValueError:
-            candidate = None
-        if candidate and candidate.is_file():
+    if full_path in ROOT_STATIC_FILES:
+        candidate = STATIC_DIR / full_path
+        if candidate.is_file():
             return FileResponse(candidate)
 
     index = STATIC_DIR / "index.html"
