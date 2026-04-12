@@ -199,7 +199,7 @@ export default function ProductDetail() {
               target="_blank"
               rel="noopener noreferrer"
               title={product.url}
-              className="text-sm text-indigo-500 hover:underline block w-full max-w-[50%] text-center truncate"
+              className="text-sm text-indigo-500 hover:underline block max-w-[50%] text-center truncate"
             >
               {product.url}
             </a>
