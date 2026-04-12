@@ -16,6 +16,7 @@ export default function AddProduct() {
   const [form, setForm] = useState({
     name: '',
     category: '',
+    memo: '',
     tags: '',
     image_url: '',
     url: '',
@@ -30,6 +31,7 @@ export default function AddProduct() {
       {
         ...form,
         category: form.category || null,
+        memo: form.memo || null,
         image_url: form.image_url || null,
         tags: form.tags
           .split(',')
@@ -85,6 +87,17 @@ export default function AddProduct() {
             value={form.tags}
             onChange={(e) => setForm({ ...form, tags: e.target.value })}
             placeholder="comma,separated,tags"
+            className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Memo</label>
+          <textarea
+            value={form.memo}
+            onChange={(e) => setForm({ ...form, memo: e.target.value })}
+            placeholder="Optional notes for this product"
+            rows={4}
             className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
           />
         </div>

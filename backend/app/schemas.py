@@ -2,7 +2,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 # ── Users ────────────────────────────────────────────────────────────────────
@@ -36,6 +36,7 @@ class LoginRequest(BaseModel):
 class ProductCreate(BaseModel):
     name: str = Field(min_length=1, max_length=256)
     category: str | None = Field(default=None, max_length=128)
+    memo: str | None = None
     tags: list[str] = Field(default_factory=list)
     image_url: str | None = None
     url: str = Field(min_length=1)
@@ -58,6 +59,7 @@ class ProductCreate(BaseModel):
 class ProductUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=256)
     category: str | None = Field(default=None, max_length=128)
+    memo: str | None = None
     tags: list[str] | None = None
     image_url: str | None = None
     url: str | None = None
@@ -82,6 +84,7 @@ class ProductOut(BaseModel):
     user_id: int
     name: str
     category: str | None = None
+    memo: str | None = None
     tags: list[str] = Field(default_factory=list)
     image_url: str | None = None
     url: str
@@ -111,14 +114,23 @@ class PriceHistoryOut(BaseModel):
 
 # ── Alerts ────────────────────────────────────────────────────────────────────
 
-AlertCondition = Literal["below", "changed", "any_change"]
+AlertCondition = Literal["below", "changed", "any_change", "lowered"]
 
 
 class AlertCreate(BaseModel):
     condition: AlertCondition
     threshold_price: Decimal | None = None
-    email: str
+    email: str | None = None
+    telegram_chat_id: str | None = None
     active: bool = True
+
+    @model_validator(mode="after")
+    def validate_recipient(self) -> "AlertCreate":
+        if not (self.email and self.email.strip()) and not (
+            self.telegram_chat_id and self.telegram_chat_id.strip()
+        ):
+            raise ValueError("at least one recipient is required: email or telegram_chat_id")
+        return self
 
 
 class AlertOut(BaseModel):
@@ -126,7 +138,8 @@ class AlertOut(BaseModel):
     product_id: int
     condition: str
     threshold_price: Decimal | None
-    email: str
+    email: str | None
+    telegram_chat_id: str | None
     active: bool
 
     model_config = {"from_attributes": True}

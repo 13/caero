@@ -26,7 +26,7 @@ export default function Dashboard() {
     const query = searchTerm.trim().toLowerCase()
     if (!query) return products
     return products.filter((p) => {
-      const haystack = [p.name, p.category ?? '', p.url, ...p.tags].join(' ').toLowerCase()
+      const haystack = [p.name, p.category ?? '', p.memo ?? '', p.url, ...p.tags].join(' ').toLowerCase()
       return haystack.includes(query)
     })
   }, [products, searchTerm])

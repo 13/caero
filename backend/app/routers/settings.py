@@ -165,6 +165,7 @@ async def export_data(
                 "user_id": product.user_id,
                 "name": product.name,
                 "category": product.category,
+                "memo": product.memo,
                 "tags": product.tags,
                 "image_url": product.image_url,
                 "url": product.url,
@@ -192,6 +193,7 @@ async def export_data(
                 "condition": alert.condition,
                 "threshold_price": _serialize_decimal(alert.threshold_price),
                 "email": alert.email,
+                "telegram_chat_id": alert.telegram_chat_id,
                 "active": alert.active,
             }
             for alert in alerts
@@ -222,6 +224,7 @@ async def export_my_data(
                 "id": product.id,
                 "name": product.name,
                 "category": product.category,
+                "memo": product.memo,
                 "tags": product.tags,
                 "image_url": product.image_url,
                 "url": product.url,
@@ -249,6 +252,7 @@ async def export_my_data(
                 "condition": alert.condition,
                 "threshold_price": _serialize_decimal(alert.threshold_price),
                 "email": alert.email,
+                "telegram_chat_id": alert.telegram_chat_id,
                 "active": alert.active,
             }
             for alert in alerts
@@ -302,6 +306,7 @@ async def import_data(
                 user_id=product["user_id"],
                 name=product["name"],
                 category=product.get("category"),
+                memo=product.get("memo"),
                 tags=tags_value,
                 image_url=product.get("image_url"),
                 url=product["url"],
@@ -335,7 +340,8 @@ async def import_data(
                 threshold_price=Decimal(alert["threshold_price"])
                 if alert.get("threshold_price")
                 else None,
-                email=alert["email"],
+                email=alert.get("email"),
+                telegram_chat_id=alert.get("telegram_chat_id"),
                 active=alert.get("active", True),
             )
         )
@@ -403,6 +409,7 @@ async def import_my_data(
             user_id=user.id,
             name=product["name"],
             category=product.get("category"),
+            memo=product.get("memo"),
             tags=tags_value,
             image_url=product.get("image_url"),
             url=product["url"],
@@ -451,7 +458,8 @@ async def import_my_data(
                 threshold_price=Decimal(alert["threshold_price"])
                 if alert.get("threshold_price")
                 else None,
-                email=alert["email"],
+                email=alert.get("email"),
+                telegram_chat_id=alert.get("telegram_chat_id"),
                 active=alert.get("active", True),
             )
         )

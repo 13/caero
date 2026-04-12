@@ -15,6 +15,7 @@ export interface Product {
   user_id: number
   name: string
   category: string | null
+  memo: string | null
   tags: string[]
   image_url: string | null
   url: string
@@ -31,6 +32,7 @@ export interface Product {
 export interface ProductCreate {
   name: string
   category?: string | null
+  memo?: string | null
   tags?: string[]
   image_url?: string | null
   url: string
@@ -42,6 +44,7 @@ export interface ProductCreate {
 export interface ProductUpdate {
   name?: string
   category?: string | null
+  memo?: string | null
   tags?: string[]
   image_url?: string | null
   url?: string
@@ -61,16 +64,18 @@ export interface PriceHistory {
 export interface Alert {
   id: number
   product_id: number
-  condition: 'below' | 'changed' | 'any_change'
+  condition: 'below' | 'changed' | 'any_change' | 'lowered'
   threshold_price: string | null
-  email: string
+  email: string | null
+  telegram_chat_id: string | null
   active: boolean
 }
 
 export interface AlertCreate {
-  condition: 'below' | 'changed' | 'any_change'
+  condition: 'below' | 'changed' | 'any_change' | 'lowered'
   threshold_price?: string | null
-  email: string
+  email?: string | null
+  telegram_chat_id?: string | null
   active?: boolean
 }
 
