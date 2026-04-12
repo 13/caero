@@ -38,6 +38,11 @@ export default function Dashboard() {
     return sortDirection === 'asc' ? '↑' : '↓'
   }
 
+  const ariaSortFor = (key: SortBy): 'none' | 'ascending' | 'descending' => {
+    if (sortBy !== key) return 'none'
+    return sortDirection === 'asc' ? 'ascending' : 'descending'
+  }
+
   const sortedProducts = useMemo(() => {
     const items = [...filteredProducts]
     const direction = sortDirection === 'asc' ? 1 : -1
@@ -67,8 +72,8 @@ export default function Dashboard() {
 
     if (sortBy === 'last_change_percent') {
       items.sort((a, b) => {
-        const aChange = a.last_price_change_percent ? Math.abs(parseFloat(a.last_price_change_percent)) : null
-        const bChange = b.last_price_change_percent ? Math.abs(parseFloat(b.last_price_change_percent)) : null
+        const aChange = a.last_price_change_percent ? parseFloat(a.last_price_change_percent) : null
+        const bChange = b.last_price_change_percent ? parseFloat(b.last_price_change_percent) : null
         return compareNullableNumbers(aChange, bChange) * direction
       })
     }
@@ -141,6 +146,7 @@ export default function Dashboard() {
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           placeholder="Search products..."
+          aria-label="Search products by name, category, URL, or tags"
           className="flex-1 min-w-[180px] rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 px-3 py-1.5 text-sm"
         />
         <button
@@ -190,28 +196,48 @@ export default function Dashboard() {
                 <table className="w-full text-sm min-w-[640px]">
                   <thead className="bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-300">
                   <tr>
-                    <th className="text-left px-3 py-2">
-                      <button onClick={() => handleSort('name')} className="inline-flex items-center gap-1 hover:text-indigo-600">
+                    <th className="text-left px-3 py-2" aria-sort={ariaSortFor('name')}>
+                      <button
+                        onClick={() => handleSort('name')}
+                        aria-label={`Sort by name (${ariaSortFor('name')})`}
+                        className="inline-flex items-center gap-1 hover:text-indigo-600"
+                      >
                         Name <span>{sortIndicator('name')}</span>
                       </button>
                     </th>
-                    <th className="text-left px-3 py-2">
-                      <button onClick={() => handleSort('category')} className="inline-flex items-center gap-1 hover:text-indigo-600">
+                    <th className="text-left px-3 py-2" aria-sort={ariaSortFor('category')}>
+                      <button
+                        onClick={() => handleSort('category')}
+                        aria-label={`Sort by category (${ariaSortFor('category')})`}
+                        className="inline-flex items-center gap-1 hover:text-indigo-600"
+                      >
                         Category <span>{sortIndicator('category')}</span>
                       </button>
                     </th>
-                    <th className="text-left px-3 py-2">
-                      <button onClick={() => handleSort('latest_price')} className="inline-flex items-center gap-1 hover:text-indigo-600">
+                    <th className="text-left px-3 py-2" aria-sort={ariaSortFor('latest_price')}>
+                      <button
+                        onClick={() => handleSort('latest_price')}
+                        aria-label={`Sort by price (${ariaSortFor('latest_price')})`}
+                        className="inline-flex items-center gap-1 hover:text-indigo-600"
+                      >
                         Price <span>{sortIndicator('latest_price')}</span>
                       </button>
                     </th>
-                    <th className="text-left px-3 py-2">
-                      <button onClick={() => handleSort('last_change_percent')} className="inline-flex items-center gap-1 hover:text-indigo-600">
+                    <th className="text-left px-3 py-2" aria-sort={ariaSortFor('last_change_percent')}>
+                      <button
+                        onClick={() => handleSort('last_change_percent')}
+                        aria-label={`Sort by last change (${ariaSortFor('last_change_percent')})`}
+                        className="inline-flex items-center gap-1 hover:text-indigo-600"
+                      >
                         Last change <span>{sortIndicator('last_change_percent')}</span>
                       </button>
                     </th>
-                    <th className="text-left px-3 py-2">
-                      <button onClick={() => handleSort('last_change_date')} className="inline-flex items-center gap-1 hover:text-indigo-600">
+                    <th className="text-left px-3 py-2" aria-sort={ariaSortFor('last_change_date')}>
+                      <button
+                        onClick={() => handleSort('last_change_date')}
+                        aria-label={`Sort by date (${ariaSortFor('last_change_date')})`}
+                        className="inline-flex items-center gap-1 hover:text-indigo-600"
+                      >
                         Date <span>{sortIndicator('last_change_date')}</span>
                       </button>
                     </th>
