@@ -262,9 +262,9 @@ async def import_data(
     _admin: User = Depends(require_admin),
 ) -> dict[str, str]:
     skipped_price_rows = 0
-    existing_products = (await db.execute(select(Product))).scalars().all()
-    for product in existing_products:
-        remove_product_job(product.id)
+    existing_product_ids = (await db.execute(select(Product.id))).scalars().all()
+    for product_id in existing_product_ids:
+        remove_product_job(product_id)
 
     await db.execute(Alert.__table__.delete())
     await db.execute(PriceHistory.__table__.delete())
