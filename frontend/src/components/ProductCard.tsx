@@ -28,11 +28,11 @@ export default function ProductCard({ product }: ProductCardProps) {
     <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-4 flex flex-col gap-3">
       <div className="flex-1 min-w-0">
         {product.image_url && (
-          <div className="w-full min-h-[150px] max-h-[150px] flex items-center justify-center rounded-lg mb-2 border border-gray-200 dark:border-gray-800">
+          <div className="w-full h-[150px] overflow-hidden flex items-center justify-center rounded-lg mb-2 border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-950 p-2">
             <img
               src={product.image_url}
               alt={product.name}
-              className="w-full h-full object-contain"
+              className="max-w-full max-h-full w-auto h-auto object-contain"
               loading="lazy"
             />
           </div>
