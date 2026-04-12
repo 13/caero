@@ -17,8 +17,9 @@ import {
   useUsers,
 } from '../api/hooks'
 import type { AppSettings } from '../api/types'
+import CaeroBrand from '../components/CaeroBrand'
 import DbSelector from '../components/DbSelector'
-import { APP_NAME, APP_TAGLINE, APP_VERSION } from '../constants/appInfo'
+import { APP_DESCRIPTION, APP_TAGLINE, APP_VERSION } from '../constants/appInfo'
 
 function downloadJson(data: unknown, filename: string) {
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
@@ -243,6 +244,7 @@ export default function Setup() {
                       date_format: e.target.value as AppSettings['date_format'],
                     })
                   }
+                  style={{ colorScheme: 'light dark' }}
                   className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 px-3 py-2 text-sm"
                 >
                   <option value="DD.MM.YYYY">DD.MM.YYYY (German default)</option>
@@ -250,19 +252,6 @@ export default function Setup() {
                   <option value="MM/DD/YYYY">MM/DD/YYYY</option>
                   <option value="YYYY-MM-DD">YYYY-MM-DD</option>
                 </select>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="allow_registration"
-                  checked={form.allow_registration}
-                  onChange={(e) => setForm({ ...form, allow_registration: e.target.checked })}
-                  className="rounded text-indigo-600"
-                />
-                <label htmlFor="allow_registration" className="text-sm text-gray-700 dark:text-gray-300">
-                  Allow registration of new users
-                </label>
               </div>
 
               {switchWarning && (
@@ -355,6 +344,18 @@ export default function Setup() {
 
           <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5 space-y-4">
             <h2 className="font-semibold text-gray-800 dark:text-gray-100">Admin — User management</h2>
+            <div className="pt-1 pb-3 border-b border-gray-200 dark:border-gray-800">
+              <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                <input
+                  type="checkbox"
+                  id="allow_registration"
+                  checked={form.allow_registration}
+                  onChange={(e) => setForm({ ...form, allow_registration: e.target.checked })}
+                  className="rounded text-indigo-600"
+                />
+                Allow registration of new users
+              </label>
+            </div>
             <form
               onSubmit={(e) => {
                 e.preventDefault()
@@ -480,9 +481,8 @@ export default function Setup() {
 
       <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5 space-y-2">
         <h2 className="font-semibold text-gray-800 dark:text-gray-100">About</h2>
-        <p className="text-sm text-gray-600 dark:text-gray-300">
-          {APP_NAME} — {APP_TAGLINE}
-        </p>
+        <CaeroBrand subtitle={APP_TAGLINE} logoAriaHidden={false} />
+        <p className="text-sm text-gray-600 dark:text-gray-300">{APP_DESCRIPTION}</p>
         <p className="text-sm text-gray-600 dark:text-gray-300">Version: v{APP_VERSION}</p>
       </div>
 

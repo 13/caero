@@ -17,7 +17,7 @@ export default function DbSelector({ value, onChange }: DbSelectorProps) {
           onClick={() => onChange({ ...value, db_type: 'sqlite' })}
           className={`relative rounded-xl border-2 p-4 text-left transition-colors ${
             !isPostgres
-              ? 'border-indigo-500 bg-indigo-50'
+              ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/40'
               : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
           }`}
         >
@@ -36,7 +36,7 @@ export default function DbSelector({ value, onChange }: DbSelectorProps) {
           onClick={() => onChange({ ...value, db_type: 'postgresql' })}
           className={`rounded-xl border-2 p-4 text-left transition-colors ${
             isPostgres
-              ? 'border-indigo-500 bg-indigo-50'
+              ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/40'
               : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
           }`}
         >
