@@ -1,6 +1,10 @@
-# caero
+# <img src="frontend/public/caero.png" width="30" height="30" /> caero
 
-Self-hosted price tracker.
+zero price tracker
+
+<p align="center">
+  <img src="assets/screenshot.png" width="640" />
+</p>
 
 ## Run with Docker (recommended)
 
