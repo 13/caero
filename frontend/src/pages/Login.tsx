@@ -11,13 +11,19 @@ export default function Login() {
   const [mode, setMode] = useState<'login' | 'register'>('login')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
+  const [registerPasswordError, setRegisterPasswordError] = useState<string | null>(null)
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+    setRegisterPasswordError(null)
     if (mode === 'login') {
       loginMutation.mutate({ username, password }, { onSuccess: () => navigate('/') })
     } else {
       if (!registerStatus?.enabled) return
+      if (password.length < 5) {
+        setRegisterPasswordError('Password must be at least 5 characters long.')
+        return
+      }
       registerMutation.mutate(
         { username, password },
         { onSuccess: () => setMode('login') }
@@ -25,7 +31,7 @@ export default function Login() {
     }
   }
 
-  const error = loginMutation.error ?? registerMutation.error
+  const error = registerPasswordError ?? loginMutation.error?.message ?? registerMutation.error?.message
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950 px-4">
@@ -36,7 +42,7 @@ export default function Login() {
 
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm mb-4">
-            {error.message}
+            {error}
           </div>
         )}
 
@@ -57,6 +63,7 @@ export default function Login() {
             <input
               required
               type="password"
+              minLength={5}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
