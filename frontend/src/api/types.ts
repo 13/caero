@@ -143,3 +143,9 @@ export interface DataExportPayload {
   price_history: Record<string, unknown>[]
   alerts: Record<string, unknown>[]
 }
+
+export interface UserDataExportPayload {
+  products: Record<string, unknown>[]
+  price_history: Record<string, unknown>[]
+  alerts: Record<string, unknown>[]
+}

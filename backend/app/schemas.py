@@ -216,3 +216,9 @@ class DataExportPayload(BaseModel):
     products: list[dict[str, Any]]
     price_history: list[dict[str, Any]]
     alerts: list[dict[str, Any]]
+
+
+class UserDataExportPayload(BaseModel):
+    products: list[dict[str, Any]]
+    price_history: list[dict[str, Any]]
+    alerts: list[dict[str, Any]]

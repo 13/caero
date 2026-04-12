@@ -18,6 +18,7 @@ import type {
   TestDbResponse,
   Token,
   User,
+  UserDataExportPayload,
 } from './types'
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
@@ -273,5 +274,44 @@ export function useImportData() {
       qc.invalidateQueries({ queryKey: ['users'] })
       qc.invalidateQueries({ queryKey: ['me'] })
     },
+  })
+}
+
+export function useExportMyData() {
+  return useMutation<UserDataExportPayload, Error, void>({
+    mutationFn: () => apiFetch<UserDataExportPayload>('/api/settings/export/mine'),
+  })
+}
+
+export function useImportMyData() {
+  const qc = useQueryClient()
+  return useMutation<{ message: string }, Error, UserDataExportPayload>({
+    mutationFn: (body) =>
+      apiFetch<{ message: string }>('/api/settings/import/mine', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['products'] })
+      qc.invalidateQueries({ queryKey: ['users'] })
+      qc.invalidateQueries({ queryKey: ['me'] })
+    },
+  })
+}
+
+export function useDeleteMyProducts() {
+  const qc = useQueryClient()
+  return useMutation<void, Error, void>({
+    mutationFn: () => apiFetch<void>('/api/settings/products/mine', { method: 'DELETE' }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['products'] }),
+  })
+}
+
+export function useAdminDeleteUserProducts() {
+  const qc = useQueryClient()
+  return useMutation<{ message: string }, Error, number>({
+    mutationFn: (userId) =>
+      apiFetch<{ message: string }>(`/api/settings/users/${userId}/products`, { method: 'DELETE' }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['products'] }),
   })
 }
