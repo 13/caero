@@ -139,16 +139,16 @@ export default function Setup() {
 
   return (
     <div className="max-w-xl mx-auto px-4 py-8">
-      <h1 className="text-2xl font-bold text-gray-900 mb-2">Settings</h1>
-      <p className="text-gray-500 text-sm mb-6">Configure your Caero instance</p>
+      <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">Settings</h1>
+      <p className="text-gray-500 dark:text-gray-400 text-sm mb-6">Configure your Caero instance</p>
 
       <form onSubmit={handleSave} className="space-y-6">
         {/* DB section */}
-        <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
-          <h2 className="font-semibold text-gray-800">Database</h2>
+        <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5 space-y-4">
+          <h2 className="font-semibold text-gray-800 dark:text-gray-100">Database</h2>
           <DbSelector value={form} onChange={setForm} />
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Date format</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Date format</label>
             <select
               value={form.date_format}
               onChange={(e) =>
@@ -157,7 +157,7 @@ export default function Setup() {
                   date_format: e.target.value as AppSettings['date_format'],
                 })
               }
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+              className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 px-3 py-2 text-sm"
             >
               <option value="DD.MM.YYYY">DD.MM.YYYY (German default)</option>
               <option value="DD/MM/YYYY">DD/MM/YYYY</option>
@@ -174,7 +174,7 @@ export default function Setup() {
                 onChange={(e) => setForm({ ...form, allow_registration: e.target.checked })}
                 className="rounded text-indigo-600"
               />
-              <label htmlFor="allow_registration" className="text-sm text-gray-700">
+              <label htmlFor="allow_registration" className="text-sm text-gray-700 dark:text-gray-300">
                 Allow registration of new users
               </label>
             </div>
@@ -212,8 +212,8 @@ export default function Setup() {
               type="button"
               onClick={handleTest}
               disabled={testDbMutation.isPending}
-              className="px-3 py-1.5 rounded-lg border border-gray-300 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-            >
+                className="px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-700 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50"
+              >
               {testDbMutation.isPending ? 'Testing…' : 'Test connection'}
             </button>
             {testDbMutation.data && (
@@ -233,27 +233,27 @@ export default function Setup() {
           </div>
         </div>
 
-        <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
-          <h2 className="font-semibold text-gray-800">Change password</h2>
-          <form onSubmit={handlePasswordChange} className="grid sm:grid-cols-3 gap-3 items-end">
+        <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5 space-y-4">
+          <h2 className="font-semibold text-gray-800 dark:text-gray-100">Change password</h2>
+            <form onSubmit={handlePasswordChange} className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
             <div>
-              <label className="text-xs font-medium text-gray-600 mb-1 block">Current password</label>
+              <label className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1 block">Current password</label>
               <input
                 type="password"
                 required
                 value={currentPassword}
                 onChange={(e) => setCurrentPassword(e.target.value)}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 px-3 py-2 text-sm"
               />
             </div>
             <div>
-              <label className="text-xs font-medium text-gray-600 mb-1 block">New password</label>
+              <label className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1 block">New password</label>
               <input
                 type="password"
                 required
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 px-3 py-2 text-sm"
               />
             </div>
             <button
@@ -267,18 +267,18 @@ export default function Setup() {
         </div>
 
         {me?.is_admin && (
-          <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
-            <h2 className="font-semibold text-gray-800">Import / Export</h2>
+           <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5 space-y-4">
+             <h2 className="font-semibold text-gray-800 dark:text-gray-100">Import / Export</h2>
             <div className="flex flex-wrap items-center gap-3">
               <button
                 type="button"
                 onClick={handleExport}
                 disabled={exportDataMutation.isPending}
-                className="px-4 py-2 rounded-lg border border-gray-300 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50"
               >
                 Export all data
               </button>
-              <label className="px-4 py-2 rounded-lg border border-gray-300 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer">
+              <label className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer">
                 Import all data
                 <input
                   type="file"
@@ -293,8 +293,8 @@ export default function Setup() {
         )}
 
         {me?.is_admin && (
-          <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
-            <h2 className="font-semibold text-gray-800">User management (admin)</h2>
+          <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5 space-y-4">
+            <h2 className="font-semibold text-gray-800 dark:text-gray-100">User management (admin)</h2>
             <form
               onSubmit={(e) => {
                 e.preventDefault()
@@ -313,28 +313,28 @@ export default function Setup() {
                   }
                 )
               }}
-              className="grid sm:grid-cols-4 gap-3 items-end"
+              className="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end"
             >
               <div>
-                <label className="text-xs font-medium text-gray-600 mb-1 block">Username</label>
+                <label className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1 block">Username</label>
                 <input
                   required
                   value={newUserName}
                   onChange={(e) => setNewUserName(e.target.value)}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                  className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 px-3 py-2 text-sm"
                 />
               </div>
               <div>
-                <label className="text-xs font-medium text-gray-600 mb-1 block">Password</label>
+                <label className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1 block">Password</label>
                 <input
                   required
                   type="password"
                   value={newUserPassword}
                   onChange={(e) => setNewUserPassword(e.target.value)}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                  className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 px-3 py-2 text-sm"
                 />
               </div>
-              <label className="flex items-center gap-2 text-sm text-gray-700 pb-2">
+              <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 pb-2">
                 <input
                   type="checkbox"
                   checked={newUserAdmin}
@@ -355,10 +355,10 @@ export default function Setup() {
               {users.map((user) => (
                 <li
                   key={user.id}
-                  className="border border-gray-200 rounded-lg px-3 py-2 flex flex-col gap-2"
+                  className="border border-gray-200 dark:border-gray-800 rounded-lg px-3 py-2 flex flex-col gap-2"
                 >
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-gray-800">
+                    <span className="text-sm font-medium text-gray-800 dark:text-gray-200">
                       {user.username} {user.is_admin ? '(admin)' : ''}
                     </span>
                     <button
@@ -381,9 +381,9 @@ export default function Setup() {
                           [user.id]: e.target.value,
                         })
                       }
-                      className="rounded-lg border border-gray-300 px-2 py-1 text-sm flex-1"
-                    />
-                    <button
+                       className="rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 px-2 py-1 text-sm flex-1"
+                     />
+                     <button
                       type="button"
                       disabled={!resetPasswordByUserId[user.id]?.trim()}
                       onClick={() =>
@@ -392,8 +392,8 @@ export default function Setup() {
                           body: { new_password: resetPasswordByUserId[user.id] ?? '' },
                         })
                       }
-                      className="px-3 py-1 rounded-lg bg-gray-100 text-gray-700 text-sm disabled:opacity-50"
-                    >
+                       className="px-3 py-1 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 text-sm disabled:opacity-50"
+                     >
                       Set password
                     </button>
                   </div>

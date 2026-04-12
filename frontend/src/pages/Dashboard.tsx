@@ -42,8 +42,8 @@ export default function Dashboard() {
   }
 
   if (error) {
-    return (
-      <div className="text-center py-16 text-red-500">
+      return (
+      <div className="text-center py-16 text-red-500 dark:text-red-400">
         Failed to load products: {error.message}
       </div>
     )
@@ -51,10 +51,10 @@ export default function Dashboard() {
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-8">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Tracked Products</h1>
-          <p className="text-gray-500 text-sm mt-1">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Tracked Products</h1>
+          <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">
             {products?.length ?? 0} product{products?.length !== 1 ? 's' : ''} tracked
           </p>
         </div>
@@ -65,11 +65,11 @@ export default function Dashboard() {
           + Add product
         </Link>
       </div>
-      <div className="bg-white rounded-xl border border-gray-200 p-3 mb-4 flex items-center gap-3">
+      <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-3 mb-4 flex flex-wrap items-center gap-3">
         <select
           value={sortBy}
           onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-          className="rounded-lg border border-gray-300 px-2 py-1.5 text-sm"
+          className="rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 px-2 py-1.5 text-sm"
         >
           <option value="name">Sort by name</option>
           <option value="category">Sort by category</option>
@@ -79,7 +79,9 @@ export default function Dashboard() {
         <button
           onClick={() => setView('grid')}
           className={`px-3 py-1.5 text-sm rounded-lg ${
-            view === 'grid' ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 text-gray-600'
+            view === 'grid'
+              ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-200'
+              : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'
           }`}
         >
           Grid
@@ -87,7 +89,9 @@ export default function Dashboard() {
         <button
           onClick={() => setView('list')}
           className={`px-3 py-1.5 text-sm rounded-lg ${
-            view === 'list' ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 text-gray-600'
+            view === 'list'
+              ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-200'
+              : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'
           }`}
         >
           List
@@ -95,7 +99,7 @@ export default function Dashboard() {
       </div>
 
       {!products?.length ? (
-        <div className="text-center py-24 text-gray-400">
+        <div className="text-center py-24 text-gray-400 dark:text-gray-500">
           <p className="text-4xl mb-4">🛍️</p>
           <p className="text-lg font-medium">No products tracked yet</p>
           <p className="text-sm mt-2">
@@ -114,9 +118,10 @@ export default function Dashboard() {
               ))}
             </div>
           ) : (
-            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50 text-gray-600">
+            <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm min-w-[640px]">
+                  <thead className="bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-300">
                   <tr>
                     <th className="text-left px-3 py-2">Name</th>
                     <th className="text-left px-3 py-2">Category</th>
@@ -125,15 +130,15 @@ export default function Dashboard() {
                     <th className="text-left px-3 py-2">Date</th>
                   </tr>
                 </thead>
-                <tbody>
+                  <tbody>
                   {sortedProducts.map((p) => (
-                    <tr key={p.id} className="border-t border-gray-100">
+                    <tr key={p.id} className="border-t border-gray-100 dark:border-gray-800">
                       <td className="px-3 py-2">
                         <Link to={`/products/${p.id}`} className="text-indigo-600 hover:underline">
                           {p.name}
                         </Link>
                       </td>
-                      <td className="px-3 py-2">{p.category ?? '—'}</td>
+                      <td className="px-3 py-2 text-gray-700 dark:text-gray-300">{p.category ?? '—'}</td>
                       <td className="px-3 py-2">{formatPrice(p.latest_price)}</td>
                       <td className="px-3 py-2">{formatPercent(p.last_price_change_percent)}</td>
                       <td className="px-3 py-2">
@@ -141,8 +146,9 @@ export default function Dashboard() {
                       </td>
                     </tr>
                   ))}
-                </tbody>
-              </table>
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
         </>
