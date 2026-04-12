@@ -492,7 +492,7 @@ export default function Setup() {
           className="w-full justify-center"
         />
         <p className="text-sm text-gray-600 dark:text-gray-300 text-center">{APP_DESCRIPTION}</p>
-        <p className="text-sm text-gray-600 dark:text-gray-300">Version: v{APP_VERSION}</p>
+        <p className="text-sm text-gray-600 dark:text-gray-300 text-center">Version: v{APP_VERSION}</p>
       </div>
 
       {(saveMutation.error || changePasswordMutation.error || importDataMutation.error || importMyDataMutation.error) && (
