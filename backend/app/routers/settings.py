@@ -128,7 +128,7 @@ async def _delete_products(products: list[Product], db: AsyncSession) -> int:
 async def export_data(
     db: AsyncSession = Depends(get_db),
     _admin: User = Depends(require_admin),
-    ) -> DataExportPayload:
+) -> DataExportPayload:
     app_settings = await _get_or_create_settings(db)
     users = (await db.execute(select(User))).scalars().all()
     products = (await db.execute(select(Product))).scalars().all()
