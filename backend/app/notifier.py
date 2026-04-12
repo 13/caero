@@ -82,6 +82,12 @@ def send_alert(
             f"Your threshold: {threshold_price}\n"
             f"Product URL: {product_url}\n"
         )
+    elif condition == "lowered":
+        subject = f"[Caero] Price alert: {product_name} price lowered"
+        body = (
+            f"The price of {product_name} has been lowered to {current_price}.\n"
+            f"Product URL: {product_url}\n"
+        )
     else:
         subject = f"[Caero] Price change: {product_name}"
         body = (

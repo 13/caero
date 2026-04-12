@@ -77,7 +77,7 @@ class Alert(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     product_id: Mapped[int] = mapped_column(Integer, ForeignKey("products.id"), nullable=False)
     condition: Mapped[str] = mapped_column(
-        Enum("below", "changed", "any_change", name="alert_condition"), nullable=False
+        Enum("below", "changed", "any_change", "lowered", name="alert_condition"), nullable=False
     )
     threshold_price: Mapped[Decimal | None] = mapped_column(Numeric(10, 2), nullable=True)
     email: Mapped[str | None] = mapped_column(String(256), nullable=True)

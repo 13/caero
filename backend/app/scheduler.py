@@ -64,6 +64,8 @@ async def scrape_and_record(product_id: int) -> None:
             triggered = False
             if alert.condition == "below" and alert.threshold_price is not None:
                 triggered = price <= alert.threshold_price
+            elif alert.condition == "lowered":
+                triggered = prev is not None and price < prev.price
             elif alert.condition in ("changed", "any_change"):
                 triggered = prev is not None and price != prev.price
 

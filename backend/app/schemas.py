@@ -111,7 +111,7 @@ class PriceHistoryOut(BaseModel):
 
 # ── Alerts ────────────────────────────────────────────────────────────────────
 
-AlertCondition = Literal["below", "changed", "any_change"]
+AlertCondition = Literal["below", "changed", "any_change", "lowered"]
 
 
 class AlertCreate(BaseModel):

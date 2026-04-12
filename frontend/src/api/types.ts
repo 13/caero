@@ -61,7 +61,7 @@ export interface PriceHistory {
 export interface Alert {
   id: number
   product_id: number
-  condition: 'below' | 'changed' | 'any_change'
+  condition: 'below' | 'changed' | 'any_change' | 'lowered'
   threshold_price: string | null
   email: string | null
   telegram_chat_id: string | null
@@ -69,7 +69,7 @@ export interface Alert {
 }
 
 export interface AlertCreate {
-  condition: 'below' | 'changed' | 'any_change'
+  condition: 'below' | 'changed' | 'any_change' | 'lowered'
   threshold_price?: string | null
   email?: string | null
   telegram_chat_id?: string | null
