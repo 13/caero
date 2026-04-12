@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Pencil } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
   useAlerts,
@@ -197,7 +198,8 @@ export default function ProductDetail() {
               href={product.url}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-sm text-indigo-500 hover:underline block max-w-md text-center break-all"
+              title={product.url}
+              className="text-sm text-indigo-500 hover:underline block w-full max-w-[50%] text-center truncate"
             >
               {product.url}
             </a>
@@ -440,9 +442,11 @@ export default function ProductDetail() {
                           active: alert.active,
                         })
                       }
+                      title="Edit alert"
+                      aria-label="Edit alert"
                       className="text-indigo-500 hover:text-indigo-700"
                     >
-                      Edit
+                      <Pencil className="h-4 w-4" />
                     </button>
                     <button
                       onClick={() => deleteAlertMutation.mutate(alert.id)}
