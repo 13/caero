@@ -48,9 +48,9 @@ export default function PriceChart({ data, currency = 'EUR' }: PriceChartProps) 
 
   const chartData = useMemo(
     () =>
-      data.map((d) => ({
-        date: new Date(d.scraped_at).getTime(),
-        price: parseFloat(d.price),
+      data.map((dataPoint) => ({
+        date: new Date(dataPoint.scraped_at).getTime(),
+        price: parseFloat(dataPoint.price),
       })),
     [data]
   )
@@ -70,7 +70,7 @@ export default function PriceChart({ data, currency = 'EUR' }: PriceChartProps) 
         <XAxis
           dataKey="date"
           tick={{ fontSize: 11, fill: 'var(--chart-axis)' }}
-          tickFormatter={(value: number) => formatDate(value)}
+          tickFormatter={(timestamp: number) => formatDate(timestamp)}
         />
         <YAxis
           tick={{ fontSize: 11, fill: 'var(--chart-axis)' }}

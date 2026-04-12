@@ -10,8 +10,12 @@ import Setup from './pages/Setup'
 type Theme = 'light' | 'dark'
 
 function resolveInitialTheme(): Theme {
-  const stored = localStorage.getItem('theme')
-  if (stored === 'light' || stored === 'dark') return stored
+  try {
+    const stored = localStorage.getItem('theme')
+    if (stored === 'light' || stored === 'dark') return stored
+  } catch {
+    // Ignore localStorage access issues and fallback to system preference.
+  }
   return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
 }
 
@@ -68,7 +72,11 @@ export default function App() {
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', theme === 'dark')
-    localStorage.setItem('theme', theme)
+    try {
+      localStorage.setItem('theme', theme)
+    } catch {
+      // Ignore localStorage access issues.
+    }
   }, [theme])
 
   if (isLoading) {
