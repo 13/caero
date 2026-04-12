@@ -1,6 +1,6 @@
 import logging
 
-from sqlalchemy import inspect, text
+from sqlalchemy import inspect
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy.schema import CreateColumn
@@ -44,10 +44,10 @@ async def create_tables() -> None:
         await conn.run_sync(_add_missing_columns_for_existing_tables)
 
 
-def _add_missing_columns_for_existing_tables(sync_conn) -> None:
-    inspector = inspect(sync_conn)
+def _add_missing_columns_for_existing_tables(connection) -> None:
+    inspector = inspect(connection)
     existing_tables = set(inspector.get_table_names())
-    preparer = sync_conn.dialect.identifier_preparer
+    preparer = connection.dialect.identifier_preparer
 
     for table in Base.metadata.sorted_tables:
         if table.name not in existing_tables:
@@ -74,7 +74,15 @@ def _add_missing_columns_for_existing_tables(sync_conn) -> None:
                 )
                 continue
 
-            column_sql = str(CreateColumn(column).compile(dialect=sync_conn.dialect))
+            column_sql = str(CreateColumn(column).compile(dialect=connection.dialect))
             table_sql = preparer.quote(table.name)
-            sync_conn.execute(text(f"ALTER TABLE {table_sql} ADD COLUMN {column_sql}"))
-            logger.info("Added missing column %s.%s", table.name, column.name)
+            try:
+                connection.exec_driver_sql(f"ALTER TABLE {table_sql} ADD COLUMN {column_sql}")
+                logger.info("Added missing column %s.%s", table.name, column.name)
+            except Exception as exc:
+                logger.warning(
+                    "Could not backfill missing column %s.%s: %s",
+                    table.name,
+                    column.name,
+                    exc,
+                )
