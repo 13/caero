@@ -199,8 +199,7 @@ export default function ProductDetail() {
               target="_blank"
               rel="noopener noreferrer"
               title={product.url}
-              aria-label={`Open product page for ${product.name}`}
-              className="text-sm text-indigo-500 hover:underline focus:underline block max-w-[50%] text-left truncate focus:max-w-md focus:whitespace-normal focus:break-all"
+              className="text-sm text-indigo-500 hover:underline block max-w-[50%] text-left truncate"
             >
               {product.url}
             </a>
