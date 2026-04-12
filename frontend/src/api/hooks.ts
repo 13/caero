@@ -16,6 +16,9 @@ import type {
   ProductUpdate,
   TestDbRequest,
   TestDbResponse,
+  TestEmailRequest,
+  TestNotificationResponse,
+  TestTelegramRequest,
   Token,
   User,
   UserDataExportPayload,
@@ -181,6 +184,18 @@ export function useDeleteAlert(productId: number) {
   })
 }
 
+export function useUpdateAlert(productId: number) {
+  const qc = useQueryClient()
+  return useMutation<Alert, Error, { alertId: number; body: AlertCreate }>({
+    mutationFn: ({ alertId, body }) =>
+      apiFetch<Alert>(`/api/alerts/${alertId}`, {
+        method: 'PATCH',
+        body: JSON.stringify(body),
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['alerts', productId] }),
+  })
+}
+
 // ── Settings ──────────────────────────────────────────────────────────────────
 
 export function useSettings() {
@@ -203,6 +218,26 @@ export function useTestDb() {
   return useMutation<TestDbResponse, Error, TestDbRequest>({
     mutationFn: (body) =>
       apiFetch<TestDbResponse>('/api/settings/test-db', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+  })
+}
+
+export function useTestEmail() {
+  return useMutation<TestNotificationResponse, Error, TestEmailRequest>({
+    mutationFn: (body) =>
+      apiFetch<TestNotificationResponse>('/api/settings/test-email', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+  })
+}
+
+export function useTestTelegram() {
+  return useMutation<TestNotificationResponse, Error, TestTelegramRequest>({
+    mutationFn: (body) =>
+      apiFetch<TestNotificationResponse>('/api/settings/test-telegram', {
         method: 'POST',
         body: JSON.stringify(body),
       }),

@@ -107,6 +107,19 @@ export interface TestDbResponse {
   message: string
 }
 
+export interface TestEmailRequest {
+  email: string
+}
+
+export interface TestTelegramRequest {
+  chat_id: string
+}
+
+export interface TestNotificationResponse {
+  status: 'sent' | 'error'
+  message: string
+}
+
 export interface CheckResult {
   product_id: number
   price: string | null

@@ -10,6 +10,7 @@ import {
   useProduct,
   useProductStats,
   useSettings,
+  useUpdateAlert,
   useUpdateProduct,
 } from '../api/hooks'
 import type { AlertCreate } from '../api/types'
@@ -25,6 +26,14 @@ import {
   normalizeIntervalHoursToMinutes,
 } from '../utils/format'
 import { getTagColorClass } from '../utils/tags'
+
+const createDefaultAlertForm = (): AlertCreate => ({
+  condition: 'below',
+  threshold_price: null,
+  email: null,
+  telegram_chat_id: null,
+  active: true,
+})
 
 export default function ProductDetail() {
   const { id } = useParams<{ id: string }>()
@@ -42,6 +51,7 @@ export default function ProductDetail() {
   const checkMutation = useCheckProduct()
   const deleteAlertMutation = useDeleteAlert(productId)
   const createAlertMutation = useCreateAlert(productId)
+  const updateAlertMutation = useUpdateAlert(productId)
 
   const [editMode, setEditMode] = useState(false)
   const [editForm, setEditForm] = useState({
@@ -56,13 +66,9 @@ export default function ProductDetail() {
     active: true,
   })
 
-  const [alertForm, setAlertForm] = useState<AlertCreate>({
-    condition: 'below',
-    threshold_price: null,
-    email: null,
-    telegram_chat_id: null,
-    active: true,
-  })
+  const [alertForm, setAlertForm] = useState<AlertCreate>(createDefaultAlertForm)
+  const [editingAlertId, setEditingAlertId] = useState<number | null>(null)
+  const [alertEditForm, setAlertEditForm] = useState<AlertCreate>(createDefaultAlertForm)
 
   const handleEdit = () => {
     if (product) {
@@ -107,15 +113,37 @@ export default function ProductDetail() {
   const handleAddAlert = (e: React.FormEvent) => {
     e.preventDefault()
     createAlertMutation.mutate(alertForm, {
-      onSuccess: () =>
-        setAlertForm({
-          condition: 'below',
-          threshold_price: null,
-          email: null,
-          telegram_chat_id: null,
-          active: true,
-        }),
+      onSuccess: () => setAlertForm(createDefaultAlertForm()),
     })
+  }
+
+  const startEditAlert = (
+    alert: {
+      id: number
+      condition: AlertCreate['condition']
+      threshold_price: string | null
+      email: string | null
+      telegram_chat_id: string | null
+      active: boolean
+    }
+  ) => {
+    setEditingAlertId(alert.id)
+    setAlertEditForm({
+      condition: alert.condition,
+      threshold_price: alert.threshold_price,
+      email: alert.email,
+      telegram_chat_id: alert.telegram_chat_id,
+      active: alert.active,
+    })
+  }
+
+  const handleUpdateAlert = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editingAlertId) return
+    updateAlertMutation.mutate(
+      { alertId: editingAlertId, body: alertEditForm },
+      { onSuccess: () => setEditingAlertId(null) }
+    )
   }
 
   if (isLoading || !product) {
@@ -373,29 +401,135 @@ export default function ProductDetail() {
         {alerts.length > 0 && (
           <ul className="space-y-2 mb-4">
             {alerts.map((alert) => (
-              <li
-                key={alert.id}
-                className="flex items-center justify-between text-sm bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2"
-              >
-                <div>
-                  <span className="font-medium text-gray-800 dark:text-gray-200 capitalize">
-                    {alert.condition.replace('_', ' ')}
-                  </span>
-                  {alert.threshold_price && (
-                    <span className="text-gray-500 dark:text-gray-400 ml-1">
-                      € {parseFloat(alert.threshold_price).toFixed(2)}
+              <li key={alert.id} className="text-sm bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2 space-y-2">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <span className="font-medium text-gray-800 dark:text-gray-200 capitalize">
+                      {alert.condition.replace('_', ' ')}
                     </span>
-                  )}
-                  <span className="text-gray-400 dark:text-gray-500 ml-2">
-                    → {[alert.email, alert.telegram_chat_id ? `tg:${alert.telegram_chat_id}` : null].filter(Boolean).join(' • ')}
-                  </span>
+                    {alert.threshold_price && (
+                      <span className="text-gray-500 dark:text-gray-400 ml-1">
+                        € {parseFloat(alert.threshold_price).toFixed(2)}
+                      </span>
+                    )}
+                    <span
+                      className={`ml-2 px-2 py-0.5 rounded-full text-xs font-medium ${
+                        alert.active
+                          ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300'
+                          : 'bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-300'
+                      }`}
+                    >
+                      {alert.active ? 'active' : 'inactive'}
+                    </span>
+                    <span className="text-gray-400 dark:text-gray-500 ml-2">
+                      → {[alert.email, alert.telegram_chat_id ? `tg:${alert.telegram_chat_id}` : null].filter(Boolean).join(' • ')}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        startEditAlert({
+                          id: alert.id,
+                          condition: alert.condition as AlertCreate['condition'],
+                          threshold_price: alert.threshold_price,
+                          email: alert.email,
+                          telegram_chat_id: alert.telegram_chat_id,
+                          active: alert.active,
+                        })
+                      }
+                      className="text-indigo-500 hover:text-indigo-700"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => deleteAlertMutation.mutate(alert.id)}
+                      className="text-red-400 hover:text-red-600"
+                    >
+                      ✕
+                    </button>
+                  </div>
                 </div>
-                <button
-                  onClick={() => deleteAlertMutation.mutate(alert.id)}
-                  className="text-red-400 hover:text-red-600 ml-4"
-                >
-                  ✕
-                </button>
+                {editingAlertId === alert.id && (
+                  <form onSubmit={handleUpdateAlert} className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <select
+                      value={alertEditForm.condition}
+                      onChange={(e) =>
+                        setAlertEditForm({
+                          ...alertEditForm,
+                          condition: e.target.value as AlertCreate['condition'],
+                        })
+                      }
+                      className="rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-1.5"
+                    >
+                      <option value="below">Below threshold</option>
+                      <option value="lowered">Price lowered</option>
+                      <option value="changed">Price changed</option>
+                      <option value="any_change">Any change</option>
+                    </select>
+                    {alertEditForm.condition === 'below' && (
+                      <input
+                        type="number"
+                        step="0.01"
+                        min={0}
+                        value={alertEditForm.threshold_price ?? ''}
+                        onChange={(e) =>
+                          setAlertEditForm({ ...alertEditForm, threshold_price: e.target.value || null })
+                        }
+                        placeholder="Threshold price"
+                        className="rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-1.5"
+                      />
+                    )}
+                    <input
+                      type="email"
+                      value={alertEditForm.email ?? ''}
+                      onChange={(e) =>
+                        setAlertEditForm({
+                          ...alertEditForm,
+                          email: e.target.value.trim() ? e.target.value : null,
+                        })
+                      }
+                      placeholder="you@example.com"
+                      className="rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-1.5"
+                    />
+                    <input
+                      type="text"
+                      value={alertEditForm.telegram_chat_id ?? ''}
+                      onChange={(e) =>
+                        setAlertEditForm({
+                          ...alertEditForm,
+                          telegram_chat_id: e.target.value.trim() ? e.target.value : null,
+                        })
+                      }
+                      placeholder="Telegram chat ID"
+                      className="rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-1.5"
+                    />
+                    <label className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300">
+                      <input
+                        type="checkbox"
+                        checked={alertEditForm.active}
+                        onChange={(e) => setAlertEditForm({ ...alertEditForm, active: e.target.checked })}
+                      />
+                      Active
+                    </label>
+                    <div className="flex gap-2">
+                      <button
+                        type="submit"
+                        disabled={updateAlertMutation.isPending}
+                        className="px-3 py-1 rounded bg-indigo-600 text-white disabled:opacity-50"
+                      >
+                        Save
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditingAlertId(null)}
+                        className="px-3 py-1 rounded border border-gray-300 dark:border-gray-700"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </form>
+                )}
               </li>
             ))}
           </ul>
@@ -471,6 +605,16 @@ export default function ProductDetail() {
             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
               Provide email, Telegram chat ID, or both.
             </p>
+          </div>
+          <div className="sm:col-span-2">
+            <label className="inline-flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
+              <input
+                type="checkbox"
+                checked={alertForm.active}
+                onChange={(e) => setAlertForm({ ...alertForm, active: e.target.checked })}
+              />
+              Active
+            </label>
           </div>
           <div className="sm:col-span-2">
             <button
