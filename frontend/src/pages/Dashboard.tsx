@@ -139,7 +139,6 @@ export default function Dashboard() {
         <button
           onClick={() => setSortDirection((d) => (d === 'asc' ? 'desc' : 'asc'))}
           aria-label={`Sort direction: ${sortDirection === 'asc' ? 'ascending' : 'descending'}`}
-          title={sortDirection === 'asc' ? 'Ascending' : 'Descending'}
           className="px-3 py-1.5 text-sm rounded-lg bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-200"
         >
           <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
@@ -157,7 +156,6 @@ export default function Dashboard() {
         <button
           onClick={() => setView('grid')}
           aria-label="Grid view"
-          title="Grid view"
           className={`px-3 py-1.5 text-sm rounded-lg ${
             view === 'grid'
               ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-200'
@@ -175,7 +173,6 @@ export default function Dashboard() {
         <button
           onClick={() => setView('list')}
           aria-label="List view"
-          title="List view"
           className={`px-3 py-1.5 text-sm rounded-lg ${
             view === 'list'
               ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-200'
