@@ -155,6 +155,8 @@ export default function ProductDetail() {
     )
   }
 
+  const productUrlPreview = product.url.length > 40 ? `${product.url.slice(0, 40)}…` : product.url
+
   return (
     <div className="max-w-4xl mx-auto px-4 py-8 space-y-8">
       {/* Header */}
@@ -199,9 +201,9 @@ export default function ProductDetail() {
               target="_blank"
               rel="noopener noreferrer"
               title={product.url}
-              className="text-sm text-indigo-500 hover:underline block max-w-[50%] text-left truncate"
+              className="text-sm text-indigo-500 hover:underline block text-left"
             >
-              {product.url}
+              {productUrlPreview}
             </a>
           </div>
         </div>
