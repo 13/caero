@@ -138,10 +138,13 @@ export default function Dashboard() {
         </select>
         <button
           onClick={() => setSortDirection((d) => (d === 'asc' ? 'desc' : 'asc'))}
-          aria-label="Toggle sort direction"
+          aria-label={`Sort direction: ${sortDirection === 'asc' ? 'ascending' : 'descending'}`}
+          title={sortDirection === 'asc' ? 'Ascending' : 'Descending'}
           className="px-3 py-1.5 text-sm rounded-lg bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-200"
         >
-          {sortDirection === 'asc' ? 'Ascending' : 'Descending'}
+          <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+            {sortDirection === 'asc' ? <path d="M12 5v14M6 11l6-6 6 6" /> : <path d="M12 19V5M6 13l6 6 6-6" />}
+          </svg>
         </button>
         <input
           value={searchTerm}
@@ -152,23 +155,34 @@ export default function Dashboard() {
         />
         <button
           onClick={() => setView('grid')}
+          aria-label="Grid view"
+          title="Grid view"
           className={`px-3 py-1.5 text-sm rounded-lg ${
             view === 'grid'
               ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-200'
               : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'
           }`}
         >
-          Grid
+          <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4" fill="currentColor">
+            <rect x="4" y="4" width="7" height="7" rx="1" />
+            <rect x="13" y="4" width="7" height="7" rx="1" />
+            <rect x="4" y="13" width="7" height="7" rx="1" />
+            <rect x="13" y="13" width="7" height="7" rx="1" />
+          </svg>
         </button>
         <button
           onClick={() => setView('list')}
+          aria-label="List view"
+          title="List view"
           className={`px-3 py-1.5 text-sm rounded-lg ${
             view === 'list'
               ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-200'
               : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'
           }`}
         >
-          List
+          <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M5 7h14M5 12h14M5 17h14" />
+          </svg>
         </button>
       </div>
 
