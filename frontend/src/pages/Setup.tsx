@@ -594,7 +594,7 @@ export default function Setup() {
         <div className="flex flex-col items-center gap-2 py-2">
           <CaeroBrand showText={false} logoAriaHidden={false} logoSizeClassName="h-16 w-16" className="justify-center" />
           <p className="text-sm text-gray-600 dark:text-gray-300 text-center">{APP_DESCRIPTION}</p>
-          <p className="text-xs text-gray-400 dark:text-gray-500">Version v{APP_VERSION}</p>
+          <p className="text-xs text-gray-400 dark:text-gray-500">Version {APP_VERSION}</p>
         </div>
       </div>
 
