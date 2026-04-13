@@ -4,8 +4,9 @@ from __future__ import annotations
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import aliased
 
 from app.database import get_db
 from app.models import PriceHistory, Product, User
@@ -87,7 +88,56 @@ async def list_products(
 ) -> list[ProductOut]:
     result = await db.execute(select(Product).where(Product.user_id == user.id))
     products = result.scalars().all()
-    return [await _to_product_out(product, db) for product in products]
+    if not products:
+        return []
+
+    product_ids = [p.id for p in products]
+
+    rn = func.row_number().over(
+        partition_by=PriceHistory.product_id,
+        order_by=PriceHistory.scraped_at.desc()
+    ).label("rn")
+
+    stmt = (
+        select(PriceHistory)
+        .add_columns(rn)
+        .where(PriceHistory.product_id.in_(product_ids))
+    )
+
+    subq = stmt.subquery()
+    aliased_ph = aliased(PriceHistory, subq)
+
+    prices_stmt = select(aliased_ph).where(subq.c.rn <= 2).order_by(aliased_ph.product_id, aliased_ph.scraped_at.desc())
+    prices_result = await db.execute(prices_stmt)
+    prices = prices_result.scalars().all()
+
+    from collections import defaultdict
+    prices_by_product = defaultdict(list)
+    for p in prices:
+        prices_by_product[p.product_id].append(p)
+
+    out = []
+    for product in products:
+        latest_two = prices_by_product.get(product.id, [])
+        latest_price = latest_two[0].price if latest_two else None
+        previous_price = latest_two[1].price if len(latest_two) > 1 else None
+        last_change_percent = None
+        last_change_at = latest_two[0].scraped_at if len(latest_two) > 1 else None
+        if latest_price is not None and previous_price is not None and previous_price != Decimal(0):
+            last_change_percent = ((latest_price - previous_price) / previous_price) * Decimal(100)
+            last_change_percent = last_change_percent.quantize(Decimal("0.01"))
+
+        out.append(ProductOut.model_validate(
+            {
+                **product.__dict__,
+                "tags": _tags_to_list(product.tags),
+                "latest_price": latest_price,
+                "previous_price": previous_price,
+                "last_price_change_percent": last_change_percent,
+                "last_price_change_at": last_change_at,
+            }
+        ))
+    return out
 
 
 @router.post("", response_model=ProductOut, status_code=status.HTTP_201_CREATED)
@@ -195,23 +245,50 @@ async def get_product_statistics(
     db: AsyncSession = Depends(get_db),
 ) -> ProductStatisticsOut:
     await _get_product(product_id, user, db)
-    result = await db.execute(
-        select(PriceHistory)
-        .where(PriceHistory.product_id == product_id)
-        .order_by(PriceHistory.scraped_at.asc())
-    )
-    prices = result.scalars().all()
-    if not prices:
+
+    # Run aggregations in DB
+    stats_stmt = select(
+        func.count(PriceHistory.id),
+        func.min(PriceHistory.price),
+        func.max(PriceHistory.price),
+        func.avg(PriceHistory.price)
+    ).where(PriceHistory.product_id == product_id)
+
+    stats_result = await db.execute(stats_stmt)
+    data_points, lowest_val, highest_val, avg_val = stats_result.one()
+
+    if not data_points:
         return ProductStatisticsOut()
 
-    values = [p.price for p in prices]
-    average_price = (sum(values) / Decimal(len(values))).quantize(Decimal("0.01"))
+    average_price = Decimal(str(avg_val)).quantize(Decimal("0.01")) if avg_val else Decimal(0)
 
-    lowest = min(prices, key=lambda p: p.price)
-    highest = max(prices, key=lambda p: p.price)
-    first = prices[0]
-    current = prices[-1]
-    previous = prices[-2] if len(prices) > 1 else None
+    # Min/Max queries
+    # Lowest price at
+    lowest_stmt = select(PriceHistory).where(
+        PriceHistory.product_id == product_id,
+        PriceHistory.price == lowest_val
+    ).order_by(PriceHistory.scraped_at.asc()).limit(1)
+    lowest_res = await db.execute(lowest_stmt)
+    lowest = lowest_res.scalar_one()
+
+    # Highest price at
+    highest_stmt = select(PriceHistory).where(
+        PriceHistory.product_id == product_id,
+        PriceHistory.price == highest_val
+    ).order_by(PriceHistory.scraped_at.asc()).limit(1)
+    highest_res = await db.execute(highest_stmt)
+    highest = highest_res.scalar_one()
+
+    # First and Last two points
+    first_stmt = select(PriceHistory).where(PriceHistory.product_id == product_id).order_by(PriceHistory.scraped_at.asc()).limit(1)
+    first_res = await db.execute(first_stmt)
+    first = first_res.scalar_one()
+
+    last_two_stmt = select(PriceHistory).where(PriceHistory.product_id == product_id).order_by(PriceHistory.scraped_at.desc()).limit(2)
+    last_two_res = await db.execute(last_two_stmt)
+    last_two = last_two_res.scalars().all()
+    current = last_two[0]
+    previous = last_two[1] if len(last_two) > 1 else None
 
     total_change_percent = None
     if first.price != Decimal(0):
@@ -237,5 +314,5 @@ async def get_product_statistics(
         total_change_percent=total_change_percent,
         last_change_percent=last_change_percent,
         last_change_at=last_change_at,
-        data_points=len(prices),
+        data_points=data_points,
     )

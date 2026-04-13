@@ -39,20 +39,19 @@ async def scrape_and_record(product_id: int) -> None:
 
         price = Decimal(str(price_float)).quantize(Decimal("0.01"))
 
-        # Persist price record
-        record = PriceHistory(product_id=product_id, price=price)
-        db.add(record)
-        await db.flush()
-
-        # Get previous price for change detection
+        # Get previous price for change detection BEFORE adding the new one
         prev_result = await db.execute(
             select(PriceHistory)
             .where(PriceHistory.product_id == product_id)
             .order_by(PriceHistory.scraped_at.desc())
-            .offset(1)
             .limit(1)
         )
         prev = prev_result.scalar_one_or_none()
+
+        # Persist price record
+        record = PriceHistory(product_id=product_id, price=price)
+        db.add(record)
+        # Flush if necessary, but we don't strictly need to flush here anymore
 
         # Check alerts
         alerts_result = await db.execute(
@@ -70,7 +69,7 @@ async def scrape_and_record(product_id: int) -> None:
                 triggered = prev is not None and price != prev.price
 
             if triggered:
-                send_alert(
+                await send_alert(
                     to_email=alert.email,
                     telegram_chat_id=alert.telegram_chat_id,
                     product_name=product.name,

@@ -27,23 +27,24 @@ def _build_notification(subject: str, body: str) -> str:
     return f"{subject}\n\n{body}"
 
 
-def _send_telegram_alert(*, chat_id: str, text: str) -> None:
+async def _send_telegram_alert(*, chat_id: str, text: str) -> None:
     if not settings.telegram_bot_token:
         logger.info("Telegram bot token not configured — skipping Telegram notification")
         return
     try:
-        response = httpx.post(
-            f"https://api.telegram.org/bot{settings.telegram_bot_token}/sendMessage",
-            json={"chat_id": chat_id, "text": text},
-            timeout=10.0,
-        )
-        response.raise_for_status()
-        logger.info("Telegram alert sent to chat %s", chat_id)
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"https://api.telegram.org/bot{settings.telegram_bot_token}/sendMessage",
+                json={"chat_id": chat_id, "text": text},
+                timeout=10.0,
+            )
+            response.raise_for_status()
+            logger.info("Telegram alert sent to chat %s", chat_id)
     except Exception as exc:
         logger.error("Failed to send Telegram alert to chat %s: %s", chat_id, exc)
 
 
-def _send_email_alert(*, to_email: str, msg: MIMEMultipart, product_name: str) -> None:
+def _send_email_alert_sync(*, to_email: str, msg: MIMEMultipart, product_name: str) -> None:
     try:
         if settings.smtp_tls:
             with smtplib.SMTP(settings.smtp_host, settings.smtp_port) as server:
@@ -61,7 +62,7 @@ def _send_email_alert(*, to_email: str, msg: MIMEMultipart, product_name: str) -
         logger.error("Failed to send email alert to %s: %s", to_email, exc)
 
 
-def send_alert(
+async def send_alert(
     *,
     to_email: str | None = None,
     telegram_chat_id: str | None = None,
@@ -95,6 +96,8 @@ def send_alert(
             f"Product URL: {product_url}\n"
         )
 
+    import asyncio
+
     if to_email:
         if not settings.smtp_host:
             logger.info(
@@ -104,10 +107,10 @@ def send_alert(
             )
         else:
             msg = _build_message(subject, body, to_email)
-            _send_email_alert(to_email=to_email, msg=msg, product_name=product_name)
+            await asyncio.to_thread(_send_email_alert_sync, to_email=to_email, msg=msg, product_name=product_name)
 
     if telegram_chat_id:
-        _send_telegram_alert(
+        await _send_telegram_alert(
             chat_id=telegram_chat_id,
             text=_build_notification(subject, body),
         )
