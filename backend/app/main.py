@@ -67,8 +67,8 @@ async def lifespan(application: FastAPI):
 
 app = FastAPI(
     title="Caero",
-    description="Self-hosted price tracker",
-    version="0.1.0",
+    description="zero price tracker",
+    version="0.2.0",
     lifespan=lifespan,
 )
 

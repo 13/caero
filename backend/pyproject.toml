@@ -1,7 +1,7 @@
 [project]
 name = "caero"
-version = "0.1.0"
-description = "Self-hosted price tracker"
+version = "0.2.0"
+description = "zero price tracker"
 requires-python = ">=3.13"
 dependencies = [
     "fastapi[standard]>=0.135.0,<0.136.0",
