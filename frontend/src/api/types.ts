@@ -174,3 +174,9 @@ export interface UserDataExportPayload {
   price_history: Record<string, unknown>[]
   alerts: Record<string, unknown>[]
 }
+export interface SystemInfoOut {
+  version: string
+  db_type: string
+  db_version: string
+}
+

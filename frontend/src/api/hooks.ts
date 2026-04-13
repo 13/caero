@@ -15,6 +15,7 @@ import type {
   ProductCreate,
   ProductStatistics,
   ProductUpdate,
+  SystemInfoOut,
   TestDbRequest,
   TestDbResponse,
   TestEmailRequest,
@@ -212,6 +213,13 @@ export function useSaveSettings() {
     mutationFn: (body) =>
       apiFetch<AppSettings>('/api/settings', { method: 'POST', body: JSON.stringify(body) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['settings'] }),
+  })
+}
+
+export function useSystemInfo() {
+  return useQuery<SystemInfoOut>({
+    queryKey: ['system-info'],
+    queryFn: () => apiFetch<SystemInfoOut>('/api/settings/system-info'),
   })
 }
 

@@ -13,6 +13,7 @@ import {
   useMe,
   useSettings,
   useSaveSettings,
+  useSystemInfo,
   useTestDb,
   useTestEmail,
   useTestTelegram,
@@ -72,6 +73,7 @@ type Tab = 'account' | 'admin'
 
 export default function Setup() {
   const { data: currentSettings, isLoading } = useSettings()
+  const { data: systemInfo } = useSystemInfo()
   const { data: me } = useMe()
   const { data: users = [] } = useUsers(!!me?.is_admin)
 
@@ -120,6 +122,9 @@ export default function Setup() {
 
   const [defaultEmail, setDefaultEmail] = useState('')
   const [defaultTelegram, setDefaultTelegram] = useState('')
+
+  const [hideTracked, setHideTracked] = useState(() => localStorage.getItem('caero_hide_tracked') === 'true')
+  const [hideStats, setHideStats] = useState(() => localStorage.getItem('caero_hide_stats') === 'true')
 
   useEffect(() => {
     if (currentSettings) setForm(currentSettings)
@@ -249,16 +254,57 @@ export default function Setup() {
       {activeTab === 'account' && (
         <div className="space-y-4">
 
-          {/* App version */}
-          <div className="flex items-center justify-between px-4 py-3 rounded-xl bg-gray-50 dark:bg-gray-800">
-            <div>
-              <p className="text-sm font-medium text-gray-800 dark:text-gray-200">App version</p>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Currently installed</p>
+          {/* Preferences */}
+          <Section icon={User} title="Preferences" description="Customize your experience">
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Date format</label>
+                <select
+                  value={form.date_format}
+                  onChange={(e) => {
+                    const nextForm = { ...form, date_format: e.target.value as AppSettings['date_format'] }
+                    setForm(nextForm)
+                    saveSettings(nextForm)
+                  }}
+                  style={{ colorScheme: 'light dark' }}
+                  className={inputCls}
+                >
+                  <option value="DD.MM.YYYY">DD.MM.YYYY (German default)</option>
+                  <option value="DD/MM/YYYY">DD/MM/YYYY</option>
+                  <option value="MM/DD/YYYY">MM/DD/YYYY</option>
+                  <option value="YYYY-MM-DD">YYYY-MM-DD</option>
+                </select>
+              </div>
+
+              <div className="space-y-2 pt-2 border-t border-gray-100 dark:border-gray-800">
+                <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Dashboard visibility</p>
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={hideStats}
+                    onChange={(e) => {
+                      setHideStats(e.target.checked)
+                      localStorage.setItem('caero_hide_stats', e.target.checked ? 'true' : 'false')
+                    }}
+                    className="rounded text-indigo-600 h-4 w-4"
+                  />
+                  <span className="text-sm text-gray-800 dark:text-gray-200">Hide total tracked stats (active, price drops)</span>
+                </label>
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={hideTracked}
+                    onChange={(e) => {
+                      setHideTracked(e.target.checked)
+                      localStorage.setItem('caero_hide_tracked', e.target.checked ? 'true' : 'false')
+                    }}
+                    className="rounded text-indigo-600 h-4 w-4"
+                  />
+                  <span className="text-sm text-gray-800 dark:text-gray-200">Hide tracked products list</span>
+                </label>
+              </div>
             </div>
-            <span className="text-xs font-mono font-semibold px-2.5 py-1 rounded-full bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300">
-              {APP_VERSION}
-            </span>
-          </div>
+          </Section>
 
           {/* Change password */}
           <Section icon={KeyRound} title="Change password" description="Update your login credentials">
@@ -373,24 +419,9 @@ export default function Setup() {
         <div className="space-y-4">
 
           {/* System config */}
-          <Section icon={Database} title="System configuration" description="Database engine and display preferences">
+          <Section icon={Database} title="System configuration" description="Database engine">
             <form onSubmit={handleSaveSettings} className="space-y-4">
               <DbSelector value={form} onChange={setForm} />
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Date format</label>
-                <select
-                  value={form.date_format}
-                  onChange={(e) => setForm({ ...form, date_format: e.target.value as AppSettings['date_format'] })}
-                  style={{ colorScheme: 'light dark' }}
-                  className={inputCls}
-                >
-                  <option value="DD.MM.YYYY">DD.MM.YYYY (German default)</option>
-                  <option value="DD/MM/YYYY">DD/MM/YYYY</option>
-                  <option value="MM/DD/YYYY">MM/DD/YYYY</option>
-                  <option value="YYYY-MM-DD">YYYY-MM-DD</option>
-                </select>
-              </div>
 
               {switchWarning && (
                 <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-xl p-4 text-sm text-amber-800 dark:text-amber-200">
@@ -627,20 +658,35 @@ export default function Setup() {
         </div>
       )}
 
-      {/* About — always shown at bottom */}
-      <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-5">
-        <div className="flex items-center gap-3 mb-3">
-          <div className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
-            <Info className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+      {/* About — Move to Account Tab only according to request */}
+      {activeTab === 'account' && (
+        <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-5 mt-8">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+              <Info className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+            </div>
+            <h2 className="font-semibold text-gray-900 dark:text-gray-100 text-sm">About</h2>
           </div>
-          <h2 className="font-semibold text-gray-900 dark:text-gray-100 text-sm">About</h2>
+          <div className="flex flex-col items-center gap-3 py-2">
+            <CaeroBrand showText={false} logoAriaHidden={false} logoSizeClassName="h-16 w-16" className="justify-center mb-1" />
+            <p className="text-sm text-gray-600 dark:text-gray-300 text-center mb-2">{APP_DESCRIPTION}</p>
+
+            <div className="grid grid-cols-2 gap-x-8 gap-y-1 text-sm bg-gray-50 dark:bg-gray-800/50 p-4 rounded-xl text-gray-700 dark:text-gray-200">
+              <div className="text-right font-medium text-gray-500 hover:text-gray-700">Frontend Version:</div>
+              <div className="font-mono">{APP_VERSION}</div>
+
+              <div className="text-right font-medium text-gray-500 hover:text-gray-700">Backend Version:</div>
+              <div className="font-mono">{systemInfo?.version || '...'}</div>
+
+              <div className="text-right font-medium text-gray-500 hover:text-gray-700">Active Database:</div>
+              <div className="font-mono capitalize">{systemInfo?.db_type || '...'}</div>
+
+              <div className="text-right font-medium text-gray-500 hover:text-gray-700">DB Version:</div>
+              <div className="font-mono text-xs mt-1">{systemInfo?.db_version || '...'}</div>
+            </div>
+          </div>
         </div>
-        <div className="flex flex-col items-center gap-2 py-2">
-          <CaeroBrand showText={false} logoAriaHidden={false} logoSizeClassName="h-16 w-16" className="justify-center" />
-          <p className="text-sm text-gray-600 dark:text-gray-300 text-center">{APP_DESCRIPTION}</p>
-          <p className="text-xs text-gray-400 dark:text-gray-500">Version {APP_VERSION}</p>
-        </div>
-      </div>
+      )}
 
       {/* Global error */}
       {anyError && (

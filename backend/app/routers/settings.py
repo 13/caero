@@ -10,7 +10,7 @@ from email.message import EmailMessage
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
@@ -22,6 +22,7 @@ from app.schemas import (
     AppSettingsIn,
     AppSettingsOut,
     DataExportPayload,
+    SystemInfoOut,
     TestDbRequest,
     TestDbResponse,
     TestEmailRequest,
@@ -145,24 +146,43 @@ async def test_email_notification(
 @router.post("/test-telegram", response_model=TestNotificationResponse)
 async def test_telegram_notification(
     body: TestTelegramRequest,
-    _admin: User = Depends(require_admin),
+    _user=Depends(require_admin),
 ) -> TestNotificationResponse:
-    if not settings.telegram_bot_token:
-        return TestNotificationResponse(status="error", message="Telegram bot token is not configured")
+    from app.notifier import init_telegram_bot
+
+    bot = init_telegram_bot()
+    if bot is None:
+        return TestNotificationResponse(status="failed", message="Telegram bot token not configured")
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.post(
-                f"https://api.telegram.org/bot{settings.telegram_bot_token}/sendMessage",
-                json={"chat_id": body.chat_id, "text": "✅ Test message from Caero settings."},
-            )
-            response.raise_for_status()
-        return TestNotificationResponse(status="sent", message=f"Test Telegram message sent to {body.chat_id}")
-    except Exception as exc:
-        logger.error("Failed to send test Telegram message to chat %s: %s", body.chat_id, exc)
-        return TestNotificationResponse(
-            status="error",
-            message="Failed to send test Telegram message. Check bot token/chat id and logs.",
+        await bot.send_message(
+            chat_id=body.chat_id,
+            text="Testing Telegram notification from Caero...",
         )
+        return TestNotificationResponse(status="sent", message="Test Telegram message sent")
+    except Exception as e:
+        return TestNotificationResponse(status="failed", message=str(e))
+
+
+@router.get("/system-info", response_model=SystemInfoOut)
+async def system_info(
+    db: AsyncSession = Depends(get_db),
+) -> SystemInfoOut:
+    db_version = "Unknown"
+    try:
+        if settings.db_type == "postgresql":
+            result = await db.execute(text("SHOW server_version;"))
+            db_version = result.scalar_one_or_none() or "Unknown"
+        else:
+            result = await db.execute(text("select sqlite_version();"))
+            db_version = result.scalar_one_or_none() or "Unknown"
+    except Exception:
+        pass
+
+    return SystemInfoOut(
+        version="0.2.0",
+        db_type=settings.db_type,
+        db_version=str(db_version),
+    )
 
 
 def _serialize_decimal(value: Decimal | None) -> str | None:

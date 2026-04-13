@@ -255,3 +255,9 @@ class UserDataExportPayload(BaseModel):
     products: list[dict[str, Any]]
     price_history: list[dict[str, Any]]
     alerts: list[dict[str, Any]]
+
+class SystemInfoOut(BaseModel):
+    version: str
+    db_type: str
+    db_version: str
+
