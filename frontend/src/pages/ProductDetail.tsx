@@ -1,5 +1,8 @@
 import { useState } from 'react'
-import { Pencil, X } from 'lucide-react'
+import {
+  ArrowLeft, RefreshCw, Pencil, Trash2, ExternalLink,
+  Bell, Plus, X, TrendingDown, TrendingUp, BarChart3, ZoomIn,
+} from 'lucide-react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
   useAlerts,
@@ -70,6 +73,8 @@ export default function ProductDetail() {
   const [alertForm, setAlertForm] = useState<AlertCreate>(createDefaultAlertForm)
   const [editingAlertId, setEditingAlertId] = useState<number | null>(null)
   const [alertEditForm, setAlertEditForm] = useState<AlertCreate>(createDefaultAlertForm)
+  const [showAddAlert, setShowAddAlert] = useState(false)
+  const [imageZoomed, setImageZoomed] = useState(false)
 
   const handleEdit = () => {
     if (product) {
@@ -157,28 +162,128 @@ export default function ProductDetail() {
 
   const productUrlChars = Array.from(product.url)
   const productUrlPreview =
-    productUrlChars.length > 40 ? `${productUrlChars.slice(0, 40).join('')}…` : product.url
+    productUrlChars.length > 50 ? `${productUrlChars.slice(0, 50).join('')}…` : product.url
+
+  const inputCls =
+    'w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 text-gray-900 dark:text-gray-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500'
+  const labelCls = 'text-xs font-medium text-gray-500 dark:text-gray-400 mb-1 block'
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8 space-y-8">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-        <div>
+    <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
+
+      {/* ── Top nav ── */}
+      <div className="flex items-center justify-between gap-3">
+        <button
+          onClick={() => navigate('/')}
+          className="inline-flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-100 transition-colors"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back
+        </button>
+        <div className="flex items-center gap-2">
           <button
-            onClick={() => navigate('/')}
-            className="text-sm text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 mb-2 block"
+            onClick={() => checkMutation.mutate(productId)}
+            disabled={checkMutation.isPending}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900 font-medium disabled:opacity-50 transition-colors"
           >
-            ← Back
+            <RefreshCw className={`h-3.5 w-3.5 ${checkMutation.isPending ? 'animate-spin' : ''}`} />
+            {checkMutation.isPending ? 'Checking…' : 'Check now'}
           </button>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">{product.name}</h1>
-          {product.category && <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Category: {product.category}</p>}
-          {product.memo && (
-            <p className="text-sm text-gray-600 dark:text-gray-400 mt-2 whitespace-pre-wrap">
-              {product.memo}
-            </p>
+          <button
+            onClick={handleEdit}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+          >
+            <Pencil className="h-3.5 w-3.5" />
+            Edit
+          </button>
+          <button
+            onClick={handleDelete}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950 transition-colors"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            Delete
+          </button>
+        </div>
+      </div>
+
+      {/* ── Hero card ── */}
+      <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-6">
+        <div className="flex gap-6 items-start">
+          {product.image_url && (
+            <>
+              {/* Lightbox */}
+              {imageZoomed && (
+                <div
+                  className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm cursor-zoom-out"
+                  onClick={() => setImageZoomed(false)}
+                >
+                  <button
+                    onClick={() => setImageZoomed(false)}
+                    className="absolute top-4 right-4 p-2 rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors"
+                    aria-label="Close zoom"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                  <img
+                    src={product.image_url}
+                    alt={product.name}
+                    className="max-w-[90vw] max-h-[90vh] object-contain rounded-xl shadow-2xl"
+                  />
+                </div>
+              )}
+              <div className="shrink-0 relative group cursor-zoom-in" onClick={() => setImageZoomed(true)}>
+                <img
+                  src={product.image_url}
+                  alt={product.name}
+                  className="w-28 h-28 object-contain rounded-xl border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800 transition-opacity group-hover:opacity-80"
+                  loading="lazy"
+                />
+                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                  <ZoomIn className="h-6 w-6 text-gray-700 dark:text-gray-200 drop-shadow" />
+                </div>
+              </div>
+            </>
           )}
-          {product.tags.length > 0 && (
-            <div className="mt-2 flex flex-wrap gap-1.5">
+          <div className="flex-1 min-w-0">
+            <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100 leading-tight">
+              {product.name}
+            </h1>
+
+            {/* Price row */}
+            <div className="mt-3 flex items-baseline gap-3 flex-wrap">
+              <span className="text-4xl font-extrabold text-indigo-600 dark:text-indigo-400 tracking-tight">
+                {formatPrice(product.latest_price)}
+              </span>
+              {product.last_price_change_percent !== null && (() => {
+                const pct = parseFloat(product.last_price_change_percent ?? '0')
+                return (
+                  <span
+                    className={`inline-flex items-center gap-1 text-sm font-semibold px-2 py-0.5 rounded-full ${
+                      pct < 0
+                        ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300'
+                        : pct > 0
+                        ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300'
+                        : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'
+                    }`}
+                  >
+                    {pct < 0 ? (
+                      <TrendingDown className="h-3.5 w-3.5" />
+                    ) : (
+                      <TrendingUp className="h-3.5 w-3.5" />
+                    )}
+                    {formatPercent(product.last_price_change_percent)}
+                  </span>
+                )
+              })()}
+            </div>
+
+            {/* Meta row */}
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              {product.category && (
+                <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 font-medium">
+                  {product.category}
+                </span>
+              )}
               {product.tags.map((tag) => (
                 <span
                   key={tag}
@@ -187,253 +292,209 @@ export default function ProductDetail() {
                   {tag}
                 </span>
               ))}
+              {!product.active && (
+                <span className="text-xs px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300 font-medium">
+                  Paused
+                </span>
+              )}
             </div>
-          )}
-          <div className="mt-3 flex flex-col items-center gap-2">
-            {product.image_url && (
-              <img
-                src={product.image_url}
-                alt={product.name}
-                className="block w-full max-w-[12rem] h-auto max-h-[12rem] object-contain rounded-lg border border-gray-200 dark:border-gray-800"
-                loading="lazy"
-              />
+
+            {product.memo && (
+              <p className="mt-3 text-sm text-gray-500 dark:text-gray-400 whitespace-pre-wrap">
+                {product.memo}
+              </p>
             )}
-            <a
-              href={product.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              title={product.url}
-              className="text-sm text-indigo-500 hover:underline block text-left"
-            >
-              {productUrlPreview}
-            </a>
+
+            {/* URL chip */}
+            <div className="mt-3 min-w-0 max-w-full">
+              <a
+                href={product.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                title={product.url}
+                className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border border-indigo-200 dark:border-indigo-800 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950 transition-colors max-w-full overflow-hidden"
+              >
+                <ExternalLink className="h-3 w-3 shrink-0" />
+                <span className="truncate">{productUrlPreview}</span>
+              </a>
+            </div>
           </div>
-        </div>
-         <div className="flex flex-wrap gap-2">
-          <button
-            onClick={() => checkMutation.mutate(productId)}
-            disabled={checkMutation.isPending}
-            className="px-3 py-1.5 text-sm rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 font-medium disabled:opacity-50"
-          >
-            {checkMutation.isPending ? 'Checking…' : 'Check now'}
-          </button>
-          <button
-            onClick={handleEdit}
-            className="px-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800"
-          >
-            Edit
-          </button>
-          <button
-            onClick={handleDelete}
-            className="px-3 py-1.5 text-sm rounded-lg bg-red-50 text-red-600 hover:bg-red-100"
-          >
-            Delete
-          </button>
         </div>
       </div>
 
-      {/* Edit form */}
+      {/* ── Edit panel (bottom sheet on mobile, slide-over on desktop) ── */}
       {editMode && (
-        <form
-          onSubmit={handleSave}
-          className="bg-gray-50 dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5 space-y-4"
-        >
-          <h2 className="font-semibold text-gray-800 dark:text-gray-100">Edit product</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1 block">Name</label>
-              <input
-                type="text"
-                value={editForm.name}
-                onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              />
+        <div className="fixed inset-0 z-40 flex flex-col justify-end sm:flex-row sm:justify-end">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            onClick={() => setEditMode(false)}
+          />
+          {/* Panel */}
+          <div className="relative w-full sm:w-auto sm:max-w-lg sm:h-full bg-white dark:bg-gray-950 shadow-2xl flex flex-col rounded-t-2xl sm:rounded-none max-h-[90dvh] sm:max-h-full">
+            <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-gray-200 dark:border-gray-800 shrink-0">
+              <h2 className="font-semibold text-gray-900 dark:text-gray-100">Edit product</h2>
+              <button onClick={() => setEditMode(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+                <X className="h-5 w-5" />
+              </button>
             </div>
-              <div>
-                <label className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1 block">
-                  Check interval (hours)
-                </label>
-              <input
-                type="number"
-                min={MIN_CHECK_INTERVAL_HOURS}
-                step={CHECK_INTERVAL_HOUR_STEP}
-                value={intervalMinutesToHours(editForm.check_interval_minutes)}
-                onChange={(e) => {
-                  const hours = parseFloat(e.target.value)
-                  setEditForm({
-                    ...editForm,
-                    check_interval_minutes: normalizeIntervalHoursToMinutes(hours),
-                  })
-                }}
-                className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              />
-            </div>
-            <div>
-              <label className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1 block">Category</label>
-              <input
-                type="text"
-                value={editForm.category}
-                onChange={(e) => setEditForm({ ...editForm, category: e.target.value })}
-                className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              />
-            </div>
-            <div>
-              <label className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1 block">Tags</label>
-              <input
-                type="text"
-                value={editForm.tags}
-                onChange={(e) => setEditForm({ ...editForm, tags: e.target.value })}
-                className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              />
-            </div>
-            <div className="sm:col-span-2">
-              <label className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1 block">Memo</label>
-              <textarea
-                value={editForm.memo}
-                onChange={(e) => setEditForm({ ...editForm, memo: e.target.value })}
-                rows={4}
-                className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              />
-            </div>
-            <div className="sm:col-span-2">
-              <label className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1 block">URL</label>
-              <input
-                type="url"
-                value={editForm.url}
-                onChange={(e) => setEditForm({ ...editForm, url: e.target.value })}
-                className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              />
-            </div>
-            <div className="sm:col-span-2">
-              <label className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1 block">CSS selector</label>
-              <input
-                type="text"
-                value={editForm.selector}
-                onChange={(e) => setEditForm({ ...editForm, selector: e.target.value })}
-                className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 px-3 py-1.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              />
-            </div>
-            <div className="sm:col-span-2">
-              <label className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1 block">Image URL</label>
-              <input
-                type="url"
-                value={editForm.image_url}
-                onChange={(e) => setEditForm({ ...editForm, image_url: e.target.value })}
-                className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              />
-            </div>
+            <form onSubmit={handleSave} className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="col-span-2">
+                  <label className={labelCls}>Name</label>
+                  <input type="text" value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} className={inputCls} />
+                </div>
+                <div>
+                  <label className={labelCls}>Category</label>
+                  <input type="text" value={editForm.category} onChange={(e) => setEditForm({ ...editForm, category: e.target.value })} className={inputCls} />
+                </div>
+                <div>
+                  <label className={labelCls}>Interval (hrs)</label>
+                  <input
+                    type="number"
+                    min={MIN_CHECK_INTERVAL_HOURS}
+                    step={CHECK_INTERVAL_HOUR_STEP}
+                    value={intervalMinutesToHours(editForm.check_interval_minutes)}
+                    onChange={(e) => setEditForm({ ...editForm, check_interval_minutes: normalizeIntervalHoursToMinutes(parseFloat(e.target.value)) })}
+                    className={inputCls}
+                  />
+                </div>
+                <div className="col-span-2">
+                  <label className={labelCls}>Tags <span className="font-normal text-gray-400">(comma-separated)</span></label>
+                  <input type="text" value={editForm.tags} onChange={(e) => setEditForm({ ...editForm, tags: e.target.value })} className={inputCls} />
+                </div>
+                <div className="col-span-2">
+                  <label className={labelCls}>Memo</label>
+                  <textarea value={editForm.memo} onChange={(e) => setEditForm({ ...editForm, memo: e.target.value })} rows={3} className={inputCls} />
+                </div>
+                <div className="col-span-2">
+                  <label className={labelCls}>URL</label>
+                  <input type="url" value={editForm.url} onChange={(e) => setEditForm({ ...editForm, url: e.target.value })} className={inputCls} />
+                </div>
+                <div className="col-span-2">
+                  <label className={labelCls}>CSS selector</label>
+                  <input type="text" value={editForm.selector} onChange={(e) => setEditForm({ ...editForm, selector: e.target.value })} className={`${inputCls} font-mono text-xs`} />
+                </div>
+                <div className="col-span-2">
+                  <label className={labelCls}>Image URL</label>
+                  <input type="url" value={editForm.image_url} onChange={(e) => setEditForm({ ...editForm, image_url: e.target.value })} className={inputCls} />
+                </div>
+              </div>
+              <label className="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+                <input type="checkbox" id="edit-active" checked={editForm.active} onChange={(e) => setEditForm({ ...editForm, active: e.target.checked })} className="rounded text-indigo-600" />
+                Active
+              </label>
+              <div className="flex gap-2 pt-1 pb-4">
+                <button type="submit" disabled={updateMutation.isPending} className="flex-1 bg-indigo-600 text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 transition-colors">
+                  {updateMutation.isPending ? 'Saving…' : 'Save changes'}
+                </button>
+                <button type="button" onClick={() => setEditMode(false)} className="px-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-700 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                  Cancel
+                </button>
+              </div>
+            </form>
           </div>
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="edit-active"
-              checked={editForm.active}
-              onChange={(e) => setEditForm({ ...editForm, active: e.target.checked })}
-              className="rounded text-indigo-600"
-            />
-            <label htmlFor="edit-active" className="text-sm text-gray-700 dark:text-gray-300">
-              Active
-            </label>
-          </div>
-          <div className="flex gap-2">
-            <button
-              type="submit"
-              disabled={updateMutation.isPending}
-              className="bg-indigo-600 text-white px-4 py-1.5 rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50"
-            >
-              Save
-            </button>
-            <button
-              type="button"
-              onClick={() => setEditMode(false)}
-              className="px-4 py-1.5 rounded-lg border border-gray-300 dark:border-gray-700 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800"
-            >
-              Cancel
-            </button>
-          </div>
-        </form>
+        </div>
       )}
 
-      {/* Current price + stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-4">
-          <p className="text-xs text-gray-400 dark:text-gray-500">Current price</p>
-          <p className="text-3xl font-bold text-indigo-600">{formatPrice(product.latest_price)}</p>
-        </div>
-        <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-4">
-          <p className="text-xs text-gray-400 dark:text-gray-500">All-time low</p>
-          <p className="text-2xl font-bold text-green-600">
-            {prices.length
-              ? `€ ${Math.min(...prices.map((p) => parseFloat(p.price))).toFixed(2)}`
-              : '—'}
-          </p>
-        </div>
-        <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-4">
-          <p className="text-xs text-gray-400 dark:text-gray-500">Last change</p>
-          <p className="text-2xl font-bold text-gray-700 dark:text-gray-200">
-            {formatPercent(product.last_price_change_percent)}
-          </p>
-        </div>
+      {/* ── Stats strip ── */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+        {[
+          { label: 'Average', value: formatPrice(stats?.average_price ?? null) },
+          {
+            label: 'All-time low',
+            value: formatPrice(stats?.lowest_price ?? null),
+            sub: formatDate(stats?.lowest_price_at ?? null, settings?.date_format),
+            accent: 'text-green-600 dark:text-green-400',
+          },
+          {
+            label: 'All-time high',
+            value: formatPrice(stats?.highest_price ?? null),
+            sub: formatDate(stats?.highest_price_at ?? null, settings?.date_format),
+            accent: 'text-red-500 dark:text-red-400',
+          },
+          {
+            label: 'Total change',
+            value: formatPercent(stats?.total_change_percent ?? null),
+          },
+          { label: 'Data points', value: String(stats?.data_points ?? 0) },
+        ].map(({ label, value, sub, accent }) => (
+          <div key={label} className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-3">
+            <p className="text-xs text-gray-400 dark:text-gray-500 mb-1">{label}</p>
+            <p className={`text-base font-bold ${accent ?? 'text-gray-800 dark:text-gray-100'}`}>{value}</p>
+            {sub && <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{sub}</p>}
+          </div>
+        ))}
       </div>
 
-      <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5">
-        <h2 className="font-semibold text-gray-800 dark:text-gray-100 mb-4">Statistics</h2>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
-          <div>Average: <span className="font-semibold">{formatPrice(stats?.average_price ?? null)}</span></div>
-          <div>Current: <span className="font-semibold">{formatPrice(stats?.current_price ?? null)}</span></div>
-          <div>Data points: <span className="font-semibold">{stats?.data_points ?? 0}</span></div>
-          <div>
-            Lowest: <span className="font-semibold">{formatPrice(stats?.lowest_price ?? null)}</span> (
-            {formatDate(stats?.lowest_price_at ?? null, settings?.date_format)})
-          </div>
-          <div>
-            Highest: <span className="font-semibold">{formatPrice(stats?.highest_price ?? null)}</span> (
-            {formatDate(stats?.highest_price_at ?? null, settings?.date_format)})
-          </div>
-          <div>
-            Total change: <span className="font-semibold">{formatPercent(stats?.total_change_percent ?? null)}</span>
-          </div>
+      {/* ── Price chart ── */}
+      <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-5">
+        <div className="flex items-center gap-2 mb-4">
+          <BarChart3 className="h-4 w-4 text-indigo-500" />
+          <h2 className="font-semibold text-gray-800 dark:text-gray-100">Price history</h2>
         </div>
-      </div>
-
-      {/* Price chart */}
-      <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5">
-        <h2 className="font-semibold text-gray-800 dark:text-gray-100 mb-4">Price history</h2>
         <PriceChart data={prices} />
       </div>
 
-      {/* Alerts */}
-      <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5">
-        <h2 className="font-semibold text-gray-800 dark:text-gray-100 mb-4">Price alerts</h2>
+      {/* ── Alerts ── */}
+      <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-5">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Bell className="h-4 w-4 text-indigo-500" />
+            <h2 className="font-semibold text-gray-800 dark:text-gray-100">Price alerts</h2>
+            {alerts.length > 0 && (
+              <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 font-medium">
+                {alerts.length}
+              </span>
+            )}
+          </div>
+          <button
+            onClick={() => setShowAddAlert((v) => !v)}
+            className="inline-flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 transition-colors font-medium"
+          >
+            {showAddAlert ? <X className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
+            {showAddAlert ? 'Cancel' : 'Add alert'}
+          </button>
+        </div>
+
+        {alerts.length === 0 && !showAddAlert && (
+          <div className="flex flex-col items-center justify-center py-10 text-center">
+            <Bell className="h-8 w-8 text-gray-300 dark:text-gray-600 mb-2" />
+            <p className="text-sm text-gray-400 dark:text-gray-500">No alerts yet</p>
+            <p className="text-xs text-gray-400 dark:text-gray-600 mt-1">Add one to get notified when the price changes.</p>
+          </div>
+        )}
 
         {alerts.length > 0 && (
           <ul className="space-y-2 mb-4">
             {alerts.map((alert) => (
-              <li key={alert.id} className="text-sm bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2 space-y-2">
+              <li key={alert.id} className="text-sm bg-gray-50 dark:bg-gray-800/60 rounded-xl px-4 py-3 space-y-3">
                 <div className="flex items-center justify-between gap-3">
-                  <div>
+                  <div className="flex items-center flex-wrap gap-2">
                     <span className="font-medium text-gray-800 dark:text-gray-200 capitalize">
                       {alert.condition.replace('_', ' ')}
                     </span>
                     {alert.threshold_price && (
-                      <span className="text-gray-500 dark:text-gray-400 ml-1">
+                      <span className="text-sm font-semibold text-indigo-600 dark:text-indigo-400">
                         € {parseFloat(alert.threshold_price).toFixed(2)}
                       </span>
                     )}
                     <span
-                      className={`ml-2 px-2 py-0.5 rounded-full text-xs font-medium ${
+                      className={`px-2 py-0.5 rounded-full text-xs font-medium ${
                         alert.active
                           ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300'
-                          : 'bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-300'
+                          : 'bg-gray-200 text-gray-500 dark:bg-gray-700 dark:text-gray-400'
                       }`}
                     >
-                      {alert.active ? 'active' : 'inactive'}
+                      {alert.active ? 'Active' : 'Paused'}
                     </span>
-                    <span className="text-gray-400 dark:text-gray-500 ml-2">
-                      → {[alert.email, alert.telegram_chat_id ? `tg:${alert.telegram_chat_id}` : null].filter(Boolean).join(' • ')}
-                    </span>
+                    {(alert.email || alert.telegram_chat_id) && (
+                      <span className="text-xs text-gray-400 dark:text-gray-500">
+                        → {[alert.email, alert.telegram_chat_id ? `tg:${alert.telegram_chat_id}` : null].filter(Boolean).join(' • ')}
+                      </span>
+                    )}
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5 shrink-0">
                     <button
                       type="button"
                       onClick={() =>
@@ -448,29 +509,26 @@ export default function ProductDetail() {
                       }
                       title="Edit alert"
                       aria-label="Edit alert"
-                      className="text-indigo-500 hover:text-indigo-700"
+                      className="p-1.5 rounded-lg text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950 transition-colors"
                     >
-                      <Pencil className="h-4 w-4" />
+                      <Pencil className="h-3.5 w-3.5" />
                     </button>
                     <button
                       onClick={() => deleteAlertMutation.mutate(alert.id)}
-                      className="text-red-400 hover:text-red-600"
+                      title="Delete alert"
+                      aria-label="Delete alert"
+                      className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950 transition-colors"
                     >
-                      <X className="h-4 w-4" />
+                      <X className="h-3.5 w-3.5" />
                     </button>
                   </div>
                 </div>
                 {editingAlertId === alert.id && (
-                  <form onSubmit={handleUpdateAlert} className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <form onSubmit={handleUpdateAlert} className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 border-t border-gray-200 dark:border-gray-700">
                     <select
                       value={alertEditForm.condition}
-                      onChange={(e) =>
-                        setAlertEditForm({
-                          ...alertEditForm,
-                          condition: e.target.value as AlertCreate['condition'],
-                        })
-                      }
-                      className="rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-1.5"
+                      onChange={(e) => setAlertEditForm({ ...alertEditForm, condition: e.target.value as AlertCreate['condition'] })}
+                      className={inputCls}
                     >
                       <option value="below">Below threshold</option>
                       <option value="lowered">Price lowered</option>
@@ -478,65 +536,17 @@ export default function ProductDetail() {
                       <option value="any_change">Any change</option>
                     </select>
                     {alertEditForm.condition === 'below' && (
-                      <input
-                        type="number"
-                        step="0.01"
-                        min={0}
-                        value={alertEditForm.threshold_price ?? ''}
-                        onChange={(e) =>
-                          setAlertEditForm({ ...alertEditForm, threshold_price: e.target.value || null })
-                        }
-                        placeholder="Threshold price"
-                        className="rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-1.5"
-                      />
+                      <input type="number" step="0.01" min={0} value={alertEditForm.threshold_price ?? ''} onChange={(e) => setAlertEditForm({ ...alertEditForm, threshold_price: e.target.value || null })} placeholder="Threshold price" className={inputCls} />
                     )}
-                    <input
-                      type="email"
-                      value={alertEditForm.email ?? ''}
-                      onChange={(e) =>
-                        setAlertEditForm({
-                          ...alertEditForm,
-                          email: e.target.value.trim() ? e.target.value : null,
-                        })
-                      }
-                      placeholder="you@example.com"
-                      className="rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-1.5"
-                    />
-                    <input
-                      type="text"
-                      value={alertEditForm.telegram_chat_id ?? ''}
-                      onChange={(e) =>
-                        setAlertEditForm({
-                          ...alertEditForm,
-                          telegram_chat_id: e.target.value.trim() ? e.target.value : null,
-                        })
-                      }
-                      placeholder="Telegram chat ID"
-                      className="rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-1.5"
-                    />
-                    <label className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300">
-                      <input
-                        type="checkbox"
-                        checked={alertEditForm.active}
-                        onChange={(e) => setAlertEditForm({ ...alertEditForm, active: e.target.checked })}
-                      />
+                    <input type="email" value={alertEditForm.email ?? ''} onChange={(e) => setAlertEditForm({ ...alertEditForm, email: e.target.value.trim() ? e.target.value : null })} placeholder="you@example.com" className={inputCls} />
+                    <input type="text" value={alertEditForm.telegram_chat_id ?? ''} onChange={(e) => setAlertEditForm({ ...alertEditForm, telegram_chat_id: e.target.value.trim() ? e.target.value : null })} placeholder="Telegram chat ID" className={inputCls} />
+                    <label className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
+                      <input type="checkbox" checked={alertEditForm.active} onChange={(e) => setAlertEditForm({ ...alertEditForm, active: e.target.checked })} />
                       Active
                     </label>
                     <div className="flex gap-2">
-                      <button
-                        type="submit"
-                        disabled={updateAlertMutation.isPending}
-                        className="px-3 py-1 rounded bg-indigo-600 text-white disabled:opacity-50"
-                      >
-                        Save
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setEditingAlertId(null)}
-                        className="px-3 py-1 rounded border border-gray-300 dark:border-gray-700"
-                      >
-                        Cancel
-                      </button>
+                      <button type="submit" disabled={updateAlertMutation.isPending} className="px-3 py-1.5 rounded-lg bg-indigo-600 text-white text-xs font-medium disabled:opacity-50">Save</button>
+                      <button type="button" onClick={() => setEditingAlertId(null)} className="px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-700 text-xs">Cancel</button>
                     </div>
                   </form>
                 )}
@@ -545,97 +555,56 @@ export default function ProductDetail() {
           </ul>
         )}
 
-        <form onSubmit={handleAddAlert} className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div>
-            <label className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1 block">Condition</label>
-            <select
-              value={alertForm.condition}
-              onChange={(e) =>
-                setAlertForm({
-                  ...alertForm,
-                  condition: e.target.value as AlertCreate['condition'],
-                })
-              }
-              className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        {/* Collapsible add-alert form */}
+        {showAddAlert && (
+          <div className="border-t border-gray-100 dark:border-gray-800 pt-4">
+            <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">New alert</p>
+            <form
+              onSubmit={(e) => { handleAddAlert(e); setShowAddAlert(false) }}
+              className="grid grid-cols-1 sm:grid-cols-2 gap-3"
             >
-              <option value="below">Below threshold</option>
-              <option value="lowered">Price lowered</option>
-              <option value="changed">Price changed</option>
-              <option value="any_change">Any change</option>
-            </select>
+              <div>
+                <label className={labelCls}>Condition</label>
+                <select
+                  value={alertForm.condition}
+                  onChange={(e) => setAlertForm({ ...alertForm, condition: e.target.value as AlertCreate['condition'] })}
+                  className={inputCls}
+                >
+                  <option value="below">Below threshold</option>
+                  <option value="lowered">Price lowered</option>
+                  <option value="changed">Price changed</option>
+                  <option value="any_change">Any change</option>
+                </select>
+              </div>
+              {alertForm.condition === 'below' && (
+                <div>
+                  <label className={labelCls}>Threshold price (€)</label>
+                  <input type="number" step="0.01" min={0} value={alertForm.threshold_price ?? ''} onChange={(e) => setAlertForm({ ...alertForm, threshold_price: e.target.value || null })} className={inputCls} />
+                </div>
+              )}
+              <div className="sm:col-span-2">
+                <label className={labelCls}>Email</label>
+                <input type="email" value={alertForm.email ?? ''} onChange={(e) => setAlertForm({ ...alertForm, email: e.target.value.trim() ? e.target.value : null })} placeholder="you@example.com" className={inputCls} />
+              </div>
+              <div className="sm:col-span-2">
+                <label className={labelCls}>Telegram chat ID</label>
+                <input type="text" value={alertForm.telegram_chat_id ?? ''} onChange={(e) => setAlertForm({ ...alertForm, telegram_chat_id: e.target.value.trim() ? e.target.value : null })} placeholder="123456789" className={inputCls} />
+                <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">Provide email, Telegram chat ID, or both.</p>
+              </div>
+              <div className="sm:col-span-2">
+                <label className="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+                  <input type="checkbox" checked={alertForm.active} onChange={(e) => setAlertForm({ ...alertForm, active: e.target.checked })} />
+                  Active
+                </label>
+              </div>
+              <div className="sm:col-span-2">
+                <button type="submit" disabled={createAlertMutation.isPending} className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 transition-colors">
+                  {createAlertMutation.isPending ? 'Adding…' : 'Add alert'}
+                </button>
+              </div>
+            </form>
           </div>
-          {alertForm.condition === 'below' && (
-            <div>
-              <label className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1 block">
-                Threshold price (€)
-              </label>
-              <input
-                type="number"
-                step="0.01"
-                min={0}
-                value={alertForm.threshold_price ?? ''}
-                onChange={(e) =>
-                  setAlertForm({ ...alertForm, threshold_price: e.target.value || null })
-                }
-                className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              />
-            </div>
-          )}
-          <div className="sm:col-span-2">
-            <label className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1 block">Email</label>
-            <input
-              type="email"
-              value={alertForm.email ?? ''}
-              onChange={(e) =>
-                setAlertForm({
-                  ...alertForm,
-                  email: e.target.value.trim() ? e.target.value : null,
-                })
-              }
-              placeholder="you@example.com"
-              className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
-          </div>
-          <div className="sm:col-span-2">
-            <label className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1 block">
-              Telegram chat ID
-            </label>
-            <input
-              type="text"
-              value={alertForm.telegram_chat_id ?? ''}
-              onChange={(e) =>
-                setAlertForm({
-                  ...alertForm,
-                  telegram_chat_id: e.target.value.trim() ? e.target.value : null,
-                })
-              }
-              placeholder="123456789"
-              className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
-            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              Provide email, Telegram chat ID, or both.
-            </p>
-          </div>
-          <div className="sm:col-span-2">
-            <label className="inline-flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
-              <input
-                type="checkbox"
-                checked={alertForm.active}
-                onChange={(e) => setAlertForm({ ...alertForm, active: e.target.checked })}
-              />
-              Active
-            </label>
-          </div>
-          <div className="sm:col-span-2">
-            <button
-              type="submit"
-              disabled={createAlertMutation.isPending}
-              className="bg-indigo-600 text-white px-4 py-1.5 rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50"
-            >
-              {createAlertMutation.isPending ? 'Adding…' : 'Add alert'}
-            </button>
-          </div>
-        </form>
+        )}
       </div>
     </div>
   )

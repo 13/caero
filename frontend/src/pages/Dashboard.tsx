@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { ArrowDown, ArrowUp, Grid2x2, List, Plus, X } from 'lucide-react'
+import { ArrowDown, ArrowUp, Grid2x2, List, Plus, X, Search, Package } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useProducts, useSettings } from '../api/hooks'
 import { formatDate, formatPercent, formatPrice } from '../utils/format'
@@ -41,28 +41,23 @@ export default function Dashboard() {
     setSortDirection('asc')
   }
 
-  const sortIndicator = (key: SortBy) => {
-    if (sortBy !== key) return ''
-    return sortDirection === 'asc' ? '↑' : '↓'
-  }
-
   const ariaSortFor = (key: SortBy): 'none' | 'ascending' | 'descending' => {
     if (sortBy !== key) return 'none'
     return sortDirection === 'asc' ? 'ascending' : 'descending'
   }
 
+  const sortIndicator = (key: SortBy) => {
+    if (sortBy !== key) return null
+    return sortDirection === 'asc'
+      ? <ArrowUp className="h-3 w-3 inline ml-0.5" />
+      : <ArrowDown className="h-3 w-3 inline ml-0.5" />
+  }
+
   const sortedProducts = useMemo(() => {
     const items = [...filteredProducts]
     const direction = sortDirection === 'asc' ? 1 : -1
-
-    if (sortBy === 'name') {
-      items.sort((a, b) => a.name.localeCompare(b.name) * direction)
-    }
-
-    if (sortBy === 'category') {
-      items.sort((a, b) => (a.category ?? '').localeCompare(b.category ?? '') * direction)
-    }
-
+    if (sortBy === 'name') items.sort((a, b) => a.name.localeCompare(b.name) * direction)
+    if (sortBy === 'category') items.sort((a, b) => (a.category ?? '').localeCompare(b.category ?? '') * direction)
     if (sortBy === 'latest_price') {
       items.sort((a, b) => {
         const aPrice = a.latest_price ? parseFloat(a.latest_price) : null
@@ -70,7 +65,6 @@ export default function Dashboard() {
         return compareNullableNumbers(aPrice, bPrice) * direction
       })
     }
-
     if (sortBy === 'last_change_percent') {
       items.sort((a, b) => {
         const aChange = a.last_price_change_percent ? Math.abs(parseFloat(a.last_price_change_percent)) : null
@@ -78,7 +72,6 @@ export default function Dashboard() {
         return compareNullableNumbers(aChange, bChange) * direction
       })
     }
-
     if (sortBy === 'last_change_date') {
       items.sort((a, b) => {
         const aDate = a.last_price_change_at ? new Date(a.last_price_change_at).getTime() : null
@@ -86,9 +79,15 @@ export default function Dashboard() {
         return compareNullableNumbers(aDate, bDate) * direction
       })
     }
-
     return items
   }, [filteredProducts, sortBy, sortDirection])
+
+  // Summary stats
+  const activeCount = products?.filter((p) => p.active).length ?? 0
+  const droppedCount = products?.filter((p) => {
+    const pct = p.last_price_change_percent ? parseFloat(p.last_price_change_percent) : null
+    return pct !== null && pct < 0
+  }).length ?? 0
 
   if (isLoading) {
     return (
@@ -99,7 +98,7 @@ export default function Dashboard() {
   }
 
   if (error) {
-      return (
+    return (
       <div className="text-center py-16 text-red-500 dark:text-red-400">
         Failed to load products: {error.message}
       </div>
@@ -107,98 +106,143 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-8">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+    <div className="max-w-5xl mx-auto px-4 py-6 space-y-5">
+
+      {/* ── Page header ── */}
+      <div className="flex items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Tracked Products</h1>
-          <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">
-            {products?.length ?? 0} product{products?.length !== 1 ? 's' : ''} tracked
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+            {products?.length ?? 0} product{products?.length !== 1 ? 's' : ''}
           </p>
         </div>
         <Link
           to="/add"
-          className="inline-flex items-center gap-1.5 bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors"
+          className="inline-flex items-center gap-1.5 bg-indigo-600 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-indigo-700 transition-colors shadow-sm"
         >
-          <Plus aria-hidden="true" className="h-4 w-4" />
-          Add
+          <Plus className="h-4 w-4" aria-hidden />
+          Add product
         </Link>
       </div>
-      <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-3 mb-4 flex flex-wrap items-center gap-3">
-        <select
-          value={sortBy}
-          onChange={(e) => handleSort(e.target.value as SortBy)}
-          className="rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 px-2 py-1.5 text-sm"
-        >
-          <option value="name">Sort by name</option>
-          <option value="category">Sort by category</option>
-          <option value="latest_price">Sort by price</option>
-          <option value="last_change_percent">Sort by last price change %</option>
-          <option value="last_change_date">Sort by last price change date</option>
-        </select>
-        <button
-          onClick={() => setSortDirection((d) => (d === 'asc' ? 'desc' : 'asc'))}
-          aria-label={sortDirection === 'asc' ? 'Change to descending order' : 'Change to ascending order'}
-          className="px-3 py-1.5 text-sm rounded-lg bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-200"
-        >
-          {sortDirection === 'asc' ? (
-            <ArrowUp aria-hidden="true" className="h-4 w-4" />
-          ) : (
-            <ArrowDown aria-hidden="true" className="h-4 w-4" />
-          )}
-        </button>
-        <div className="relative flex-1 min-w-[180px]">
+
+      {/* ── Summary strip ── */}
+      {(products?.length ?? 0) > 0 && (
+        <div className="grid grid-cols-3 gap-3">
+          <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 px-4 py-3">
+            <p className="text-xs text-gray-400 dark:text-gray-500">Total tracked</p>
+            <p className="text-xl font-bold text-gray-900 dark:text-gray-100">{products?.length ?? 0}</p>
+          </div>
+          <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 px-4 py-3">
+            <p className="text-xs text-gray-400 dark:text-gray-500">Active</p>
+            <p className="text-xl font-bold text-green-600 dark:text-green-400">{activeCount}</p>
+          </div>
+          <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 px-4 py-3">
+            <p className="text-xs text-gray-400 dark:text-gray-500">Price drops</p>
+            <p className="text-xl font-bold text-indigo-600 dark:text-indigo-400">{droppedCount}</p>
+          </div>
+        </div>
+      )}
+
+      {/* ── Toolbar ── */}
+      <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-3 flex flex-wrap items-center gap-2">
+        {/* Search */}
+        <div className="relative flex-1 min-w-[160px]">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400 pointer-events-none" />
           <input
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Search products..."
-            aria-label="Search products by name, category, URL, or tags"
-            className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 px-3 py-1.5 pr-8 text-sm"
+            placeholder="Search…"
+            aria-label="Search products"
+            className="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 pl-8 pr-7 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
           />
           {searchTerm && (
             <button
               type="button"
               onClick={() => setSearchTerm('')}
               aria-label="Clear search"
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
             >
-              <X aria-hidden="true" className="h-4 w-4" />
+              <X className="h-3.5 w-3.5" />
             </button>
           )}
         </div>
-        <button
-          onClick={() => setView('grid')}
-          aria-label="Grid view"
-          className={`px-3 py-1.5 text-sm rounded-lg ${
-            view === 'grid'
-              ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-200'
-              : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'
-          }`}
+
+        {/* Sort select */}
+        <select
+          value={sortBy}
+          onChange={(e) => handleSort(e.target.value as SortBy)}
+          className="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-200 px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
         >
-          <Grid2x2 aria-hidden="true" className="h-4 w-4" />
-        </button>
+          <option value="name">Name</option>
+          <option value="category">Category</option>
+          <option value="latest_price">Price</option>
+          <option value="last_change_percent">Change %</option>
+          <option value="last_change_date">Change date</option>
+        </select>
+
+        {/* Sort direction */}
         <button
-          onClick={() => setView('list')}
-          aria-label="List view"
-          className={`px-3 py-1.5 text-sm rounded-lg ${
-            view === 'list'
-              ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-200'
-              : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'
-          }`}
+          onClick={() => setSortDirection((d) => (d === 'asc' ? 'desc' : 'asc'))}
+          aria-label={sortDirection === 'asc' ? 'Switch to descending' : 'Switch to ascending'}
+          className="p-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
         >
-          <List aria-hidden="true" className="h-4 w-4" />
+          {sortDirection === 'asc' ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />}
         </button>
+
+        {/* Divider */}
+        <div className="w-px h-6 bg-gray-200 dark:bg-gray-700" />
+
+        {/* View toggle */}
+        <div className="flex rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+          <button
+            onClick={() => setView('grid')}
+            aria-label="Grid view"
+            className={`px-2.5 py-1.5 transition-colors ${
+              view === 'grid'
+                ? 'bg-indigo-600 text-white'
+                : 'bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
+            }`}
+          >
+            <Grid2x2 className="h-4 w-4" />
+          </button>
+          <button
+            onClick={() => setView('list')}
+            aria-label="List view"
+            className={`px-2.5 py-1.5 transition-colors ${
+              view === 'list'
+                ? 'bg-indigo-600 text-white'
+                : 'bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
+            }`}
+          >
+            <List className="h-4 w-4" />
+          </button>
+        </div>
       </div>
 
+      {/* ── Search result hint ── */}
+      {searchTerm && (
+        <p className="text-sm text-gray-500 dark:text-gray-400 px-1">
+          {sortedProducts.length === 0
+            ? 'No products match your search.'
+            : `${sortedProducts.length} result${sortedProducts.length !== 1 ? 's' : ''} for "${searchTerm}"`}
+        </p>
+      )}
+
+      {/* ── Empty state ── */}
       {!products?.length ? (
-        <div className="text-center py-24 text-gray-400 dark:text-gray-500">
-          <p className="text-4xl mb-4">🛍️</p>
-          <p className="text-lg font-medium">No products tracked yet</p>
-          <p className="text-sm mt-2">
-            <Link to="/add" className="text-indigo-500 hover:underline">
-              Add your first product
-            </Link>{' '}
-            to start tracking prices.
-          </p>
+        <div className="flex flex-col items-center justify-center py-24 text-center">
+          <div className="w-16 h-16 rounded-2xl bg-indigo-50 dark:bg-indigo-950 flex items-center justify-center mb-4">
+            <Package className="h-8 w-8 text-indigo-400" />
+          </div>
+          <p className="text-lg font-semibold text-gray-700 dark:text-gray-200">No products yet</p>
+          <p className="text-sm text-gray-400 dark:text-gray-500 mt-1 mb-5">Start tracking prices by adding your first product.</p>
+          <Link
+            to="/add"
+            className="inline-flex items-center gap-1.5 bg-indigo-600 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-indigo-700 transition-colors"
+          >
+            <Plus className="h-4 w-4" />
+            Add your first product
+          </Link>
         </div>
       ) : (
         <>
@@ -211,72 +255,61 @@ export default function Dashboard() {
           ) : (
             <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden">
               <div className="overflow-x-auto">
-                <table className="w-full text-sm min-w-[640px]">
-                  <thead className="bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-300">
-                  <tr>
-                    <th className="text-left px-3 py-2" aria-sort={ariaSortFor('name')}>
-                      <button
-                        onClick={() => handleSort('name')}
-                        aria-label="Sort by name"
-                        className="inline-flex items-center gap-1 hover:text-indigo-600"
-                      >
-                        Name <span>{sortIndicator('name')}</span>
-                      </button>
-                    </th>
-                    <th className="text-left px-3 py-2" aria-sort={ariaSortFor('category')}>
-                      <button
-                        onClick={() => handleSort('category')}
-                        aria-label="Sort by category"
-                        className="inline-flex items-center gap-1 hover:text-indigo-600"
-                      >
-                        Category <span>{sortIndicator('category')}</span>
-                      </button>
-                    </th>
-                    <th className="text-left px-3 py-2" aria-sort={ariaSortFor('latest_price')}>
-                      <button
-                        onClick={() => handleSort('latest_price')}
-                        aria-label="Sort by price"
-                        className="inline-flex items-center gap-1 hover:text-indigo-600"
-                      >
-                        Price <span>{sortIndicator('latest_price')}</span>
-                      </button>
-                    </th>
-                    <th className="text-left px-3 py-2" aria-sort={ariaSortFor('last_change_percent')}>
-                      <button
-                        onClick={() => handleSort('last_change_percent')}
-                        aria-label="Sort by last change"
-                        className="inline-flex items-center gap-1 hover:text-indigo-600"
-                      >
-                        Last change <span>{sortIndicator('last_change_percent')}</span>
-                      </button>
-                    </th>
-                    <th className="text-left px-3 py-2" aria-sort={ariaSortFor('last_change_date')}>
-                      <button
-                        onClick={() => handleSort('last_change_date')}
-                        aria-label="Sort by date"
-                        className="inline-flex items-center gap-1 hover:text-indigo-600"
-                      >
-                        Date <span>{sortIndicator('last_change_date')}</span>
-                      </button>
-                    </th>
-                  </tr>
-                </thead>
-                  <tbody>
-                  {sortedProducts.map((p) => (
-                    <tr key={p.id} className="border-t border-gray-100 dark:border-gray-800">
-                      <td className="px-3 py-2">
-                        <Link to={`/products/${p.id}`} className="text-indigo-600 hover:underline">
-                          {p.name}
-                        </Link>
-                      </td>
-                      <td className="px-3 py-2 text-gray-700 dark:text-gray-300">{p.category ?? '—'}</td>
-                      <td className="px-3 py-2">{formatPrice(p.latest_price)}</td>
-                      <td className="px-3 py-2">{formatPercent(p.last_price_change_percent)}</td>
-                      <td className="px-3 py-2">
-                        {formatDate(p.last_price_change_at, settings?.date_format)}
-                      </td>
+                <table className="w-full text-sm min-w-[600px]">
+                  <thead className="bg-gray-50 dark:bg-gray-800">
+                    <tr>
+                      {(
+                        [
+                          { key: 'name', label: 'Name' },
+                          { key: 'category', label: 'Category' },
+                          { key: 'latest_price', label: 'Price' },
+                          { key: 'last_change_percent', label: 'Change' },
+                          { key: 'last_change_date', label: 'Date' },
+                        ] as { key: SortBy; label: string }[]
+                      ).map(({ key, label }) => (
+                        <th
+                          key={key}
+                          className="text-left px-4 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider"
+                          aria-sort={ariaSortFor(key)}
+                        >
+                          <button
+                            onClick={() => handleSort(key)}
+                            className="inline-flex items-center gap-1 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
+                          >
+                            {label} {sortIndicator(key)}
+                          </button>
+                        </th>
+                      ))}
                     </tr>
-                  ))}
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                    {sortedProducts.map((p) => (
+                      <tr key={p.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+                        <td className="px-4 py-3">
+                          <Link to={`/products/${p.id}`} className="font-medium text-indigo-600 dark:text-indigo-400 hover:underline">
+                            {p.name}
+                          </Link>
+                        </td>
+                        <td className="px-4 py-3 text-gray-500 dark:text-gray-400">{p.category ?? '—'}</td>
+                        <td className="px-4 py-3 font-semibold text-gray-800 dark:text-gray-200">{formatPrice(p.latest_price)}</td>
+                        <td className="px-4 py-3">
+                          {p.last_price_change_percent ? (
+                            <span className={`text-xs font-semibold ${
+                              parseFloat(p.last_price_change_percent) < 0
+                                ? 'text-green-600 dark:text-green-400'
+                                : parseFloat(p.last_price_change_percent) > 0
+                                ? 'text-red-600 dark:text-red-400'
+                                : 'text-gray-500'
+                            }`}>
+                              {formatPercent(p.last_price_change_percent)}
+                            </span>
+                          ) : '—'}
+                        </td>
+                        <td className="px-4 py-3 text-gray-500 dark:text-gray-400">
+                          {formatDate(p.last_price_change_at, settings?.date_format)}
+                        </td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               </div>

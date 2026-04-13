@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useCreateProduct } from '../api/hooks'
+import { ArrowLeft, Package, Link as LinkIcon, Code, Clock, Image, Tag, FileText, FolderOpen } from 'lucide-react'
 import {
   CHECK_INTERVAL_HOUR_STEP,
   MIN_CHECK_INTERVAL_HOURS,
@@ -8,6 +9,29 @@ import {
   intervalMinutesToHours,
   normalizeIntervalHoursToMinutes,
 } from '../utils/format'
+
+const inputCls = 'w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-950 text-gray-900 dark:text-gray-100 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors placeholder:text-gray-400 dark:placeholder:text-gray-600'
+//const labelCls = 'text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5 block uppercase tracking-wide'
+
+function Field({ icon: Icon, label, required, hint, children }: {
+  icon: React.ElementType
+  label: string
+  required?: boolean
+  hint?: string
+  children: React.ReactNode
+}) {
+  return (
+    <div className="space-y-1.5">
+      <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+        <Icon className="h-3.5 w-3.5" />
+        {label}
+        {required && <span className="text-indigo-500 font-bold">*</span>}
+      </label>
+      {children}
+      {hint && <p className="text-xs text-gray-400 dark:text-gray-500">{hint}</p>}
+    </div>
+  )
+}
 
 export default function AddProduct() {
   const navigate = useNavigate()
@@ -33,162 +57,174 @@ export default function AddProduct() {
         category: form.category || null,
         memo: form.memo || null,
         image_url: form.image_url || null,
-        tags: form.tags
-          .split(',')
-          .map((tag) => tag.trim())
-          .filter(Boolean),
+        tags: form.tags.split(',').map((t) => t.trim()).filter(Boolean),
       },
-      {
-      onSuccess: (product) => navigate(`/products/${product.id}`),
-      }
+      { onSuccess: (product) => navigate(`/products/${product.id}`) }
     )
   }
 
   return (
-    <div className="max-w-xl mx-auto px-4 py-8">
-      <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6">Add Product</h1>
+    <div className="max-w-xl mx-auto px-4 py-6">
+
+      {/* Header */}
+      <div className="mb-6">
+        <button
+          onClick={() => navigate('/')}
+          className="inline-flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-100 transition-colors mb-3"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back
+        </button>
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-indigo-100 dark:bg-indigo-950 flex items-center justify-center">
+            <Package className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">Add product</h1>
+            <p className="text-sm text-gray-500 dark:text-gray-400">Start tracking a new price</p>
+          </div>
+        </div>
+      </div>
 
       <form onSubmit={handleSubmit} className="space-y-5">
+
         {createMutation.error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+          <div className="bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 px-4 py-3 rounded-xl text-sm">
             {createMutation.error.message}
           </div>
         )}
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Product name *
-          </label>
-          <input
+        {/* Core info card */}
+        <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-5 space-y-4">
+          <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Product info</p>
+
+          <Field icon={Package} label="Product name" required>
+            <input
+              required
+              type="text"
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              placeholder="e.g. Sony WH-1000XM5"
+              className={inputCls}
+              autoFocus
+            />
+          </Field>
+
+          <div className="grid grid-cols-2 gap-3">
+            <Field icon={FolderOpen} label="Category">
+              <input
+                type="text"
+                value={form.category}
+                onChange={(e) => setForm({ ...form, category: e.target.value })}
+                placeholder="e.g. Electronics"
+                className={inputCls}
+              />
+            </Field>
+            <Field icon={Tag} label="Tags" hint="Comma-separated">
+              <input
+                type="text"
+                value={form.tags}
+                onChange={(e) => setForm({ ...form, tags: e.target.value })}
+                placeholder="audio, sony"
+                className={inputCls}
+              />
+            </Field>
+          </div>
+
+          <Field icon={FileText} label="Memo">
+            <textarea
+              value={form.memo}
+              onChange={(e) => setForm({ ...form, memo: e.target.value })}
+              placeholder="Optional notes about this product"
+              rows={3}
+              className={inputCls}
+            />
+          </Field>
+
+          <Field icon={Image} label="Image URL">
+            <input
+              type="url"
+              value={form.image_url}
+              onChange={(e) => setForm({ ...form, image_url: e.target.value })}
+              placeholder="https://example.com/image.jpg"
+              className={inputCls}
+            />
+          </Field>
+        </div>
+
+        {/* Tracking config card */}
+        <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-5 space-y-4">
+          <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Tracking config</p>
+
+          <Field icon={LinkIcon} label="Product URL" required>
+            <input
+              required
+              type="url"
+              value={form.url}
+              onChange={(e) => setForm({ ...form, url: e.target.value })}
+              placeholder="https://example.com/product"
+              className={inputCls}
+            />
+          </Field>
+
+          <Field
+            icon={Code}
+            label="CSS selector"
             required
-            type="text"
-            value={form.name}
-            onChange={(e) => setForm({ ...form, name: e.target.value })}
-            placeholder="e.g. Sony WH-1000XM5"
-            className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          />
-        </div>
+            hint="The CSS selector that points to the price element on the page"
+          >
+            <input
+              required
+              type="text"
+              value={form.selector}
+              onChange={(e) => setForm({ ...form, selector: e.target.value })}
+              placeholder=".price, #product-price, [data-price]"
+              className={`${inputCls} font-mono`}
+            />
+          </Field>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Category</label>
-          <input
-            type="text"
-            value={form.category}
-            onChange={(e) => setForm({ ...form, category: e.target.value })}
-            placeholder="e.g. Electronics"
-            className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tags</label>
-          <input
-            type="text"
-            value={form.tags}
-            onChange={(e) => setForm({ ...form, tags: e.target.value })}
-            placeholder="comma,separated,tags"
-            className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Memo</label>
-          <textarea
-            value={form.memo}
-            onChange={(e) => setForm({ ...form, memo: e.target.value })}
-            placeholder="Optional notes for this product"
-            rows={4}
-            className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Image URL</label>
-          <input
-            type="url"
-            value={form.image_url}
-            onChange={(e) => setForm({ ...form, image_url: e.target.value })}
-            placeholder="https://example.com/image.jpg"
-            className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Product URL *
-          </label>
-          <input
-            required
-            type="url"
-            value={form.url}
-            onChange={(e) => setForm({ ...form, url: e.target.value })}
-            placeholder="https://example.com/product"
-            className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            CSS selector *
-          </label>
-          <input
-            required
-            type="text"
-            value={form.selector}
-            onChange={(e) => setForm({ ...form, selector: e.target.value })}
-            placeholder=".price, #product-price, [data-price]"
-            className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          />
-          <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-            CSS selector for the price element on the page
-          </p>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Check interval (hours)
-          </label>
-          <input
-            type="number"
-            min={MIN_CHECK_INTERVAL_HOURS}
-            step={CHECK_INTERVAL_HOUR_STEP}
-            value={intervalMinutesToHours(form.check_interval_minutes)}
-            onChange={(e) => {
-              const hours = parseFloat(e.target.value)
-              setForm({
+          <Field icon={Clock} label="Check interval (hours)">
+            <input
+              type="number"
+              min={MIN_CHECK_INTERVAL_HOURS}
+              step={CHECK_INTERVAL_HOUR_STEP}
+              value={intervalMinutesToHours(form.check_interval_minutes)}
+              onChange={(e) => setForm({
                 ...form,
-                check_interval_minutes: normalizeIntervalHoursToMinutes(hours),
-              })
-            }}
-            className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          />
-        </div>
+                check_interval_minutes: normalizeIntervalHoursToMinutes(parseFloat(e.target.value)),
+              })}
+              className={inputCls}
+            />
+          </Field>
 
-        <div className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            id="active"
-            checked={form.active}
-            onChange={(e) => setForm({ ...form, active: e.target.checked })}
-            className="rounded text-indigo-600 focus:ring-indigo-500"
-          />
-          <label htmlFor="active" className="text-sm text-gray-700 dark:text-gray-300">
-            Start tracking immediately
+          <label className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-800 cursor-pointer">
+            <div>
+              <p className="text-sm font-medium text-gray-800 dark:text-gray-200">Start tracking immediately</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">First price check will run right away</p>
+            </div>
+            <input
+              type="checkbox"
+              id="active"
+              checked={form.active}
+              onChange={(e) => setForm({ ...form, active: e.target.checked })}
+              className="rounded text-indigo-600 focus:ring-indigo-500 h-4 w-4"
+            />
           </label>
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-3 pt-2">
+        {/* Submit */}
+        <div className="flex gap-3 pb-2">
           <button
             type="submit"
             disabled={createMutation.isPending}
-            className="flex-1 bg-indigo-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+            className="flex-1 bg-indigo-600 text-white py-2.5 rounded-xl text-sm font-semibold hover:bg-indigo-700 disabled:opacity-50 transition-colors shadow-sm"
           >
             {createMutation.isPending ? 'Adding…' : 'Add product'}
           </button>
           <button
             type="button"
             onClick={() => navigate('/')}
-            className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800"
+            className="px-5 py-2.5 rounded-xl border border-gray-300 dark:border-gray-700 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
           >
             Cancel
           </button>

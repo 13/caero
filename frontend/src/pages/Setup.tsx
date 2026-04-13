@@ -22,6 +22,10 @@ import type { AppSettings } from '../api/types'
 import CaeroBrand from '../components/CaeroBrand'
 import DbSelector from '../components/DbSelector'
 import { APP_DESCRIPTION, APP_VERSION } from '../constants/appInfo'
+import {
+  User, KeyRound, Download, Upload, Trash2,
+  Shield, Database, Bell, Users, Check, Info,
+} from 'lucide-react'
 
 function downloadJson(data: unknown, filename: string) {
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
@@ -36,6 +40,34 @@ function downloadJson(data: unknown, filename: string) {
 function exportDateSuffix() {
   return new Date().toISOString().slice(0, 10)
 }
+
+// Reusable section card
+function Section({ icon: Icon, title, description, children }: {
+  icon: React.ElementType
+  title: string
+  description?: string
+  children: React.ReactNode
+}) {
+  return (
+    <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 overflow-hidden">
+      <div className="flex items-center gap-3 px-5 py-4 border-b border-gray-100 dark:border-gray-800">
+        <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-950 flex items-center justify-center shrink-0">
+          <Icon className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+        </div>
+        <div>
+          <h2 className="font-semibold text-gray-900 dark:text-gray-100 text-sm">{title}</h2>
+          {description && <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{description}</p>}
+        </div>
+      </div>
+      <div className="p-5 space-y-4">{children}</div>
+    </div>
+  )
+}
+
+const inputCls = 'w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 text-gray-900 dark:text-gray-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500'
+const labelCls = 'text-xs font-medium text-gray-500 dark:text-gray-400 mb-1 block'
+
+type Tab = 'account' | 'admin'
 
 export default function Setup() {
   const { data: currentSettings, isLoading } = useSettings()
@@ -57,6 +89,7 @@ export default function Setup() {
   const deleteMyProductsMutation = useDeleteMyProducts()
   const adminDeleteUserProductsMutation = useAdminDeleteUserProducts()
 
+  const [activeTab, setActiveTab] = useState<Tab>('account')
   const [form, setForm] = useState<AppSettings>({
     db_type: 'sqlite',
     sqlite_path: '/data/caero.db',
@@ -84,9 +117,7 @@ export default function Setup() {
   const [testTelegramChatId, setTestTelegramChatId] = useState('')
 
   useEffect(() => {
-    if (currentSettings) {
-      setForm(currentSettings)
-    }
+    if (currentSettings) setForm(currentSettings)
   }, [currentSettings])
 
   const handleSaveSettings = (e: React.FormEvent) => {
@@ -112,12 +143,7 @@ export default function Setup() {
     e.preventDefault()
     changePasswordMutation.mutate(
       { current_password: currentPassword, new_password: newPassword },
-      {
-        onSuccess: () => {
-          setCurrentPassword('')
-          setNewPassword('')
-        },
-      }
+      { onSuccess: () => { setCurrentPassword(''); setNewPassword('') } }
     )
   }
 
@@ -125,12 +151,9 @@ export default function Setup() {
     const file = e.target.files?.[0]
     if (!file) return
     try {
-      const content = await file.text()
-      importDataMutation.mutate(JSON.parse(content))
+      importDataMutation.mutate(JSON.parse(await file.text()))
       setAdminImportError(null)
-    } catch {
-      setAdminImportError('Invalid JSON file')
-    }
+    } catch { setAdminImportError('Invalid JSON file') }
     e.target.value = ''
   }
 
@@ -138,12 +161,9 @@ export default function Setup() {
     const file = e.target.files?.[0]
     if (!file) return
     try {
-      const content = await file.text()
-      importMyDataMutation.mutate(JSON.parse(content))
+      importMyDataMutation.mutate(JSON.parse(await file.text()))
       setMyImportError(null)
-    } catch {
-      setMyImportError('Invalid JSON file')
-    }
+    } catch { setMyImportError('Invalid JSON file') }
     e.target.value = ''
   }
 
@@ -153,6 +173,9 @@ export default function Setup() {
     }
   }
 
+  const anyError = saveMutation.error || changePasswordMutation.error
+    || importDataMutation.error || importMyDataMutation.error
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -161,86 +184,152 @@ export default function Setup() {
     )
   }
 
+  const tabs: { key: Tab; label: string; icon: React.ElementType }[] = [
+    { key: 'account', label: 'Account', icon: User },
+    ...(me?.is_admin ? [{ key: 'admin' as Tab, label: 'Admin', icon: Shield }] : []),
+  ]
+
   return (
-    <div className="max-w-5xl mx-auto px-4 py-8 space-y-6">
-      <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Settings</h1>
+    <div className="max-w-3xl mx-auto px-4 py-6 space-y-5">
 
-      <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5 space-y-4">
-        <h2 className="font-semibold text-gray-800 dark:text-gray-100">User</h2>
-        <p className="text-sm text-gray-600 dark:text-gray-400">
-          Account and personal product data management.
-        </p>
-
-        <form onSubmit={handlePasswordChange} className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
-          <div>
-            <label className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1 block">Current password</label>
-            <input
-              type="password"
-              required
-              value={currentPassword}
-              onChange={(e) => setCurrentPassword(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 px-3 py-2 text-sm"
-            />
-          </div>
-          <div>
-            <label className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1 block">New password</label>
-            <input
-              type="password"
-              required
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 px-3 py-2 text-sm"
-            />
-          </div>
-          <button
-            type="submit"
-            disabled={changePasswordMutation.isPending}
-            className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50"
-          >
-            Change password
-          </button>
-        </form>
-
-        <div className="pt-3 border-t border-gray-200 dark:border-gray-800 space-y-3">
-          <h3 className="font-medium text-gray-800 dark:text-gray-100">My product data import / export</h3>
-          <div className="flex flex-wrap items-center gap-3">
-            <button
-              type="button"
-              onClick={() =>
-                exportMyDataMutation.mutate(undefined, {
-                  onSuccess: (data) => downloadJson(data, `caero-my-products-export-${exportDateSuffix()}.json`),
-                })
-              }
-              disabled={exportMyDataMutation.isPending}
-              className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50"
-            >
-              Export my product data
-            </button>
-            <label className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer">
-              Import my product data
-              <input type="file" accept="application/json" onChange={handleMyImportFile} className="hidden" />
-            </label>
-          </div>
-          {myImportError && <p className="text-sm text-red-600">{myImportError}</p>}
-        </div>
-
-        <div className="pt-3 border-t border-red-200 dark:border-red-900/30 space-y-2">
-          <h3 className="font-medium text-red-700 dark:text-red-300">Danger zone</h3>
-          <button
-            type="button"
-            onClick={handleDeleteMyProducts}
-            disabled={deleteMyProductsMutation.isPending}
-            className="px-4 py-2 rounded-lg bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-300 hover:bg-red-100 dark:hover:bg-red-900/50 text-sm font-medium disabled:opacity-50"
-          >
-            Delete all my products
-          </button>
-        </div>
+      {/* Header */}
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Settings</h1>
+        {me?.username && (
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+            Signed in as <span className="font-medium text-gray-700 dark:text-gray-300">{me.username}</span>
+            {me.is_admin && (
+              <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 font-medium">Admin</span>
+            )}
+          </p>
+        )}
       </div>
 
+      {/* Tab bar */}
       {me?.is_admin && (
-        <>
-          <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5 space-y-4">
-            <h2 className="font-semibold text-gray-800 dark:text-gray-100">Admin — System configuration</h2>
+        <div className="flex gap-1 bg-gray-100 dark:bg-gray-800 rounded-xl p-1 w-fit">
+          {tabs.map(({ key, label, icon: Icon }) => (
+            <button
+              key={key}
+              onClick={() => setActiveTab(key)}
+              className={`inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                activeTab === key
+                  ? 'bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 shadow-sm'
+                  : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+              }`}
+            >
+              <Icon className="h-3.5 w-3.5" />
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* ── Account tab ── */}
+      {activeTab === 'account' && (
+        <div className="space-y-4">
+
+          {/* App version */}
+          <div className="flex items-center justify-between px-4 py-3 rounded-xl bg-gray-50 dark:bg-gray-800">
+            <div>
+              <p className="text-sm font-medium text-gray-800 dark:text-gray-200">App version</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Currently installed</p>
+            </div>
+            <span className="text-xs font-mono font-semibold px-2.5 py-1 rounded-full bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300">
+              {APP_VERSION}
+            </span>
+          </div>
+
+          {/* Change password */}
+          <Section icon={KeyRound} title="Change password" description="Update your login credentials">
+            <form onSubmit={handlePasswordChange} className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className={labelCls}>Current password</label>
+                <input type="password" required value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} className={inputCls} />
+              </div>
+              <div>
+                <label className={labelCls}>New password</label>
+                <input type="password" required value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className={inputCls} />
+              </div>
+              <div className="sm:col-span-2 flex items-center gap-3">
+                <button type="submit" disabled={changePasswordMutation.isPending} className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 transition-colors">
+                  {changePasswordMutation.isPending ? 'Updating…' : 'Update password'}
+                </button>
+                {changePasswordMutation.isSuccess && (
+                  <span className="inline-flex items-center gap-1 text-sm text-green-600 font-medium">
+                    <Check className="h-4 w-4" /> Updated
+                  </span>
+                )}
+              </div>
+            </form>
+          </Section>
+
+          {/* My data */}
+          <Section icon={Download} title="My product data" description="Export or import your tracked products and price history">
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => exportMyDataMutation.mutate(undefined, {
+                  onSuccess: (data) => downloadJson(data, `caero-my-products-export-${exportDateSuffix()}.json`),
+                })}
+                disabled={exportMyDataMutation.isPending}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50 transition-colors"
+              >
+                <Download className="h-3.5 w-3.5" />
+                {exportMyDataMutation.isPending ? 'Exporting…' : 'Export my data'}
+              </button>
+              <label className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer transition-colors">
+                <Upload className="h-3.5 w-3.5" />
+                Import my data
+                <input type="file" accept="application/json" onChange={handleMyImportFile} className="hidden" />
+              </label>
+            </div>
+            {myImportError && <p className="text-sm text-red-600 dark:text-red-400">{myImportError}</p>}
+            {importMyDataMutation.isSuccess && (
+              <p className="inline-flex items-center gap-1 text-sm text-green-600 font-medium">
+                <Check className="h-4 w-4" /> Import successful
+              </p>
+            )}
+          </Section>
+
+          {/* Danger zone */}
+          <div className="bg-white dark:bg-gray-900 rounded-2xl border border-red-200 dark:border-red-900/40 overflow-hidden">
+            <div className="flex items-center gap-3 px-5 py-4 border-b border-red-100 dark:border-red-900/30">
+              <div className="w-8 h-8 rounded-lg bg-red-50 dark:bg-red-950 flex items-center justify-center shrink-0">
+                <Trash2 className="h-4 w-4 text-red-600 dark:text-red-400" />
+              </div>
+              <div>
+                <h2 className="font-semibold text-red-700 dark:text-red-300 text-sm">Danger zone</h2>
+                <p className="text-xs text-red-500 dark:text-red-400/70 mt-0.5">These actions are permanent and cannot be undone</p>
+              </div>
+            </div>
+            <div className="p-5">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-sm font-medium text-gray-800 dark:text-gray-200">Delete all my products</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Removes all your products, alerts, and price history</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleDeleteMyProducts}
+                  disabled={deleteMyProductsMutation.isPending}
+                  className="shrink-0 px-4 py-2 rounded-lg bg-red-50 dark:bg-red-950 text-red-700 dark:text-red-300 hover:bg-red-100 dark:hover:bg-red-900 text-sm font-medium disabled:opacity-50 transition-colors"
+                >
+                  Delete all
+                </button>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      )}
+
+      {/* ── Admin tab ── */}
+      {activeTab === 'admin' && me?.is_admin && (
+        <div className="space-y-4">
+
+          {/* System config */}
+          <Section icon={Database} title="System configuration" description="Database engine and display preferences">
             <form onSubmit={handleSaveSettings} className="space-y-4">
               <DbSelector value={form} onChange={setForm} />
 
@@ -248,14 +337,9 @@ export default function Setup() {
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Date format</label>
                 <select
                   value={form.date_format}
-                  onChange={(e) =>
-                    setForm({
-                      ...form,
-                      date_format: e.target.value as AppSettings['date_format'],
-                    })
-                  }
+                  onChange={(e) => setForm({ ...form, date_format: e.target.value as AppSettings['date_format'] })}
                   style={{ colorScheme: 'light dark' }}
-                  className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 px-3 py-2 text-sm"
+                  className={inputCls}
                 >
                   <option value="DD.MM.YYYY">DD.MM.YYYY (German default)</option>
                   <option value="DD/MM/YYYY">DD/MM/YYYY</option>
@@ -265,24 +349,12 @@ export default function Setup() {
               </div>
 
               {switchWarning && (
-                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-800">
-                  <p className="font-medium mb-2">⚠️ Switching database engine</p>
-                  <p>Switching databases will not migrate existing data. Export your data first.</p>
+                <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-xl p-4 text-sm text-amber-800 dark:text-amber-200">
+                  <p className="font-semibold mb-1">⚠️ Switching database engine</p>
+                  <p className="text-amber-700 dark:text-amber-300">Switching databases will not migrate existing data. Export your data first.</p>
                   <div className="flex gap-2 mt-3">
-                    <button
-                      type="button"
-                      onClick={() => saveSettings()}
-                      className="bg-amber-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-amber-700"
-                    >
-                      Switch anyway
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setSwitchWarning(false)}
-                      className="px-3 py-1.5 rounded-lg border border-amber-300 text-sm text-amber-800 hover:bg-amber-100"
-                    >
-                      Cancel
-                    </button>
+                    <button type="button" onClick={() => saveSettings()} className="bg-amber-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-amber-700">Switch anyway</button>
+                    <button type="button" onClick={() => setSwitchWarning(false)} className="px-3 py-1.5 rounded-lg border border-amber-300 text-sm text-amber-800 dark:text-amber-200 hover:bg-amber-100 dark:hover:bg-amber-900/40">Cancel</button>
                   </div>
                 </div>
               )}
@@ -290,293 +362,250 @@ export default function Setup() {
               <div className="flex items-center gap-3 flex-wrap">
                 <button
                   type="button"
-                  onClick={() =>
-                    testDbMutation.mutate({
-                      db_type: form.db_type,
-                      sqlite_path: form.sqlite_path,
-                      pg_host: form.pg_host,
-                      pg_port: form.pg_port,
-                      pg_database: form.pg_database,
-                      pg_user: form.pg_user,
-                      pg_password: form.pg_password,
-                    })
-                  }
+                  onClick={() => testDbMutation.mutate({
+                    db_type: form.db_type, sqlite_path: form.sqlite_path,
+                    pg_host: form.pg_host, pg_port: form.pg_port,
+                    pg_database: form.pg_database, pg_user: form.pg_user, pg_password: form.pg_password,
+                  })}
                   disabled={testDbMutation.isPending}
-                  className="px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-700 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50"
+                  className="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50 transition-colors"
                 >
                   {testDbMutation.isPending ? 'Testing…' : 'Test connection'}
                 </button>
                 {testDbMutation.data && (
-                  <span
-                    className={`text-sm px-2.5 py-0.5 rounded-full font-medium ${
-                      testDbMutation.data.status === 'connected'
-                        ? 'bg-green-100 text-green-700'
-                        : 'bg-red-100 text-red-700'
-                    }`}
-                  >
+                  <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${
+                    testDbMutation.data.status === 'connected'
+                      ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300'
+                      : 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300'
+                  }`}>
                     {testDbMutation.data.status === 'connected' ? '✓ Connected' : '✗ Error'}
                   </span>
                 )}
-                <button
-                  type="submit"
-                  disabled={saveMutation.isPending}
-                  className="bg-indigo-600 text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50"
-                >
+                <button type="submit" disabled={saveMutation.isPending} className="bg-indigo-600 text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 transition-colors">
                   {saveMutation.isPending ? 'Saving…' : 'Save settings'}
                 </button>
-                {saved && <span className="text-sm text-green-600 font-medium">✓ Saved</span>}
-              </div>
-
-              <div className="pt-3 border-t border-gray-200 dark:border-gray-800 space-y-3">
-                <h3 className="font-medium text-gray-800 dark:text-gray-100">Notification tests</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="space-y-2">
-                    <label className="text-xs font-medium text-gray-600 dark:text-gray-400 block">Test email recipient</label>
-                    <div className="flex gap-2">
-                      <input
-                        type="email"
-                        value={testEmail}
-                        onChange={(e) => setTestEmail(e.target.value)}
-                        placeholder="you@example.com"
-                        className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 px-3 py-2 text-sm"
-                      />
-                      <button
-                        type="button"
-                        disabled={testEmailMutation.isPending || !testEmail.trim()}
-                        onClick={() => testEmailMutation.mutate({ email: testEmail.trim() })}
-                        className="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 text-sm whitespace-nowrap text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50"
-                      >
-                        {testEmailMutation.isPending ? 'Sending…' : 'Test email'}
-                      </button>
-                    </div>
-                    {testEmailMutation.data && (
-                      <p
-                        className={`text-xs ${
-                          testEmailMutation.data.status === 'sent' ? 'text-green-600' : 'text-red-600'
-                        }`}
-                      >
-                        {testEmailMutation.data.message}
-                      </p>
-                    )}
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-xs font-medium text-gray-600 dark:text-gray-400 block">Test Telegram chat ID</label>
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={testTelegramChatId}
-                        onChange={(e) => setTestTelegramChatId(e.target.value)}
-                        placeholder="123456789"
-                        className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 px-3 py-2 text-sm"
-                      />
-                      <button
-                        type="button"
-                        disabled={testTelegramMutation.isPending || !testTelegramChatId.trim()}
-                        onClick={() => testTelegramMutation.mutate({ chat_id: testTelegramChatId.trim() })}
-                        className="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 text-sm whitespace-nowrap text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50"
-                      >
-                        {testTelegramMutation.isPending ? 'Sending…' : 'Test Telegram'}
-                      </button>
-                    </div>
-                    {testTelegramMutation.data && (
-                      <p
-                        className={`text-xs ${
-                          testTelegramMutation.data.status === 'sent' ? 'text-green-600' : 'text-red-600'
-                        }`}
-                      >
-                        {testTelegramMutation.data.message}
-                      </p>
-                    )}
-                  </div>
-                </div>
+                {saved && (
+                  <span className="inline-flex items-center gap-1 text-sm text-green-600 dark:text-green-400 font-medium">
+                    <Check className="h-4 w-4" /> Saved
+                  </span>
+                )}
               </div>
             </form>
-          </div>
+          </Section>
 
-          <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5 space-y-4">
-            <h2 className="font-semibold text-gray-800 dark:text-gray-100">Admin — Full import / export</h2>
-            <div className="flex flex-wrap items-center gap-3">
+          {/* Notification tests */}
+          <Section icon={Bell} title="Notification tests" description="Verify email and Telegram alerts are working">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className={labelCls}>Test email recipient</label>
+                <div className="flex gap-2">
+                  <input type="email" value={testEmail} onChange={(e) => setTestEmail(e.target.value)} placeholder="you@example.com" className={inputCls} />
+                  <button
+                    type="button"
+                    disabled={testEmailMutation.isPending || !testEmail.trim()}
+                    onClick={() => testEmailMutation.mutate({ email: testEmail.trim() })}
+                    className="shrink-0 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50 transition-colors whitespace-nowrap"
+                  >
+                    {testEmailMutation.isPending ? 'Sending…' : 'Send test'}
+                  </button>
+                </div>
+                {testEmailMutation.data && (
+                  <p className={`text-xs font-medium ${testEmailMutation.data.status === 'sent' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                    {testEmailMutation.data.message}
+                  </p>
+                )}
+              </div>
+              <div className="space-y-2">
+                <label className={labelCls}>Test Telegram chat ID</label>
+                <div className="flex gap-2">
+                  <input type="text" value={testTelegramChatId} onChange={(e) => setTestTelegramChatId(e.target.value)} placeholder="123456789" className={inputCls} />
+                  <button
+                    type="button"
+                    disabled={testTelegramMutation.isPending || !testTelegramChatId.trim()}
+                    onClick={() => testTelegramMutation.mutate({ chat_id: testTelegramChatId.trim() })}
+                    className="shrink-0 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50 transition-colors whitespace-nowrap"
+                  >
+                    {testTelegramMutation.isPending ? 'Sending…' : 'Send test'}
+                  </button>
+                </div>
+                {testTelegramMutation.data && (
+                  <p className={`text-xs font-medium ${testTelegramMutation.data.status === 'sent' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                    {testTelegramMutation.data.message}
+                  </p>
+                )}
+              </div>
+            </div>
+          </Section>
+
+          {/* Full import / export */}
+          <Section icon={Download} title="Full import / export" description="Backup or restore all data across all users">
+            <div className="flex flex-wrap gap-2">
               <button
                 type="button"
-                onClick={() =>
-                  exportDataMutation.mutate(undefined, {
-                    onSuccess: (data) => downloadJson(data, `caero-export-all-${exportDateSuffix()}.json`),
-                  })
-                }
+                onClick={() => exportDataMutation.mutate(undefined, {
+                  onSuccess: (data) => downloadJson(data, `caero-export-all-${exportDateSuffix()}.json`),
+                })}
                 disabled={exportDataMutation.isPending}
-                className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50 transition-colors"
               >
-                Export all data
+                <Download className="h-3.5 w-3.5" />
+                {exportDataMutation.isPending ? 'Exporting…' : 'Export all data'}
               </button>
-              <label className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer">
+              <label className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer transition-colors">
+                <Upload className="h-3.5 w-3.5" />
                 Import all data
                 <input type="file" accept="application/json" onChange={handleAdminImportFile} className="hidden" />
               </label>
             </div>
-            {adminImportError && <p className="text-sm text-red-600">{adminImportError}</p>}
-          </div>
+            {adminImportError && <p className="text-sm text-red-600 dark:text-red-400">{adminImportError}</p>}
+            {importDataMutation.isSuccess && (
+              <p className="inline-flex items-center gap-1 text-sm text-green-600 dark:text-green-400 font-medium">
+                <Check className="h-4 w-4" /> Import successful
+              </p>
+            )}
+          </Section>
 
-          <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5 space-y-4">
-            <h2 className="font-semibold text-gray-800 dark:text-gray-100">Admin — User management</h2>
-            <div className="pt-1 pb-3 border-b border-gray-200 dark:border-gray-800">
-              <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-                <input
-                  type="checkbox"
-                  id="allow_registration"
-                  checked={form.allow_registration}
-                  onChange={(e) => {
-                    const nextForm = { ...form, allow_registration: e.target.checked }
-                    setForm(nextForm)
-                    saveSettings(nextForm)
-                  }}
-                  className="rounded text-indigo-600"
-                />
-                Allow registration of new users
-              </label>
-            </div>
-            <form
-              onSubmit={(e) => {
-                e.preventDefault()
-                createUserMutation.mutate(
-                  {
-                    username: newUserName,
-                    password: newUserPassword,
-                    is_admin: newUserAdmin,
-                  },
-                  {
-                    onSuccess: () => {
-                      setNewUserName('')
-                      setNewUserPassword('')
-                      setNewUserAdmin(false)
-                    },
-                  }
-                )
-              }}
-              className="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end"
-            >
+          {/* User management */}
+          <Section icon={Users} title="User management" description="Create users and manage accounts">
+            {/* Toggle registration */}
+            <label className="flex items-center justify-between gap-4 p-3 rounded-xl bg-gray-50 dark:bg-gray-800 cursor-pointer">
               <div>
-                <label className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1 block">Username</label>
-                <input
-                  required
-                  value={newUserName}
-                  onChange={(e) => setNewUserName(e.target.value)}
-                  className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 px-3 py-2 text-sm"
-                />
+                <p className="text-sm font-medium text-gray-800 dark:text-gray-200">Allow new registrations</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Let new users create their own accounts</p>
               </div>
-              <div>
-                <label className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1 block">Password</label>
-                <input
-                  required
-                  type="password"
-                  value={newUserPassword}
-                  onChange={(e) => setNewUserPassword(e.target.value)}
-                  className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 px-3 py-2 text-sm"
-                />
-              </div>
-              <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 pb-2">
-                <input type="checkbox" checked={newUserAdmin} onChange={(e) => setNewUserAdmin(e.target.checked)} />
-                Admin
-              </label>
-              <button
-                type="submit"
-                disabled={createUserMutation.isPending}
-                className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50"
+              <input
+                type="checkbox"
+                checked={form.allow_registration}
+                onChange={(e) => {
+                  const nextForm = { ...form, allow_registration: e.target.checked }
+                  setForm(nextForm)
+                  saveSettings(nextForm)
+                }}
+                className="rounded text-indigo-600 h-4 w-4"
+              />
+            </label>
+
+            {/* Add user form */}
+            <div className="pt-1">
+              <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">Add user</p>
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault()
+                  createUserMutation.mutate(
+                    { username: newUserName, password: newUserPassword, is_admin: newUserAdmin },
+                    { onSuccess: () => { setNewUserName(''); setNewUserPassword(''); setNewUserAdmin(false) } }
+                  )
+                }}
+                className="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end"
               >
-                Add user
-              </button>
-            </form>
+                <div>
+                  <label className={labelCls}>Username</label>
+                  <input required value={newUserName} onChange={(e) => setNewUserName(e.target.value)} className={inputCls} />
+                </div>
+                <div>
+                  <label className={labelCls}>Password</label>
+                  <input required type="password" value={newUserPassword} onChange={(e) => setNewUserPassword(e.target.value)} className={inputCls} />
+                </div>
+                <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer pb-0.5">
+                  <input type="checkbox" checked={newUserAdmin} onChange={(e) => setNewUserAdmin(e.target.checked)} className="rounded text-indigo-600" />
+                  Admin
+                </label>
+                <button type="submit" disabled={createUserMutation.isPending} className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 transition-colors">
+                  {createUserMutation.isPending ? 'Adding…' : 'Add user'}
+                </button>
+              </form>
+            </div>
 
-            <ul className="space-y-2">
-              {users.map((user) => (
-                <li
-                  key={user.id}
-                  className="border border-gray-200 dark:border-gray-800 rounded-lg px-3 py-3 flex flex-col gap-3"
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-sm font-medium text-gray-800 dark:text-gray-200">
-                      {user.username} {user.is_admin ? '(admin)' : ''}
-                    </span>
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        disabled={adminDeleteUserProductsMutation.isPending}
-                        onClick={() => {
-                          if (
-                            confirm(
-                              `Delete all products, alerts, and price history for user "${user.username}"?`
-                            )
-                          ) {
-                            adminDeleteUserProductsMutation.mutate(user.id)
-                          }
-                        }}
-                        className="text-amber-700 dark:text-amber-300 text-sm disabled:opacity-50"
-                      >
-                        Delete all products
-                      </button>
-                      <button
-                        type="button"
-                        disabled={user.id === me?.id || deleteUserMutation.isPending}
-                        onClick={() => deleteUserMutation.mutate(user.id)}
-                        className="text-red-600 text-sm disabled:opacity-50"
-                      >
-                        Delete user
-                      </button>
+            {/* User list */}
+            {users.length > 0 && (
+              <ul className="space-y-2 pt-1">
+                {users.map((user) => (
+                  <li key={user.id} className="border border-gray-200 dark:border-gray-700 rounded-xl p-3 space-y-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-full bg-indigo-100 dark:bg-indigo-900/40 flex items-center justify-center text-indigo-700 dark:text-indigo-300 text-xs font-bold">
+                          {user.username[0].toUpperCase()}
+                        </div>
+                        <span className="text-sm font-medium text-gray-800 dark:text-gray-200">{user.username}</span>
+                        {user.is_admin && (
+                          <span className="text-xs px-1.5 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 font-medium">Admin</span>
+                        )}
+                      </div>
+                      <div className="flex gap-1.5">
+                        <button
+                          type="button"
+                          disabled={adminDeleteUserProductsMutation.isPending}
+                          onClick={() => {
+                            if (confirm(`Delete all products for "${user.username}"?`)) {
+                              adminDeleteUserProductsMutation.mutate(user.id)
+                            }
+                          }}
+                          className="text-xs px-2.5 py-1 rounded-lg text-amber-700 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-900/30 disabled:opacity-50 transition-colors"
+                        >
+                          Clear products
+                        </button>
+                        <button
+                          type="button"
+                          disabled={user.id === me?.id || deleteUserMutation.isPending}
+                          onClick={() => deleteUserMutation.mutate(user.id)}
+                          className="text-xs px-2.5 py-1 rounded-lg text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950 disabled:opacity-50 transition-colors"
+                        >
+                          Delete
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex gap-2">
-                    <input
-                      type="password"
-                      placeholder="New password"
-                      value={resetPasswordByUserId[user.id] ?? ''}
-                      onChange={(e) =>
-                        setResetPasswordByUserId({
-                          ...resetPasswordByUserId,
-                          [user.id]: e.target.value,
-                        })
-                      }
-                      className="rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 px-2 py-1 text-sm flex-1"
-                    />
-                    <button
-                      type="button"
-                      disabled={!resetPasswordByUserId[user.id]?.trim()}
-                      onClick={() =>
-                        adminPasswordMutation.mutate({
+                    <div className="flex gap-2">
+                      <input
+                        type="password"
+                        placeholder="New password"
+                        value={resetPasswordByUserId[user.id] ?? ''}
+                        onChange={(e) => setResetPasswordByUserId({ ...resetPasswordByUserId, [user.id]: e.target.value })}
+                        className="flex-1 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 text-gray-900 dark:text-gray-100 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      />
+                      <button
+                        type="button"
+                        disabled={!resetPasswordByUserId[user.id]?.trim()}
+                        onClick={() => adminPasswordMutation.mutate({
                           userId: user.id,
                           body: { new_password: resetPasswordByUserId[user.id] ?? '' },
-                        })
-                      }
-                      className="px-3 py-1 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 text-sm disabled:opacity-50"
-                    >
-                      Set password
-                    </button>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </>
-      )}
+                        })}
+                        className="px-3 py-1.5 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 disabled:opacity-50 transition-colors"
+                      >
+                        Set password
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Section>
 
-      <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5 space-y-2">
-        <h2 className="font-semibold text-gray-800 dark:text-gray-100">About</h2>
-        <CaeroBrand
-          showText={false}
-          logoAriaHidden={false}
-          logoSizeClassName="h-20 w-20"
-          className="w-full justify-center"
-        />
-        <p className="text-sm text-gray-600 dark:text-gray-300 text-center">{APP_DESCRIPTION}</p>
-        <p className="text-sm text-gray-600 dark:text-gray-300 text-center">Version: v{APP_VERSION}</p>
-      </div>
-
-      {(saveMutation.error || changePasswordMutation.error || importDataMutation.error || importMyDataMutation.error) && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
-          {saveMutation.error?.message ||
-            changePasswordMutation.error?.message ||
-            importDataMutation.error?.message ||
-            importMyDataMutation.error?.message}
         </div>
       )}
+
+      {/* About — always shown at bottom */}
+      <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-5">
+        <div className="flex items-center gap-3 mb-3">
+          <div className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+            <Info className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+          </div>
+          <h2 className="font-semibold text-gray-900 dark:text-gray-100 text-sm">About</h2>
+        </div>
+        <div className="flex flex-col items-center gap-2 py-2">
+          <CaeroBrand showText={false} logoAriaHidden={false} logoSizeClassName="h-16 w-16" className="justify-center" />
+          <p className="text-sm text-gray-600 dark:text-gray-300 text-center">{APP_DESCRIPTION}</p>
+          <p className="text-xs text-gray-400 dark:text-gray-500">Version v{APP_VERSION}</p>
+        </div>
+      </div>
+
+      {/* Global error */}
+      {anyError && (
+        <div className="bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 px-4 py-3 rounded-xl text-sm">
+          {saveMutation.error?.message || changePasswordMutation.error?.message
+            || importDataMutation.error?.message || importMyDataMutation.error?.message}
+        </div>
+      )}
+
     </div>
   )
 }
