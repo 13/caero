@@ -7,9 +7,10 @@ import { getTagColorClass } from '../utils/tags'
 
 interface ProductCardProps {
   product: Product
+  onKeywordClick?: (keyword: string) => void
 }
 
-export default function ProductCard({ product }: ProductCardProps) {
+export default function ProductCard({ product, onKeywordClick }: ProductCardProps) {
   const deleteMutation = useDeleteProduct()
   const checkMutation = useCheckProduct()
   const { data: settings } = useSettings()
@@ -61,14 +62,27 @@ export default function ProductCard({ product }: ProductCardProps) {
         {(product.category || product.tags.length > 0) && (
           <div className="flex flex-wrap items-center gap-1.5">
             {product.category && (
-              <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400">
+              <button
+                onClick={(e) => {
+                  e.preventDefault();
+                  onKeywordClick?.(product.category!);
+                }}
+                className={`text-xs px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 ${onKeywordClick ? 'cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700' : ''}`}
+              >
                 {product.category}
-              </span>
+              </button>
             )}
             {product.tags.map((tag) => (
-              <span key={tag} className={`text-xs px-2 py-0.5 rounded-full font-medium ${getTagColorClass(tag)}`}>
+              <button
+                key={tag}
+                onClick={(e) => {
+                  e.preventDefault();
+                  onKeywordClick?.(tag);
+                }}
+                className={`text-xs px-2 py-0.5 rounded-full font-medium ${getTagColorClass(tag)} ${onKeywordClick ? 'cursor-pointer hover:opacity-80' : ''}`}
+              >
                 {tag}
-              </span>
+              </button>
             ))}
           </div>
         )}
