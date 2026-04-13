@@ -14,6 +14,7 @@ from app.schemas import (
     AdminUserCreate,
     AdminUserPasswordUpdate,
     ChangePasswordRequest,
+    NotificationDefaultsUpdate,
     Token,
     UserCreate,
     UserOut,
@@ -132,6 +133,18 @@ async def change_password(
     user.hashed_password = hash_password(body.new_password)
     await db.flush()
     return {"message": "Password changed"}
+
+
+@router.patch("/me/notification-defaults")
+async def update_notification_defaults(
+    body: NotificationDefaultsUpdate,
+    user: User = Depends(require_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, str]:
+    user.default_email = body.default_email
+    user.default_telegram_chat_id = body.default_telegram_chat_id
+    await db.flush()
+    return {"message": "Notification defaults updated"}
 
 
 @router.get("/users", response_model=list[UserOut])

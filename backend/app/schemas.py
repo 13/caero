@@ -16,6 +16,8 @@ class UserOut(BaseModel):
     id: int
     username: str
     is_admin: bool
+    default_email: str | None = None
+    default_telegram_chat_id: str | None = None
     created_at: datetime
 
     model_config = {"from_attributes": True}
@@ -211,6 +213,11 @@ class CheckResult(BaseModel):
 class ChangePasswordRequest(BaseModel):
     current_password: str = Field(min_length=6)
     new_password: str = Field(min_length=6)
+
+
+class NotificationDefaultsUpdate(BaseModel):
+    default_email: str | None = None
+    default_telegram_chat_id: str | None = None
 
 
 class AdminUserCreate(BaseModel):

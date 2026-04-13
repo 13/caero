@@ -16,6 +16,7 @@ import {
   useTestDb,
   useTestEmail,
   useTestTelegram,
+  useUpdateNotificationDefaults,
   useUsers,
 } from '../api/hooks'
 import type { AppSettings } from '../api/types'
@@ -24,7 +25,7 @@ import DbSelector from '../components/DbSelector'
 import { APP_DESCRIPTION, APP_VERSION } from '../constants/appInfo'
 import {
   User, KeyRound, Download, Upload, Trash2,
-  Shield, Database, Bell, Users, Check, Info,
+  Shield, Database, Bell, Users, Check, Info
 } from 'lucide-react'
 
 function downloadJson(data: unknown, filename: string) {
@@ -82,6 +83,7 @@ export default function Setup() {
   const createUserMutation = useCreateUser()
   const deleteUserMutation = useDeleteUser()
   const adminPasswordMutation = useAdminChangeUserPassword()
+  const updateDefaultsMutation = useUpdateNotificationDefaults()
   const exportDataMutation = useExportData()
   const importDataMutation = useImportData()
   const exportMyDataMutation = useExportMyData()
@@ -116,9 +118,19 @@ export default function Setup() {
   const [testEmail, setTestEmail] = useState('')
   const [testTelegramChatId, setTestTelegramChatId] = useState('')
 
+  const [defaultEmail, setDefaultEmail] = useState('')
+  const [defaultTelegram, setDefaultTelegram] = useState('')
+
   useEffect(() => {
     if (currentSettings) setForm(currentSettings)
   }, [currentSettings])
+
+  useEffect(() => {
+    if (me) {
+      setDefaultEmail(me.default_email ?? '')
+      setDefaultTelegram(me.default_telegram_chat_id ?? '')
+    }
+  }, [me])
 
   const handleSaveSettings = (e: React.FormEvent) => {
     e.preventDefault()
@@ -145,6 +157,14 @@ export default function Setup() {
       { current_password: currentPassword, new_password: newPassword },
       { onSuccess: () => { setCurrentPassword(''); setNewPassword('') } }
     )
+  }
+
+  const handleDefaultsChange = (e: React.FormEvent) => {
+    e.preventDefault()
+    updateDefaultsMutation.mutate({
+      default_email: defaultEmail || null,
+      default_telegram_chat_id: defaultTelegram || null,
+    })
   }
 
   const handleAdminImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -258,6 +278,30 @@ export default function Setup() {
                 {changePasswordMutation.isSuccess && (
                   <span className="inline-flex items-center gap-1 text-sm text-green-600 font-medium">
                     <Check className="h-4 w-4" /> Updated
+                  </span>
+                )}
+              </div>
+            </form>
+          </Section>
+
+          {/* Notification defaults */}
+          <Section icon={Bell} title="Notification defaults" description="Pre-fill these values when creating new alerts">
+            <form onSubmit={handleDefaultsChange} className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className={labelCls}>Default email</label>
+                <input type="email" value={defaultEmail} onChange={(e) => setDefaultEmail(e.target.value)} placeholder="you@example.com" className={inputCls} />
+              </div>
+              <div>
+                <label className={labelCls}>Default Telegram chat ID</label>
+                <input type="text" value={defaultTelegram} onChange={(e) => setDefaultTelegram(e.target.value)} placeholder="123456789" className={inputCls} />
+              </div>
+              <div className="sm:col-span-2 flex items-center gap-3">
+                <button type="submit" disabled={updateDefaultsMutation.isPending} className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 transition-colors">
+                  {updateDefaultsMutation.isPending ? 'Saving…' : 'Save defaults'}
+                </button>
+                {updateDefaultsMutation.isSuccess && (
+                  <span className="inline-flex items-center gap-1 text-sm text-green-600 font-medium">
+                    <Check className="h-4 w-4" /> Saved
                   </span>
                 )}
               </div>

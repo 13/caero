@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   ArrowLeft, RefreshCw, Pencil, Trash2, ExternalLink,
   Bell, Plus, X, TrendingDown, TrendingUp, BarChart3, ZoomIn,
@@ -10,6 +10,7 @@ import {
   useCreateAlert,
   useDeleteAlert,
   useDeleteProduct,
+  useMe,
   usePrices,
   useProduct,
   useProductStats,
@@ -30,12 +31,13 @@ import {
   normalizeIntervalHoursToMinutes,
 } from '../utils/format'
 import { getTagColorClass } from '../utils/tags'
+import type { User } from '../api/types'
 
-const createDefaultAlertForm = (): AlertCreate => ({
+const createDefaultAlertForm = (user?: User): AlertCreate => ({
   condition: 'below',
   threshold_price: null,
-  email: null,
-  telegram_chat_id: null,
+  email: user?.default_email ?? null,
+  telegram_chat_id: user?.default_telegram_chat_id ?? null,
   active: true,
 })
 
@@ -49,6 +51,7 @@ export default function ProductDetail() {
   const { data: alerts = [] } = useAlerts(productId)
   const { data: stats } = useProductStats(productId)
   const { data: settings } = useSettings()
+  const { data: me } = useMe()
 
   const updateMutation = useUpdateProduct(productId)
   const deleteMutation = useDeleteProduct()
@@ -70,11 +73,26 @@ export default function ProductDetail() {
     active: true,
   })
 
-  const [alertForm, setAlertForm] = useState<AlertCreate>(createDefaultAlertForm)
+  const [alertForm, setAlertForm] = useState<AlertCreate>(createDefaultAlertForm())
   const [editingAlertId, setEditingAlertId] = useState<number | null>(null)
-  const [alertEditForm, setAlertEditForm] = useState<AlertCreate>(createDefaultAlertForm)
+  const [alertEditForm, setAlertEditForm] = useState<AlertCreate>(createDefaultAlertForm())
   const [showAddAlert, setShowAddAlert] = useState(false)
   const [imageZoomed, setImageZoomed] = useState(false)
+
+  useEffect(() => {
+    if (me) {
+      setAlertForm(prev => ({
+        ...prev,
+        email: prev.email || me.default_email || null,
+        telegram_chat_id: prev.telegram_chat_id || me.default_telegram_chat_id || null,
+      }))
+      setAlertEditForm(prev => ({
+        ...prev,
+        email: prev.email || me.default_email || null,
+        telegram_chat_id: prev.telegram_chat_id || me.default_telegram_chat_id || null,
+      }))
+    }
+  }, [me])
 
   const handleEdit = () => {
     if (product) {
@@ -119,7 +137,10 @@ export default function ProductDetail() {
   const handleAddAlert = (e: React.FormEvent) => {
     e.preventDefault()
     createAlertMutation.mutate(alertForm, {
-      onSuccess: () => setAlertForm(createDefaultAlertForm()),
+      onSuccess: () => {
+        setAlertForm(createDefaultAlertForm(me))
+        setShowAddAlert(false)
+      },
     })
   }
 

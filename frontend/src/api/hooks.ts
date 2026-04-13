@@ -9,6 +9,7 @@ import type {
   CheckResult,
   ChangePasswordRequest,
   DataExportPayload,
+  NotificationDefaultsUpdate,
   PriceHistory,
   Product,
   ProductCreate,
@@ -251,6 +252,18 @@ export function useChangePassword() {
         method: 'POST',
         body: JSON.stringify(body),
       }),
+  })
+}
+
+export function useUpdateNotificationDefaults() {
+  const qc = useQueryClient()
+  return useMutation<{ message: string }, Error, NotificationDefaultsUpdate>({
+    mutationFn: (body) =>
+      apiFetch<{ message: string }>('/api/auth/me/notification-defaults', {
+        method: 'PATCH',
+        body: JSON.stringify(body),
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['me'] }),
   })
 }
 

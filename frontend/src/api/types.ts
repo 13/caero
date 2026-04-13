@@ -2,6 +2,8 @@ export interface User {
   id: number
   username: string
   is_admin: boolean
+  default_email: string | null
+  default_telegram_chat_id: string | null
   created_at: string
 }
 
@@ -152,6 +154,11 @@ export interface AdminUserCreate {
 
 export interface AdminUserPasswordUpdate {
   new_password: string
+}
+
+export interface NotificationDefaultsUpdate {
+  default_email?: string | null
+  default_telegram_chat_id?: string | null
 }
 
 export interface DataExportPayload {
