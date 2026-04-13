@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Pencil } from 'lucide-react'
+import { Pencil, X } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
   useAlerts,
@@ -189,6 +189,25 @@ export default function ProductDetail() {
               ))}
             </div>
           )}
+          <div className="mt-3 flex flex-col items-center gap-2">
+            {product.image_url && (
+              <img
+                src={product.image_url}
+                alt={product.name}
+                className="block w-full max-w-[12rem] h-auto max-h-[12rem] object-contain rounded-lg border border-gray-200 dark:border-gray-800"
+                loading="lazy"
+              />
+            )}
+            <a
+              href={product.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              title={product.url}
+              className="text-sm text-indigo-500 hover:underline block text-left"
+            >
+              {productUrlPreview}
+            </a>
+          </div>
         </div>
          <div className="flex flex-wrap gap-2">
           <button
@@ -212,29 +231,6 @@ export default function ProductDetail() {
           </button>
         </div>
       </div>
-
-      {/* Product image + link */}
-      {(product.image_url || product.url) && (
-        <div className="flex flex-col items-center gap-2">
-          {product.image_url && (
-            <img
-              src={product.image_url}
-              alt={product.name}
-              className="block w-full max-w-[12rem] h-auto max-h-[12rem] object-contain rounded-lg border border-gray-200 dark:border-gray-800"
-              loading="lazy"
-            />
-          )}
-          <a
-            href={product.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            title={product.url}
-            className="text-sm text-indigo-500 hover:underline block text-center"
-          >
-            {productUrlPreview}
-          </a>
-        </div>
-      )}
 
       {/* Edit form */}
       {editMode && (
@@ -460,7 +456,7 @@ export default function ProductDetail() {
                       onClick={() => deleteAlertMutation.mutate(alert.id)}
                       className="text-red-400 hover:text-red-600"
                     >
-                      ✕
+                      <X className="h-4 w-4" />
                     </button>
                   </div>
                 </div>
