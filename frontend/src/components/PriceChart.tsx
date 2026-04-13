@@ -79,7 +79,17 @@ export default function PriceChart({ data, currency = 'EUR' }: PriceChartProps) 
         />
         <Tooltip
           formatter={(value: number) => [formatCurrency(value), 'Price']}
-          labelFormatter={(value: number) => formatDate(value)}
+          labelFormatter={(value: number) => {
+            try {
+              return new Intl.DateTimeFormat(locale, {
+                year: 'numeric', month: 'numeric', day: 'numeric',
+                hour: '2-digit', minute: '2-digit',
+                hour12: false,
+              }).format(new Date(value))
+            } catch {
+              return new Date(value).toLocaleString()
+            }
+          }}
           contentStyle={{
             backgroundColor: 'var(--chart-tooltip-bg)',
             borderColor: 'var(--chart-tooltip-border)',
