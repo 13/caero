@@ -13,16 +13,19 @@ export function localeFromDateFormat(format?: DateFormat) {
   return navigator.language || 'en-US'
 }
 
-export function formatPrice(value: string | null) {
+export function formatPrice(value: string | null, format?: DateFormat) {
   if (!value) return '—'
-  return `€ ${parseFloat(value).toFixed(2)}`
+  const locale = localeFromDateFormat(format)
+  return new Intl.NumberFormat(locale, { style: 'currency', currency: 'EUR' }).format(parseFloat(value))
 }
 
-export function formatPercent(value: string | null) {
+export function formatPercent(value: string | null, format?: DateFormat) {
   if (!value) return '—'
   const numeric = parseFloat(value)
   const sign = numeric > 0 ? '+' : ''
-  return `${sign}${numeric.toFixed(2)}%`
+  const locale = localeFromDateFormat(format)
+  const formatted = new Intl.NumberFormat(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(numeric)
+  return `${sign}${formatted}%`
 }
 
 export function formatDate(value: string | null, format = 'DD.MM.YYYY') {
@@ -36,6 +39,16 @@ export function formatDate(value: string | null, format = 'DD.MM.YYYY') {
   if (format === 'MM/DD/YYYY') return `${month}/${day}/${year}`
   if (format === 'YYYY-MM-DD') return `${year}-${month}-${day}`
   return `${day}.${month}.${year}`
+}
+
+export function formatDateTime(value: string | null, format = 'DD.MM.YYYY') {
+  if (!value) return '—'
+  const d = new Date(value)
+  if (Number.isNaN(d.getTime())) return '—'
+  const dateStr = formatDate(value, format)
+  const hours = String(d.getHours()).padStart(2, '0')
+  const minutes = String(d.getMinutes()).padStart(2, '0')
+  return `${dateStr} ${hours}:${minutes}`
 }
 
 export function intervalMinutesToHours(minutes: number) {

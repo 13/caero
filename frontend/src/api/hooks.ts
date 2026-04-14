@@ -166,6 +166,13 @@ export function useAlerts(productId: number) {
   })
 }
 
+export function useAllAlerts() {
+  return useQuery<Alert[]>({
+    queryKey: ['alerts_all'],
+    queryFn: () => apiFetch<Alert[]>(`/api/alerts`),
+  })
+}
+
 export function useCreateAlert(productId: number) {
   const qc = useQueryClient()
   return useMutation<Alert, Error, AlertCreate>({

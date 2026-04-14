@@ -1,8 +1,9 @@
-import { useMemo, useState } from 'react'
-import { ArrowDown, ArrowUp, Grid2x2, List, Plus, X, Search, Package } from 'lucide-react'
-import { Link } from 'react-router-dom'
-import { useProducts, useSettings } from '../api/hooks'
-import { formatDate, formatPercent, formatPrice } from '../utils/format'
+import { useMemo, useState, useEffect } from 'react'
+import { ArrowDown, ArrowUp, Grid2x2, List, Plus, X, Search, Package, Image as ImageIcon, BellRing } from 'lucide-react'
+import { Link, useNavigate } from 'react-router-dom'
+import { useProducts, useSettings, useAllAlerts } from '../api/hooks'
+import { formatDateTime, formatPercent, formatPrice } from '../utils/format'
+import { getTagColorClass } from '../utils/tags'
 import ProductCard from '../components/ProductCard'
 
 type SortBy = 'name' | 'category' | 'latest_price' | 'last_change_percent' | 'last_change_date'
@@ -17,10 +18,31 @@ const compareNullableNumbers = (a: number | null, b: number | null) => {
 export default function Dashboard() {
   const { data: products, isLoading, error } = useProducts()
   const { data: settings } = useSettings()
-  const [view, setView] = useState<'grid' | 'list'>('grid')
-  const [sortBy, setSortBy] = useState<SortBy>('name')
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
+  const { data: alerts } = useAllAlerts()
+  const navigate = useNavigate()
+
+  const [view, setView] = useState<'grid' | 'list'>(() =>
+    (localStorage.getItem('caero_view') as 'grid' | 'list') || 'grid'
+  )
+  const [sortBy, setSortBy] = useState<SortBy>(() =>
+    (localStorage.getItem('caero_sort_by') as SortBy) || 'name'
+  )
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>(() =>
+    (localStorage.getItem('caero_sort_direction') as 'asc' | 'desc') || 'asc'
+  )
   const [searchTerm, setSearchTerm] = useState('')
+
+  useEffect(() => {
+    localStorage.setItem('caero_view', view)
+  }, [view])
+
+  useEffect(() => {
+    localStorage.setItem('caero_sort_by', sortBy)
+  }, [sortBy])
+
+  useEffect(() => {
+    localStorage.setItem('caero_sort_direction', sortDirection)
+  }, [sortDirection])
 
   const hideStats = localStorage.getItem('caero_hide_stats') === 'true'
   const hideHeader = localStorage.getItem('caero_hide_header') === 'true'
@@ -70,8 +92,8 @@ export default function Dashboard() {
     }
     if (sortBy === 'last_change_percent') {
       items.sort((a, b) => {
-        const aChange = a.last_price_change_percent ? Math.abs(parseFloat(a.last_price_change_percent)) : null
-        const bChange = b.last_price_change_percent ? Math.abs(parseFloat(b.last_price_change_percent)) : null
+        const aChange = a.last_price_change_percent ? parseFloat(a.last_price_change_percent) : null
+        const bChange = b.last_price_change_percent ? parseFloat(b.last_price_change_percent) : null
         return compareNullableNumbers(aChange, bChange) * direction
       })
     }
@@ -87,10 +109,15 @@ export default function Dashboard() {
 
   // Summary stats
   const activeCount = products?.filter((p) => p.active).length ?? 0
+  const inactiveCount = (products?.length ?? 0) - activeCount
   const droppedCount = products?.filter((p) => {
     const pct = p.last_price_change_percent ? parseFloat(p.last_price_change_percent) : null
     return pct !== null && pct < 0
   }).length ?? 0
+
+  const hasAlertsActive = (productId: number) => {
+    return alerts?.some(a => a.product_id === productId && a.active) || false
+  }
 
   if (isLoading) {
     return (
@@ -224,14 +251,6 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* ── Search result hint ── */}
-      {searchTerm && (
-        <p className="text-sm text-gray-500 dark:text-gray-400 px-1">
-          {sortedProducts.length === 0
-            ? 'No products match your search.'
-            : `${sortedProducts.length} result${sortedProducts.length !== 1 ? 's' : ''} for "${searchTerm}"`}
-        </p>
-      )}
 
       {/* ── Product List ── */}
       <>
@@ -256,7 +275,7 @@ export default function Dashboard() {
             {view === 'grid' ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {sortedProducts.map((p) => (
-                  <ProductCard key={p.id} product={p} onKeywordClick={setSearchTerm} />
+                  <ProductCard key={p.id} product={p} onKeywordClick={setSearchTerm} hasActiveAlerts={hasAlertsActive(p.id)} />
                 ))}
               </div>
             ) : (
@@ -269,38 +288,72 @@ export default function Dashboard() {
                           [
                             { key: 'name', label: 'Name' },
                             { key: 'category', label: 'Category' },
+                            { key: 'tags', label: 'Tags' },
                             { key: 'latest_price', label: 'Price' },
                             { key: 'last_change_percent', label: 'Change' },
                             { key: 'last_change_date', label: 'Date' },
-                          ] as { key: SortBy; label: string }[]
+                          ] as { key: SortBy | 'tags'; label: string }[]
                         ).map(({ key, label }) => (
                           <th
                             key={key}
-                            className="text-left px-4 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider"
-                            aria-sort={ariaSortFor(key)}
+                            className="text-left px-4 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 tracking-wider"
+                            aria-sort={key !== 'tags' ? ariaSortFor(key as SortBy) : undefined}
                           >
-                            <button
-                              onClick={() => handleSort(key)}
-                              className="inline-flex items-center gap-1 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
-                            >
-                              {label} {sortIndicator(key)}
-                            </button>
+                            {key !== 'tags' ? (
+                              <button
+                                onClick={() => handleSort(key as SortBy)}
+                                className="inline-flex items-center gap-1 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
+                              >
+                                {label} {sortIndicator(key as SortBy)}
+                              </button>
+                            ) : (
+                              label
+                            )}
                           </th>
                         ))}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                       {sortedProducts.map((p) => (
-                        <tr key={p.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+                        <tr
+                          key={p.id}
+                          onClick={() => navigate(`/products/${p.id}`)}
+                          className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
+                        >
                           <td className="px-4 py-3">
-                            <Link to={`/products/${p.id}`} className="font-medium text-indigo-600 dark:text-indigo-400 hover:underline">
-                              {p.name}
-                            </Link>
+                            <div className="flex items-center gap-3">
+                              {p.image_url ? (
+                                <img src={p.image_url} alt="" className="w-10 h-10 object-cover rounded-md border border-gray-200 dark:border-gray-700" />
+                              ) : (
+                                <div className="w-10 h-10 rounded-md bg-gray-100 dark:bg-gray-800 flex items-center justify-center border border-gray-200 dark:border-gray-700">
+                                  <ImageIcon className="h-5 w-5 text-gray-400" />
+                                </div>
+                              )}
+                              <div className="flex flex-col gap-0.5">
+                                <Link to={`/products/${p.id}`} onClick={(e) => e.stopPropagation()} className="font-medium text-indigo-600 dark:text-indigo-400 hover:underline line-clamp-1">
+                                  {p.name}
+                                </Link>
+                                <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+                                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
+                                    p.active
+                                      ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300'
+                                      : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'
+                                  }`}>
+                                    {p.active ? 'Active' : 'Paused'}
+                                  </span>
+                                  {hasAlertsActive(p.id) && (
+                                    <span title="Alerts active" className="flex items-center justify-center bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300 px-1 py-0.5 rounded-full">
+                                      <BellRing className="h-3 w-3" />
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
                           </td>
                           <td className="px-4 py-3 text-gray-500 dark:text-gray-400">
                             {p.category ? (
                               <button
-                                onClick={() => setSearchTerm(p.category!)}
+                                onClick={(e) => { e.stopPropagation(); setSearchTerm(p.category!) }}
                                 className="hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
                               >
                                 {p.category}
@@ -309,7 +362,25 @@ export default function Dashboard() {
                               '—'
                             )}
                           </td>
-                          <td className="px-4 py-3 font-semibold text-gray-800 dark:text-gray-200">{formatPrice(p.latest_price)}</td>
+                          <td className="px-4 py-3">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              {p.tags.slice(0, 3).map(tag => (
+                                <button
+                                  key={tag}
+                                  onClick={(e) => { e.stopPropagation(); setSearchTerm(tag) }}
+                                  className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${getTagColorClass(tag)} cursor-pointer hover:opacity-80`}
+                                >
+                                  {tag}
+                                </button>
+                              ))}
+                              {p.tags.length > 3 && (
+                                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700">
+                                  +{p.tags.length - 3}
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 font-semibold text-gray-800 dark:text-gray-200">{formatPrice(p.latest_price, settings?.date_format)}</td>
                           <td className="px-4 py-3">
                             {p.last_price_change_percent ? (
                               <span className={`text-xs font-semibold ${
@@ -319,12 +390,12 @@ export default function Dashboard() {
                                   ? 'text-red-600 dark:text-red-400'
                                   : 'text-gray-500'
                               }`}>
-                                {formatPercent(p.last_price_change_percent)}
+                                {formatPercent(p.last_price_change_percent, settings?.date_format)}
                               </span>
                             ) : '—'}
                           </td>
                           <td className="px-4 py-3 text-gray-500 dark:text-gray-400">
-                            {formatDate(p.last_price_change_at, settings?.date_format)}
+                            {formatDateTime(p.last_price_change_at, settings?.date_format)}
                           </td>
                         </tr>
                       ))}
@@ -333,6 +404,15 @@ export default function Dashboard() {
                 </div>
               </div>
             )}
+
+            {/* ── Footer Stats ── */}
+            <div className="mt-6 flex flex-wrap items-center justify-center gap-4 text-sm text-gray-500 dark:text-gray-400 border-t border-gray-200 dark:border-gray-800 pt-4">
+              <p>Total Products: <span className="font-medium text-gray-700 dark:text-gray-300">{products?.length || 0}</span></p>
+              <span className="w-1 h-1 rounded-full bg-gray-300 dark:bg-gray-700"></span>
+              <p>Active: <span className="font-medium text-green-600 dark:text-green-400">{activeCount}</span></p>
+              <span className="w-1 h-1 rounded-full bg-gray-300 dark:bg-gray-700"></span>
+              <p>Inactive: <span className="font-medium text-red-500 dark:text-red-400">{inactiveCount}</span></p>
+            </div>
           </>
         )}
       </>

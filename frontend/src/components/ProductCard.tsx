@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { RefreshCw, X, TrendingDown, TrendingUp, ExternalLink } from 'lucide-react'
+import { RefreshCw, X, TrendingDown, TrendingUp, ExternalLink, BellRing } from 'lucide-react'
 import type { Product } from '../api/types'
 import { useCheckProduct, useDeleteProduct, useSettings } from '../api/hooks'
 import { formatDate, formatIntervalHours, formatPercent, formatPrice } from '../utils/format'
@@ -8,9 +8,10 @@ import { getTagColorClass } from '../utils/tags'
 interface ProductCardProps {
   product: Product
   onKeywordClick?: (keyword: string) => void
+  hasActiveAlerts?: boolean
 }
 
-export default function ProductCard({ product, onKeywordClick }: ProductCardProps) {
+export default function ProductCard({ product, onKeywordClick, hasActiveAlerts }: ProductCardProps) {
   const deleteMutation = useDeleteProduct()
   const checkMutation = useCheckProduct()
   const { data: settings } = useSettings()
@@ -49,13 +50,20 @@ export default function ProductCard({ product, onKeywordClick }: ProductCardProp
           >
             {product.name}
           </Link>
-          <span className={`shrink-0 text-xs px-2 py-0.5 rounded-full font-medium ${
-            product.active
-              ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300'
-              : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'
-          }`}>
-            {product.active ? 'Active' : 'Paused'}
-          </span>
+          <div className="flex items-center gap-1.5 shrink-0">
+            {hasActiveAlerts && (
+              <span title="Alerts active" className="flex items-center justify-center bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300 px-1.5 py-0.5 rounded-full">
+                <BellRing className="h-3.5 w-3.5" />
+              </span>
+            )}
+            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+              product.active
+                ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300'
+                : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'
+            }`}>
+              {product.active ? 'Active' : 'Paused'}
+            </span>
+          </div>
         </div>
 
         {/* Tags + category */}
@@ -103,7 +111,7 @@ export default function ProductCard({ product, onKeywordClick }: ProductCardProp
           <div>
             <p className="text-xs text-gray-400 dark:text-gray-500 mb-0.5">Latest price</p>
             <p className="text-2xl font-extrabold text-indigo-600 dark:text-indigo-400 tracking-tight">
-              {formatPrice(product.latest_price)}
+              {formatPrice(product.latest_price, settings?.date_format)}
             </p>
             <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">Every {checkIntervalHours}h</p>
           </div>
@@ -117,7 +125,7 @@ export default function ProductCard({ product, onKeywordClick }: ProductCardProp
                   : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'
               }`}>
                 {pct < 0 ? <TrendingDown className="h-3 w-3" /> : <TrendingUp className="h-3 w-3" />}
-                {formatPercent(product.last_price_change_percent)}
+                {formatPercent(product.last_price_change_percent, settings?.date_format)}
               </span>
             ) : (
               <span className="text-xs text-gray-300 dark:text-gray-600">—</span>

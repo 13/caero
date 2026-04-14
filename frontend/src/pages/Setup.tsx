@@ -123,8 +123,15 @@ export default function Setup() {
   const [defaultEmail, setDefaultEmail] = useState('')
   const [defaultTelegram, setDefaultTelegram] = useState('')
 
-  const [hideTracked, setHideTracked] = useState(() => localStorage.getItem('caero_hide_tracked') === 'true')
+  const [hideHeader, setHideHeader] = useState(() => localStorage.getItem('caero_hide_header') === 'true')
   const [hideStats, setHideStats] = useState(() => localStorage.getItem('caero_hide_stats') === 'true')
+
+  const [toastMsg, setToastMsg] = useState('')
+
+  const showToast = (msg: string) => {
+    setToastMsg(msg)
+    setTimeout(() => setToastMsg(''), 3000)
+  }
 
   useEffect(() => {
     if (currentSettings) setForm(currentSettings)
@@ -151,6 +158,7 @@ export default function Setup() {
     saveMutation.mutate(settingsToSave, {
       onSuccess: () => {
         setSaved(true)
+        showToast('Settings saved successfully.')
         setTimeout(() => setSaved(false), 3000)
       },
     })
@@ -160,7 +168,12 @@ export default function Setup() {
     e.preventDefault()
     changePasswordMutation.mutate(
       { current_password: currentPassword, new_password: newPassword },
-      { onSuccess: () => { setCurrentPassword(''); setNewPassword('') } }
+      { onSuccess: () => {
+          setCurrentPassword('')
+          setNewPassword('')
+          showToast('Password updated.')
+        }
+      }
     )
   }
 
@@ -169,6 +182,8 @@ export default function Setup() {
     updateDefaultsMutation.mutate({
       default_email: defaultEmail || null,
       default_telegram_chat_id: defaultTelegram || null,
+    }, {
+      onSuccess: () => showToast('Notification defaults saved.')
     })
   }
 
@@ -293,14 +308,14 @@ export default function Setup() {
                 <label className="flex items-center gap-3 cursor-pointer">
                   <input
                     type="checkbox"
-                    checked={hideTracked}
+                    checked={hideHeader}
                     onChange={(e) => {
-                      setHideTracked(e.target.checked)
-                      localStorage.setItem('caero_hide_tracked', e.target.checked ? 'true' : 'false')
+                      setHideHeader(e.target.checked)
+                      localStorage.setItem('caero_hide_header', e.target.checked ? 'true' : 'false')
                     }}
                     className="rounded text-indigo-600 h-4 w-4"
                   />
-                  <span className="text-sm text-gray-800 dark:text-gray-200">Hide tracked products list</span>
+                  <span className="text-sm text-gray-800 dark:text-gray-200">Hide header on products list</span>
                 </label>
               </div>
             </div>
@@ -693,6 +708,14 @@ export default function Setup() {
         <div className="bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 px-4 py-3 rounded-xl text-sm">
           {saveMutation.error?.message || changePasswordMutation.error?.message
             || importDataMutation.error?.message || importMyDataMutation.error?.message}
+        </div>
+      )}
+
+      {/* Global Toast */}
+      {toastMsg && (
+        <div className="fixed bottom-6 right-6 z-50 bg-gray-900 text-white dark:bg-white dark:text-gray-900 px-4 py-3 rounded-xl shadow-lg text-sm font-medium transition-all duration-300 transform translate-y-0 opacity-100 flex items-center gap-2">
+          <Check className="h-4 w-4 text-green-400 dark:text-green-600" />
+          {toastMsg}
         </div>
       )}
 

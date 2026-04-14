@@ -266,14 +266,23 @@ export default function ProductDetail() {
             </>
           )}
           <div className="flex-1 min-w-0">
-            <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100 leading-tight">
-              {product.name}
-            </h1>
+            <div className="flex items-center gap-3">
+              <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100 leading-tight">
+                {product.name}
+              </h1>
+              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                product.active
+                  ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300'
+                  : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'
+              }`}>
+                {product.active ? 'Active' : 'Paused'}
+              </span>
+            </div>
 
             {/* Price row */}
             <div className="mt-3 flex items-baseline gap-3 flex-wrap">
               <span className="text-4xl font-extrabold text-indigo-600 dark:text-indigo-400 tracking-tight">
-                {formatPrice(product.latest_price)}
+                {formatPrice(product.latest_price, settings?.date_format)}
               </span>
               {product.last_price_change_percent !== null && (() => {
                 const pct = parseFloat(product.last_price_change_percent ?? '0')
@@ -292,7 +301,7 @@ export default function ProductDetail() {
                     ) : (
                       <TrendingUp className="h-3.5 w-3.5" />
                     )}
-                    {formatPercent(product.last_price_change_percent)}
+                    {formatPercent(product.last_price_change_percent, settings?.date_format)}
                   </span>
                 )
               })()}
@@ -313,11 +322,6 @@ export default function ProductDetail() {
                   {tag}
                 </span>
               ))}
-              {!product.active && (
-                <span className="text-xs px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300 font-medium">
-                  Paused
-                </span>
-              )}
             </div>
 
             {product.memo && (
@@ -421,22 +425,22 @@ export default function ProductDetail() {
       {/* ── Stats strip ── */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
         {[
-          { label: 'Average', value: formatPrice(stats?.average_price ?? null) },
+          { label: 'Average', value: formatPrice(stats?.average_price ?? null, settings?.date_format) },
           {
             label: 'All-time low',
-            value: formatPrice(stats?.lowest_price ?? null),
+            value: formatPrice(stats?.lowest_price ?? null, settings?.date_format),
             sub: formatDate(stats?.lowest_price_at ?? null, settings?.date_format),
             accent: 'text-green-600 dark:text-green-400',
           },
           {
             label: 'All-time high',
-            value: formatPrice(stats?.highest_price ?? null),
+            value: formatPrice(stats?.highest_price ?? null, settings?.date_format),
             sub: formatDate(stats?.highest_price_at ?? null, settings?.date_format),
             accent: 'text-red-500 dark:text-red-400',
           },
           {
             label: 'Total change',
-            value: formatPercent(stats?.total_change_percent ?? null),
+            value: formatPercent(stats?.total_change_percent ?? null, settings?.date_format),
           },
           { label: 'Data points', value: String(stats?.data_points ?? 0) },
         ].map(({ label, value, sub, accent }) => (
