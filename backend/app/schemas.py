@@ -99,6 +99,11 @@ class ProductOut(BaseModel):
     last_price_change_percent: Decimal | None = None
     last_price_change_at: datetime | None = None
     next_run_at: datetime | None = None
+    last_checked_at: datetime | None = None
+    lowest_price: Decimal | None = None
+    lowest_price_at: datetime | None = None
+    highest_price: Decimal | None = None
+    highest_price_at: datetime | None = None
 
     model_config = {"from_attributes": True}
 

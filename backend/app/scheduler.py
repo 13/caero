@@ -39,6 +39,11 @@ async def scrape_and_record(product_id: int) -> None:
 
         price = Decimal(str(price_float)).quantize(Decimal("0.01"))
 
+        # Always update last_checked_at
+        from sqlalchemy.sql import func
+
+        product.last_checked_at = func.now()
+
         # Get previous price for change detection BEFORE adding the new one
         prev_result = await db.execute(
             select(PriceHistory)
@@ -47,6 +52,11 @@ async def scrape_and_record(product_id: int) -> None:
             .limit(1)
         )
         prev = prev_result.scalar_one_or_none()
+
+        if prev is not None and prev.price == price:
+            logger.debug("Price for product %d unchanged (%.2f) — skipping record", product_id, price)
+            await db.commit()
+            return
 
         # Persist price record
         record = PriceHistory(product_id=product_id, price=price)

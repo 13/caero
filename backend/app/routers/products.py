@@ -33,16 +33,6 @@ async def _get_product(product_id: int, user: User, db: AsyncSession) -> Product
     return product
 
 
-async def _latest_two_prices(product_id: int, db: AsyncSession) -> list[PriceHistory]:
-    result = await db.execute(
-        select(PriceHistory)
-        .where(PriceHistory.product_id == product_id)
-        .order_by(PriceHistory.scraped_at.desc())
-        .limit(2)
-    )
-    return result.scalars().all()
-
-
 def _tags_to_list(raw_tags: str | None) -> list[str]:
     if not raw_tags:
         return []
@@ -59,18 +49,148 @@ def _tags_to_string(tags: list[str] | None) -> str:
             unique_tags.append(cleaned)
     return ",".join(unique_tags)
 
+async def _get_latest_price_changes(db: AsyncSession, product_ids: list[int]) -> dict[int, dict]:
+    if not product_ids:
+        return {}
+
+    latest_rn = func.row_number().over(
+        partition_by=PriceHistory.product_id,
+        order_by=PriceHistory.scraped_at.desc()
+    ).label("rn")
+    latest_subq = (
+        select(PriceHistory.product_id, PriceHistory.price, PriceHistory.scraped_at)
+        .where(PriceHistory.product_id.in_(product_ids))
+        .add_columns(latest_rn)
+    ).subquery()
+
+    latest_stmt = select(latest_subq).where(latest_subq.c.rn == 1)
+    latest_rows = (await db.execute(latest_stmt)).all()
+
+    latest_prices = {row.product_id: (row.price, row.scraped_at) for row in latest_rows}
+
+    diff_rn = func.row_number().over(
+        partition_by=PriceHistory.product_id,
+        order_by=PriceHistory.scraped_at.desc()
+    ).label("rn")
+
+    diff_subq = (
+        select(PriceHistory.product_id, PriceHistory.price, PriceHistory.scraped_at)
+        .join(
+            latest_subq,
+            (PriceHistory.product_id == latest_subq.c.product_id) & (latest_subq.c.rn == 1)
+        )
+        .where(PriceHistory.price != latest_subq.c.price)
+        .add_columns(diff_rn)
+    ).subquery()
+
+    diff_stmt = select(diff_subq).where(diff_subq.c.rn == 1)
+    diff_rows = (await db.execute(diff_stmt)).all()
+
+    prev_different_prices = {row.product_id: (row.price, row.scraped_at) for row in diff_rows}
+
+    out = {}
+    from sqlalchemy import or_
+    or_conditions = []
+    for pid, prev in prev_different_prices.items():
+        or_conditions.append(
+            (PriceHistory.product_id == pid) & (PriceHistory.scraped_at > prev[1])
+        )
+
+    first_seen_map = {}
+    if or_conditions:
+        first_seen_stmt = select(PriceHistory.product_id, func.min(PriceHistory.scraped_at)).where(or_(*or_conditions)).group_by(PriceHistory.product_id)
+        first_seen_rows = (await db.execute(first_seen_stmt)).all()
+        first_seen_map = {row[0]: row[1] for row in first_seen_rows}
+
+    for pid in product_ids:
+        latest = latest_prices.get(pid)
+        if not latest:
+            out[pid] = {
+                "latest_price": None,
+                "previous_price": None,
+                "last_change_at": None,
+                "last_change_percent": None,
+                "last_checked_at": None
+            }
+            continue
+
+        latest_price, latest_scraped_at = latest
+        prev = prev_different_prices.get(pid)
+        if not prev:
+            out[pid] = {
+                "latest_price": latest_price,
+                "previous_price": latest_price,
+                "last_change_at": latest_scraped_at,
+                "last_change_percent": Decimal("0.00"),
+                "last_checked_at": latest_scraped_at
+            }
+            continue
+
+        prev_price, _ = prev
+        last_change_at = first_seen_map.get(pid)
+        last_change_percent = Decimal("0.00")
+        if prev_price != Decimal(0):
+            last_change_percent = ((latest_price - prev_price) / prev_price) * Decimal(100)
+            last_change_percent = last_change_percent.quantize(Decimal("0.01"))
+
+        out[pid] = {
+            "latest_price": latest_price,
+            "previous_price": prev_price,
+            "last_change_at": last_change_at,
+            "last_change_percent": last_change_percent,
+            "last_checked_at": latest_scraped_at
+        }
+
+    # Now get extremes (lowest and highest prices and their dates)
+    extreme_rn_min = func.row_number().over(
+        partition_by=PriceHistory.product_id,
+        order_by=[PriceHistory.price.asc(), PriceHistory.scraped_at.desc()]
+    ).label("rn_min")
+
+    extreme_rn_max = func.row_number().over(
+        partition_by=PriceHistory.product_id,
+        order_by=[PriceHistory.price.desc(), PriceHistory.scraped_at.desc()]
+    ).label("rn_max")
+
+    base_subq_extreme = select(PriceHistory.product_id, PriceHistory.price, PriceHistory.scraped_at).where(PriceHistory.product_id.in_(product_ids))
+
+    min_subq = base_subq_extreme.add_columns(extreme_rn_min).subquery()
+    max_subq = base_subq_extreme.add_columns(extreme_rn_max).subquery()
+
+    min_stmt = select(min_subq).where(min_subq.c.rn_min == 1)
+    max_stmt = select(max_subq).where(max_subq.c.rn_max == 1)
+
+    min_rows = (await db.execute(min_stmt)).all()
+    max_rows = (await db.execute(max_stmt)).all()
+
+    min_map = {row.product_id: (row.price, row.scraped_at) for row in min_rows}
+    max_map = {row.product_id: (row.price, row.scraped_at) for row in max_rows}
+
+    for pid in product_ids:
+        if pid in out:
+            min_val = min_map.get(pid)
+            max_val = max_map.get(pid)
+            out[pid]["lowest_price"] = min_val[0] if min_val else None
+            out[pid]["lowest_price_at"] = min_val[1] if min_val else None
+            out[pid]["highest_price"] = max_val[0] if max_val else None
+            out[pid]["highest_price_at"] = max_val[1] if max_val else None
+
+    return out
 
 async def _to_product_out(product: Product, db: AsyncSession) -> ProductOut:
     from app.scheduler import scheduler
 
-    latest_two = await _latest_two_prices(product.id, db)
-    latest_price = latest_two[0].price if latest_two else None
-    previous_price = latest_two[1].price if len(latest_two) > 1 else None
-    last_change_percent = None
-    last_change_at = latest_two[0].scraped_at if len(latest_two) > 1 else None
-    if latest_price is not None and previous_price is not None and previous_price != Decimal(0):
-        last_change_percent = ((latest_price - previous_price) / previous_price) * Decimal(100)
-        last_change_percent = last_change_percent.quantize(Decimal("0.01"))
+    latest_prices = await _get_latest_price_changes(db, [product.id])
+    latest_price_info = latest_prices.get(product.id, {})
+    latest_price = latest_price_info.get("latest_price")
+    previous_price = latest_price_info.get("previous_price")
+    last_change_at = latest_price_info.get("last_change_at")
+    last_change_percent = latest_price_info.get("last_change_percent")
+    last_checked_at = latest_price_info.get("last_checked_at")
+    lowest_price = latest_price_info.get("lowest_price")
+    lowest_price_at = latest_price_info.get("lowest_price_at")
+    highest_price = latest_price_info.get("highest_price")
+    highest_price_at = latest_price_info.get("highest_price_at")
 
     job = scheduler.get_job(f"product_{product.id}")
     next_run_at = job.next_run_time if job else None
@@ -83,6 +203,11 @@ async def _to_product_out(product: Product, db: AsyncSession) -> ProductOut:
             "previous_price": previous_price,
             "last_price_change_percent": last_change_percent,
             "last_price_change_at": last_change_at,
+            "last_checked_at": last_checked_at,
+            "lowest_price": lowest_price,
+            "lowest_price_at": lowest_price_at,
+            "highest_price": highest_price,
+            "highest_price_at": highest_price_at,
             "next_run_at": next_run_at,
         }
     )
@@ -101,39 +226,20 @@ async def list_products(
 
     product_ids = [p.id for p in products]
 
-    rn = func.row_number().over(
-        partition_by=PriceHistory.product_id,
-        order_by=PriceHistory.scraped_at.desc()
-    ).label("rn")
-
-    stmt = (
-        select(PriceHistory)
-        .add_columns(rn)
-        .where(PriceHistory.product_id.in_(product_ids))
-    )
-
-    subq = stmt.subquery()
-    aliased_ph = aliased(PriceHistory, subq)
-
-    prices_stmt = select(aliased_ph).where(subq.c.rn <= 2).order_by(aliased_ph.product_id, aliased_ph.scraped_at.desc())
-    prices_result = await db.execute(prices_stmt)
-    prices = prices_result.scalars().all()
-
-    from collections import defaultdict
-    prices_by_product = defaultdict(list)
-    for p in prices:
-        prices_by_product[p.product_id].append(p)
+    latest_prices = await _get_latest_price_changes(db, product_ids)
 
     out = []
     for product in products:
-        latest_two = prices_by_product.get(product.id, [])
-        latest_price = latest_two[0].price if latest_two else None
-        previous_price = latest_two[1].price if len(latest_two) > 1 else None
-        last_change_percent = None
-        last_change_at = latest_two[0].scraped_at if len(latest_two) > 1 else None
-        if latest_price is not None and previous_price is not None and previous_price != Decimal(0):
-            last_change_percent = ((latest_price - previous_price) / previous_price) * Decimal(100)
-            last_change_percent = last_change_percent.quantize(Decimal("0.01"))
+        latest_price_info = latest_prices.get(product.id, {})
+        latest_price = latest_price_info.get("latest_price")
+        previous_price = latest_price_info.get("previous_price")
+        last_change_at = latest_price_info.get("last_change_at")
+        last_change_percent = latest_price_info.get("last_change_percent")
+        last_checked_at = latest_price_info.get("last_checked_at")
+        lowest_price = latest_price_info.get("lowest_price")
+        lowest_price_at = latest_price_info.get("lowest_price_at")
+        highest_price = latest_price_info.get("highest_price")
+        highest_price_at = latest_price_info.get("highest_price_at")
 
         job = scheduler.get_job(f"product_{product.id}")
         next_run_at = job.next_run_time if job else None
@@ -146,6 +252,11 @@ async def list_products(
                 "previous_price": previous_price,
                 "last_price_change_percent": last_change_percent,
                 "last_price_change_at": last_change_at,
+                "last_checked_at": last_checked_at,
+                "lowest_price": lowest_price,
+                "lowest_price_at": lowest_price_at,
+                "highest_price": highest_price,
+                "highest_price_at": highest_price_at,
                 "next_run_at": next_run_at,
             }
         ))
@@ -301,7 +412,7 @@ async def get_product_statistics(
     lowest_stmt = select(PriceHistory).where(
         PriceHistory.product_id == product_id,
         PriceHistory.price == lowest_val
-    ).order_by(PriceHistory.scraped_at.asc()).limit(1)
+    ).order_by(PriceHistory.scraped_at.desc()).limit(1)
     lowest_res = await db.execute(lowest_stmt)
     lowest = lowest_res.scalar_one()
 
@@ -309,7 +420,7 @@ async def get_product_statistics(
     highest_stmt = select(PriceHistory).where(
         PriceHistory.product_id == product_id,
         PriceHistory.price == highest_val
-    ).order_by(PriceHistory.scraped_at.asc()).limit(1)
+    ).order_by(PriceHistory.scraped_at.desc()).limit(1)
     highest_res = await db.execute(highest_stmt)
     highest = highest_res.scalar_one()
 
@@ -318,25 +429,18 @@ async def get_product_statistics(
     first_res = await db.execute(first_stmt)
     first = first_res.scalar_one()
 
-    last_two_stmt = select(PriceHistory).where(PriceHistory.product_id == product_id).order_by(PriceHistory.scraped_at.desc()).limit(2)
-    last_two_res = await db.execute(last_two_stmt)
-    last_two = last_two_res.scalars().all()
-    current = last_two[0]
-    previous = last_two[1] if len(last_two) > 1 else None
+    # Get latest price and change percent
+    latest_prices = await _get_latest_price_changes(db, [product_id])
+    latest_price_info = latest_prices.get(product_id, {})
+    current_price = latest_price_info.get("latest_price", Decimal(0))
+    last_change_at = latest_price_info.get("last_change_at")
+    last_change_percent = latest_price_info.get("last_change_percent")
 
     total_change_percent = None
     if first.price != Decimal(0):
-        total_change_percent = (((current.price - first.price) / first.price) * Decimal(100)).quantize(
+        total_change_percent = (((current_price - first.price) / first.price) * Decimal(100)).quantize(
             Decimal("0.01")
         )
-
-    last_change_percent = None
-    last_change_at = None
-    if previous and previous.price != Decimal(0):
-        last_change_percent = (((current.price - previous.price) / previous.price) * Decimal(100)).quantize(
-            Decimal("0.01")
-        )
-        last_change_at = current.scraped_at
 
     return ProductStatisticsOut(
         average_price=average_price,
@@ -344,7 +448,7 @@ async def get_product_statistics(
         lowest_price_at=lowest.scraped_at,
         highest_price=highest.price,
         highest_price_at=highest.scraped_at,
-        current_price=current.price,
+        current_price=current_price,
         total_change_percent=total_change_percent,
         last_change_percent=last_change_percent,
         last_change_at=last_change_at,

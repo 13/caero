@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 import { RefreshCw, X, TrendingDown, TrendingUp, ExternalLink, BellRing } from 'lucide-react'
 import type { Product } from '../api/types'
 import { useCheckProduct, useDeleteProduct, useSettings } from '../api/hooks'
-import { formatDate, formatIntervalHours, formatPercent, formatPrice } from '../utils/format'
+import { formatDate, formatDateTime, formatIntervalHours, formatPercent, formatPrice } from '../utils/format'
 import { getTagColorClass } from '../utils/tags'
 
 interface ProductCardProps {
@@ -16,7 +16,7 @@ export default function ProductCard({ product, onKeywordClick, hasActiveAlerts }
   const checkMutation = useCheckProduct()
   const { data: settings } = useSettings()
   const checkIntervalHours = formatIntervalHours(product.check_interval_minutes)
-  const pct = product.last_price_change_percent ? parseFloat(product.last_price_change_percent) : null
+  const pct = product.last_price_change_percent !== null ? parseFloat(product.last_price_change_percent) : null
 
   const handleDelete = () => {
     if (confirm(`Delete "${product.name}"?`)) {
@@ -130,9 +130,14 @@ export default function ProductCard({ product, onKeywordClick, hasActiveAlerts }
             ) : (
               <span className="text-xs text-gray-300 dark:text-gray-600">—</span>
             )}
-            <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-              {formatDate(product.last_price_change_at, settings?.date_format)}
-            </p>
+            {product.last_checked_at && (
+              <p
+                className="text-xs text-gray-400 dark:text-gray-500 mt-1"
+                title={`Price last changed at: ${formatDate(product.last_price_change_at, settings?.date_format) ?? 'Never'}`}
+              >
+                {formatDateTime(product.last_checked_at)}
+              </p>
+            )}
           </div>
         </div>
 

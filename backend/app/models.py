@@ -48,6 +48,7 @@ class Product(Base):
     selector: Mapped[str] = mapped_column(String(256), nullable=False)
     check_interval_minutes: Mapped[int] = mapped_column(Integer, default=30)
     active: Mapped[bool] = mapped_column(Boolean, default=True)
+    last_checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -90,6 +91,7 @@ class Alert(Base):
     email: Mapped[str | None] = mapped_column(String(256), nullable=True)
     telegram_chat_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     active: Mapped[bool] = mapped_column(Boolean, default=True)
+    last_checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     product: Mapped["Product"] = relationship("Product", back_populates="alerts")
 

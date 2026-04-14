@@ -308,6 +308,12 @@ export default function ProductDetail() {
               })()}
             </div>
 
+            {product.last_checked_at && (
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                Last checked: {formatDateTime(product.last_checked_at, settings?.date_format)}
+              </p>
+            )}
+
             {/* Meta row */}
             <div className="mt-3 flex flex-wrap items-center gap-2">
               {product.category && (

@@ -29,6 +29,11 @@ export interface Product {
   last_price_change_percent: string | null
   last_price_change_at: string | null
   next_run_at: string | null
+  last_checked_at: string | null
+  lowest_price: string | null
+  lowest_price_at: string | null
+  highest_price: string | null
+  highest_price_at: string | null
   created_at: string
 }
 

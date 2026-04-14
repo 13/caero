@@ -395,7 +395,7 @@ export default function Dashboard() {
                             ) : '—'}
                           </td>
                           <td className="px-4 py-3 text-gray-500 dark:text-gray-400">
-                            {formatDateTime(p.last_price_change_at, settings?.date_format)}
+                            {formatDateTime(p.last_checked_at, settings?.date_format)}
                           </td>
                         </tr>
                       ))}
