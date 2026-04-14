@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 import { RefreshCw, X, TrendingDown, TrendingUp, ExternalLink, BellRing } from 'lucide-react'
 import type { Product } from '../api/types'
 import { useCheckProduct, useDeleteProduct, useSettings } from '../api/hooks'
-import { formatDate, formatDateTime, formatIntervalHours, formatPercent, formatPrice } from '../utils/format'
+import { formatDate, formatIntervalHours, formatPercent, formatPrice } from '../utils/format'
 import { getTagColorClass } from '../utils/tags'
 
 interface ProductCardProps {
@@ -135,7 +135,7 @@ export default function ProductCard({ product, onKeywordClick, hasActiveAlerts }
                 className="text-xs text-gray-400 dark:text-gray-500 mt-1"
                 title={`Price last changed at: ${formatDate(product.last_price_change_at, settings?.date_format) ?? 'Never'}`}
               >
-                {formatDateTime(product.last_checked_at)}
+                {formatDate(product.last_checked_at, settings?.date_format)}
               </p>
             )}
           </div>
