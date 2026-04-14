@@ -108,15 +108,18 @@ async def scrape_price(browser: Browser, url: str, selector: str) -> float | Non
                 )
             }
         )
-        await page.goto(url, timeout=30000, wait_until="networkidle")
-        await page.wait_for_timeout(3000)
+        #await page.goto(url, timeout=30000, wait_until="networkidle")
+        await page.goto(url, timeout=60000, wait_until="domcontentloaded")
+        await page.wait_for_load_state("load", timeout=15000)
+        await page.wait_for_timeout(800)
 
         # Primary: user-supplied CSS selector
         try:
             await page.wait_for_selector(selector, timeout=10000)
-            el = await page.query_selector(selector)
-            if el:
-                text = await el.inner_text()
+            #el = await page.query_selector(selector)
+            el = page.locator(selector).first
+            if await el.count() > 0:
+                text = await el.first.inner_text()
                 price = _parse_price(text)
                 if price is not None:
                     return price
