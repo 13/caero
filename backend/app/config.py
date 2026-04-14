@@ -35,6 +35,7 @@ class Settings(BaseSettings):
 
     # Scraper
     scraper_backend: str = Field(default="auto", description="'auto', 'patchright', or 'playwright'")
+    scraper_headless: bool = Field(default=True)
 
     @property
     def database_url(self) -> str:

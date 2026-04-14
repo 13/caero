@@ -58,16 +58,13 @@ async def lifespan(application: FastAPI):
 
         pw = await pw_module().start()
         application.state.playwright = pw
-        #application.state.browser = await pw.chromium.launch(headless=True)
+
+        headless = settings.scraper_headless
         application.state.browser = await pw.chromium.launch(
-            headless=True,  # better stealth
-            args=[
-                "--disable-blink-features=AutomationControlled",
-                "--no-sandbox",
-                "--disable-dev-shm-usage",
-            ],
+            headless=headless,
+            args=["--disable-blink-features=AutomationControlled", "--disable-dev-shm-usage", "--no-sandbox", "--disable-setuid-sandbox"] if not headless else None
         )
-        logger.info("%s browser started", application.state.scraper_backend.capitalize())
+        logger.info("Playwright browser started in %s mode", "headless" if headless else "headed")
     except Exception as exc:
         logger.error("Could not start Playwright browser: %s", exc)
         application.state.playwright = None

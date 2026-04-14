@@ -30,6 +30,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxrandr2 \
     libgbm1 \
     libasound2 \
+    xvfb \
+    xauth \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies
@@ -47,4 +49,4 @@ RUN uv run playwright install chromium --with-deps
 RUN uv run patchright install chromium --with-deps || true
 
 EXPOSE 8000
-CMD ["uv", "run", "fastapi", "run", "app/main.py", "--host", "0.0.0.0", "--port", "8000"]
+CMD xvfb-run -a -s "-screen 0 1920x1080x24" uv run fastapi run app/main.py --host 0.0.0.0 --port 8000
