@@ -25,6 +25,7 @@ import {
   MIN_CHECK_INTERVAL_HOURS,
   DEFAULT_CHECK_INTERVAL_MINUTES,
   formatDate,
+  formatDateTime,
   formatPercent,
   formatPrice,
   intervalMinutesToHours,
@@ -322,6 +323,11 @@ export default function ProductDetail() {
                   {tag}
                 </span>
               ))}
+              {product.next_run_at && (
+                <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 font-medium">
+                  Next run: {formatDateTime(product.next_run_at, settings?.date_format)}
+                </span>
+              )}
             </div>
 
             {product.memo && (

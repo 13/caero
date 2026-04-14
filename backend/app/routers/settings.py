@@ -29,6 +29,7 @@ from app.schemas import (
     TestTelegramRequest,
     UserDataExportPayload,
     SystemInfoOut,
+    JobOut,
 )
 
 logger = logging.getLogger(__name__)
@@ -183,6 +184,18 @@ async def system_info(
         db_type=settings.db_type,
         db_version=str(db_version),
     )
+
+
+@router.get("/jobs", response_model=list[JobOut])
+async def list_jobs(
+    _user=Depends(require_admin),
+) -> list[JobOut]:
+    from app.scheduler import scheduler
+
+    jobs = []
+    for job in scheduler.get_jobs():
+        jobs.append(JobOut(id=job.id, next_run_time=job.next_run_time))
+    return jobs
 
 
 def _serialize_decimal(value: Decimal | None) -> str | None:

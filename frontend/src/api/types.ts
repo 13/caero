@@ -24,11 +24,12 @@ export interface Product {
   selector: string
   check_interval_minutes: number
   active: boolean
-  created_at: string
   latest_price: string | null
   previous_price: string | null
   last_price_change_percent: string | null
   last_price_change_at: string | null
+  next_run_at: string | null
+  created_at: string
 }
 
 export interface ProductCreate {
@@ -179,4 +180,3 @@ export interface SystemInfoOut {
   db_type: string
   db_version: string
 }
-

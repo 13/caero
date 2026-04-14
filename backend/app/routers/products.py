@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
@@ -61,6 +61,8 @@ def _tags_to_string(tags: list[str] | None) -> str:
 
 
 async def _to_product_out(product: Product, db: AsyncSession) -> ProductOut:
+    from app.scheduler import scheduler
+
     latest_two = await _latest_two_prices(product.id, db)
     latest_price = latest_two[0].price if latest_two else None
     previous_price = latest_two[1].price if len(latest_two) > 1 else None
@@ -70,6 +72,9 @@ async def _to_product_out(product: Product, db: AsyncSession) -> ProductOut:
         last_change_percent = ((latest_price - previous_price) / previous_price) * Decimal(100)
         last_change_percent = last_change_percent.quantize(Decimal("0.01"))
 
+    job = scheduler.get_job(f"product_{product.id}")
+    next_run_at = job.next_run_time if job else None
+
     return ProductOut.model_validate(
         {
             **product.__dict__,
@@ -78,6 +83,7 @@ async def _to_product_out(product: Product, db: AsyncSession) -> ProductOut:
             "previous_price": previous_price,
             "last_price_change_percent": last_change_percent,
             "last_price_change_at": last_change_at,
+            "next_run_at": next_run_at,
         }
     )
 
@@ -86,6 +92,8 @@ async def _to_product_out(product: Product, db: AsyncSession) -> ProductOut:
 async def list_products(
     user: User = Depends(require_user), db: AsyncSession = Depends(get_db)
 ) -> list[ProductOut]:
+    from app.scheduler import scheduler
+
     result = await db.execute(select(Product).where(Product.user_id == user.id))
     products = result.scalars().all()
     if not products:
@@ -127,6 +135,9 @@ async def list_products(
             last_change_percent = ((latest_price - previous_price) / previous_price) * Decimal(100)
             last_change_percent = last_change_percent.quantize(Decimal("0.01"))
 
+        job = scheduler.get_job(f"product_{product.id}")
+        next_run_at = job.next_run_time if job else None
+
         out.append(ProductOut.model_validate(
             {
                 **product.__dict__,
@@ -135,6 +146,7 @@ async def list_products(
                 "previous_price": previous_price,
                 "last_price_change_percent": last_change_percent,
                 "last_price_change_at": last_change_at,
+                "next_run_at": next_run_at,
             }
         ))
     return out
@@ -236,6 +248,28 @@ async def check_product_now(
     await db.flush()
 
     return CheckResult(product_id=product_id, price=price)
+
+
+@router.post("/check-all", status_code=status.HTTP_202_ACCEPTED)
+async def check_all_products_now(
+    background_tasks: BackgroundTasks,
+    user: User = Depends(require_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, str]:
+    from app.scheduler import scrape_and_record
+
+    result = await db.execute(
+        select(Product.id).where(Product.user_id == user.id, Product.active == True)
+    )
+    product_ids = result.scalars().all()
+
+    for pid in product_ids:
+        background_tasks.add_task(scrape_and_record, pid)
+
+    return {
+        "status": "ok",
+        "message": f"Checking {len(product_ids)} active products in the background.",
+    }
 
 
 @router.get("/{product_id}/stats", response_model=ProductStatisticsOut)

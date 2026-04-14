@@ -13,6 +13,7 @@ import {
   useMe,
   useSettings,
   useSaveSettings,
+  useCheckAllProducts,
   useSystemInfo,
   useTestDb,
   useTestEmail,
@@ -25,7 +26,7 @@ import CaeroBrand from '../components/CaeroBrand'
 import DbSelector from '../components/DbSelector'
 import { APP_DESCRIPTION, APP_VERSION } from '../constants/appInfo'
 import {
-  User, KeyRound, Download, Upload, Trash2,
+  User, KeyRound, Download, Upload, Trash2, RefreshCw,
   Shield, Database, Bell, Users, Check, Info
 } from 'lucide-react'
 
@@ -92,6 +93,7 @@ export default function Setup() {
   const importMyDataMutation = useImportMyData()
   const deleteMyProductsMutation = useDeleteMyProducts()
   const adminDeleteUserProductsMutation = useAdminDeleteUserProducts()
+  const checkAllProductsMutation = useCheckAllProducts()
 
   const [activeTab, setActiveTab] = useState<Tab>('account')
   const [form, setForm] = useState<AppSettings>({
@@ -388,11 +390,25 @@ export default function Setup() {
                 Import my data
                 <input type="file" accept="application/json" onChange={handleMyImportFile} className="hidden" />
               </label>
+              <button
+                type="button"
+                onClick={() => checkAllProductsMutation.mutate()}
+                disabled={checkAllProductsMutation.isPending}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50 transition-colors"
+              >
+                <RefreshCw className={`h-3.5 w-3.5 ${checkAllProductsMutation.isPending ? 'animate-spin' : ''}`} />
+                {checkAllProductsMutation.isPending ? 'Checking…' : 'Check all prices'}
+              </button>
             </div>
             {myImportError && <p className="text-sm text-red-600 dark:text-red-400">{myImportError}</p>}
             {importMyDataMutation.isSuccess && (
               <p className="inline-flex items-center gap-1 text-sm text-green-600 font-medium">
                 <Check className="h-4 w-4" /> Import successful
+              </p>
+            )}
+            {checkAllProductsMutation.isSuccess && (
+              <p className="inline-flex items-center gap-1 text-sm text-green-600 font-medium mt-2">
+                <Check className="h-4 w-4" /> {checkAllProductsMutation.data.message}
               </p>
             )}
           </Section>

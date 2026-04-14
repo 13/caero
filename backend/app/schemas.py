@@ -98,6 +98,7 @@ class ProductOut(BaseModel):
     previous_price: Decimal | None = None
     last_price_change_percent: Decimal | None = None
     last_price_change_at: datetime | None = None
+    next_run_at: datetime | None = None
 
     model_config = {"from_attributes": True}
 
@@ -261,3 +262,8 @@ class SystemInfoOut(BaseModel):
     db_type: str
     db_version: str
 
+class JobOut(BaseModel):
+    id: str
+    next_run_time: datetime | None
+
+    model_config = {"from_attributes": True}

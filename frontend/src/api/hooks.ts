@@ -143,6 +143,13 @@ export function useCheckProduct() {
   })
 }
 
+export function useCheckAllProducts() {
+  return useMutation<{ status: string; message: string }, Error, void>({
+    mutationFn: () =>
+      apiFetch<{ status: string; message: string }>('/api/products/check-all', { method: 'POST' }),
+  })
+}
+
 // ── Prices ────────────────────────────────────────────────────────────────────
 
 export function usePrices(productId: number, from?: string, to?: string) {

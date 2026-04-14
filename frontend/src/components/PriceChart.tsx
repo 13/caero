@@ -10,7 +10,7 @@ import {
 import { useMemo } from 'react'
 import { useSettings } from '../api/hooks'
 import type { PriceHistory } from '../api/types'
-import { localeFromDateFormat } from '../utils/format'
+import { localeFromDateFormat, formatDateTime } from '../utils/format'
 
 interface PriceChartProps {
   data: PriceHistory[]
@@ -38,12 +38,12 @@ export default function PriceChart({ data, currency = 'EUR' }: PriceChartProps) 
     }
   }
 
-  const formatDate = (value: number) => {
-    try {
-      return new Intl.DateTimeFormat(locale).format(new Date(value))
-    } catch {
-      return new Date(value).toLocaleDateString()
-    }
+  const formatChartDate = (value: number) => {
+    // Rely on formatting defined in format.ts instead of pure Intl localization to honor DD.MM.YYYY padding
+    const isoString = new Date(value).toISOString()
+    // formatDateTime handles extraction based on settings
+    const localized = formatDateTime(isoString, settings?.date_format)
+    return localized.split(' ')[0] // Just return the Day/Month/Year portion for the XAxis
   }
 
   const chartData = useMemo(
@@ -70,7 +70,7 @@ export default function PriceChart({ data, currency = 'EUR' }: PriceChartProps) 
         <XAxis
           dataKey="date"
           tick={{ fontSize: 11, fill: 'var(--chart-axis)' }}
-          tickFormatter={(timestamp: number) => formatDate(timestamp)}
+          tickFormatter={(timestamp: number) => formatChartDate(timestamp)}
         />
         <YAxis
           tick={{ fontSize: 11, fill: 'var(--chart-axis)' }}
@@ -79,17 +79,7 @@ export default function PriceChart({ data, currency = 'EUR' }: PriceChartProps) 
         />
         <Tooltip
           formatter={(value: number) => [formatCurrency(value), 'Price']}
-          labelFormatter={(value: number) => {
-            try {
-              return new Intl.DateTimeFormat(locale, {
-                year: 'numeric', month: 'numeric', day: 'numeric',
-                hour: '2-digit', minute: '2-digit',
-                hour12: false,
-              }).format(new Date(value))
-            } catch {
-              return new Date(value).toLocaleString()
-            }
-          }}
+          labelFormatter={(value: number) => formatDateTime(new Date(value).toISOString(), settings?.date_format)}
           contentStyle={{
             backgroundColor: 'var(--chart-tooltip-bg)',
             borderColor: 'var(--chart-tooltip-border)',
