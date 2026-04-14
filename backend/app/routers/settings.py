@@ -168,6 +168,8 @@ async def test_telegram_notification(
 async def system_info(
     db: AsyncSession = Depends(get_db),
 ) -> SystemInfoOut:
+    from app.main import app
+
     db_version = "Unknown"
     try:
         if settings.db_type == "postgresql":
@@ -179,10 +181,13 @@ async def system_info(
     except Exception:
         pass
 
+    scraper_backend = getattr(app.state, "scraper_backend", "unknown")
+
     return SystemInfoOut(
         version=PROJECT_VERSION,
         db_type=settings.db_type,
         db_version=str(db_version),
+        scraper_backend=scraper_backend,
     )
 
 

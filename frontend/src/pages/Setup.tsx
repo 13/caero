@@ -714,6 +714,9 @@ export default function Setup() {
 
               <div className="text-right font-medium text-gray-500 hover:text-gray-700">DB Version:</div>
               <div className="font-mono text-xs mt-1">{systemInfo?.db_version || '...'}</div>
+
+              <div className="text-right font-medium text-gray-500 hover:text-gray-700">Scraper Backend:</div>
+              <div className="font-mono capitalize mt-1">{systemInfo?.scraper_backend || '...'}</div>
             </div>
           </div>
         </div>

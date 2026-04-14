@@ -184,4 +184,14 @@ export interface SystemInfoOut {
   version: string
   db_type: string
   db_version: string
+  scraper_backend: string
+}
+
+export interface JobOut {
+  id: number
+  product_id: number
+  status: 'pending' | 'in_progress' | 'completed' | 'failed'
+  error_message: string | null
+  created_at: string
+  updated_at: string
 }

@@ -266,6 +266,7 @@ class SystemInfoOut(BaseModel):
     version: str
     db_type: str
     db_version: str
+    scraper_backend: str = "unknown"
 
 class JobOut(BaseModel):
     id: str

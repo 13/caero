@@ -32,11 +32,31 @@ async def lifespan(application: FastAPI):
     if not (STATIC_DIR / "index.html").exists():
         logger.warning("Frontend not built — run npm run build in /frontend")
 
-    # Launch Playwright browser
+    # Launch Playwright/Patchright browser
     try:
-        from playwright.async_api import async_playwright
+        from app.config import settings
 
-        pw = await async_playwright().start()
+        pw_module = None
+        if settings.scraper_backend.lower() in ("auto", "patchright"):
+            try:
+                import patchright.async_api
+                pw_module = patchright.async_api.async_playwright
+                logger.info("Using Patchright for scraping")
+            except ImportError:
+                if settings.scraper_backend.lower() == "patchright":
+                    logger.error("Patchright is configured but not installed")
+                    raise
+                logger.info("Patchright not found, falling back to Playwright")
+
+        if pw_module is None:
+            from playwright.async_api import async_playwright
+            pw_module = async_playwright
+            logger.info("Using Playwright for scraping")
+            application.state.scraper_backend = "playwright"
+        else:
+            application.state.scraper_backend = "patchright"
+
+        pw = await pw_module().start()
         application.state.playwright = pw
         application.state.browser = await pw.chromium.launch(headless=True)
         logger.info("Playwright browser started")
@@ -63,7 +83,7 @@ async def lifespan(application: FastAPI):
         await pw.stop()
 
     logger.info("Caero shutdown complete")
-from app.config import settings, PROJECT_VERSION
+from app.config import PROJECT_VERSION
 
 app = FastAPI(
     title="Caero",

@@ -44,6 +44,7 @@ COPY --from=frontend-builder /backend/app/static ./app/static
 
 # Install Playwright Chromium browser
 RUN uv run playwright install chromium --with-deps
+RUN uv run patchright install chromium --with-deps || true
 
 EXPOSE 8000
 CMD ["uv", "run", "fastapi", "run", "app/main.py", "--host", "0.0.0.0", "--port", "8000"]
