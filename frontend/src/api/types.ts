@@ -185,6 +185,7 @@ export interface SystemInfoOut {
   db_type: string
   db_version: string
   scraper_backend: string
+  scraper_headless: boolean
 }
 
 export interface JobOut {

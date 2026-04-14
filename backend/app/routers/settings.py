@@ -182,12 +182,14 @@ async def system_info(
         pass
 
     scraper_backend = getattr(app.state, "scraper_backend", "unknown")
+    scraper_headless = settings.scraper_headless
 
     return SystemInfoOut(
         version=PROJECT_VERSION,
         db_type=settings.db_type,
         db_version=str(db_version),
         scraper_backend=scraper_backend,
+        scraper_headless=scraper_headless,
     )
 
 
