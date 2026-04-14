@@ -13,7 +13,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.config import settings
+from app.config import settings, PROJECT_VERSION
 from app.database import get_db
 from app.models import Alert, AppSettings, PriceHistory, Product, User
 from app.routers.auth import require_admin, require_user
@@ -22,13 +22,13 @@ from app.schemas import (
     AppSettingsIn,
     AppSettingsOut,
     DataExportPayload,
-    SystemInfoOut,
     TestDbRequest,
     TestDbResponse,
     TestEmailRequest,
     TestNotificationResponse,
     TestTelegramRequest,
     UserDataExportPayload,
+    SystemInfoOut,
 )
 
 logger = logging.getLogger(__name__)
@@ -179,7 +179,7 @@ async def system_info(
         pass
 
     return SystemInfoOut(
-        version="0.2.0",
+        version=PROJECT_VERSION,
         db_type=settings.db_type,
         db_version=str(db_version),
     )

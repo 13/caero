@@ -63,12 +63,12 @@ async def lifespan(application: FastAPI):
         await pw.stop()
 
     logger.info("Caero shutdown complete")
-
+from app.config import settings, PROJECT_VERSION
 
 app = FastAPI(
     title="Caero",
     description="zero price tracker",
-    version="0.2.0",
+    version=PROJECT_VERSION,
     lifespan=lifespan,
 )
 

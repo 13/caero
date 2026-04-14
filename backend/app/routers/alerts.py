@@ -61,17 +61,15 @@ async def create_alert(
 @router.delete("/alerts/{alert_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_alert(
     alert_id: int,
-    user: User = Depends(require_user),
     db: AsyncSession = Depends(get_db),
-) -> None:
-    result = await db.execute(
-        select(Alert)
-        .join(Product, Alert.product_id == Product.id)
-        .where(Alert.id == alert_id, Product.user_id == user.id)
-    )
+    current_user: User = Depends(require_user),
+):
+    stmt = select(Alert).join(Product).where(Alert.id == alert_id, Product.user_id == current_user.id)
+    result = await db.execute(stmt)
     alert = result.scalar_one_or_none()
     if not alert:
         raise HTTPException(status_code=404, detail="Alert not found")
+
     await db.delete(alert)
     await db.commit()
 
@@ -104,3 +102,13 @@ async def update_alert(
     await db.commit()
     await db.refresh(alert)
     return alert
+
+
+@router.get("/alerts", response_model=list[AlertOut])
+async def get_all_alerts(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_user),
+) -> list[AlertOut]:
+    stmt = select(Alert).join(Product).where(Product.user_id == current_user.id)
+    result = await db.execute(stmt)
+    return result.scalars().all()

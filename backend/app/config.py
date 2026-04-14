@@ -44,3 +44,15 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+import tomllib
+from pathlib import Path
+def _get_project_version() -> str:
+    path = Path(__file__).parent.parent / "pyproject.toml"
+    if path.exists():
+        try:
+            with open(path, "rb") as f:
+                return tomllib.load(f)["project"]["version"]
+        except Exception:
+            pass
+    return "0.0.0"
+PROJECT_VERSION = _get_project_version()
