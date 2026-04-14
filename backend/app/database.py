@@ -13,8 +13,16 @@ logger = logging.getLogger(__name__)
 engine = create_async_engine(
     settings.database_url,
     echo=False,
+    pool_pre_ping=True,
+    pool_recycle=1800,
     # SQLite-specific: check_same_thread not applicable for async
-    connect_args={"check_same_thread": False} if settings.db_type == "sqlite" else {},
+    connect_args={"check_same_thread": False} if settings.db_type == "sqlite" else {
+        "command_timeout": 120,
+        "server_settings": {
+            "idle_in_transaction_session_timeout": "120000",
+            "tcp_keepalives_idle": "30",
+        }
+    },
 )
 
 AsyncSessionLocal = async_sessionmaker(
@@ -32,9 +40,16 @@ async def get_db() -> AsyncSession:
     async with AsyncSessionLocal() as session:
         try:
             yield session
-            await session.commit()
-        except Exception:
-            await session.rollback()
+            try:
+                await session.commit()
+            except SQLAlchemyError:
+                await session.rollback()
+                raise
+        except BaseException:
+            try:
+                await session.rollback()
+            except BaseException:
+                pass
             raise
 
 
