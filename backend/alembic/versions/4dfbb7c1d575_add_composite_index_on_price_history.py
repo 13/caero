@@ -15,8 +15,21 @@ depends_on = None
 
 
 def upgrade() -> None:
-    pass
+    op.create_index(
+        'ix_price_history_product_id_scraped_at',
+        'price_history',
+        ['product_id', 'scraped_at'],
+        unique=False
+    )
+    op.create_index('ix_price_history_product_id', 'price_history', ['product_id'], unique=False)
+    op.create_index('ix_price_history_scraped_at', 'price_history', ['scraped_at'], unique=False)
+    op.create_index('ix_products_user_id', 'products', ['user_id'], unique=False)
+    op.create_index('ix_alerts_product_id', 'alerts', ['product_id'], unique=False)
 
 
 def downgrade() -> None:
-    pass
+    op.drop_index('ix_alerts_product_id', table_name='alerts')
+    op.drop_index('ix_products_user_id', table_name='products')
+    op.drop_index('ix_price_history_scraped_at', table_name='price_history')
+    op.drop_index('ix_price_history_product_id', table_name='price_history')
+    op.drop_index('ix_price_history_product_id_scraped_at', table_name='price_history')
