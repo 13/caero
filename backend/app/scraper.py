@@ -120,7 +120,9 @@ async def scrape_price(browser: Browser, url: str, selector: str) -> float | Non
             el = page.locator(selector).first
             if await el.count() > 0:
                 text = await el.first.inner_text()
+                print("EXTRACTED TEXT:", text)
                 price = _parse_price(text)
+                print("EXTRACTED PRICE:", price)
                 if price is not None:
                     return price
         except Exception:
