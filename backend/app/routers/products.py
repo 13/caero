@@ -276,7 +276,7 @@ async def create_product(
     await db.flush()
     await db.refresh(product)
     if product.active:
-        add_product_job(product)
+        add_product_job(product, run_immediately=True)
     return await _to_product_out(product, db)
 
 

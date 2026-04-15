@@ -93,10 +93,17 @@ async def scrape_and_record(product_id: int) -> None:
         logger.info("Recorded price %.2f for product %d", price, product_id)
 
 
-def add_product_job(product: Product) -> None:
+def add_product_job(product: Product, run_immediately: bool = False) -> None:
     job_id = f"product_{product.id}"
     if scheduler.get_job(job_id):
         scheduler.remove_job(job_id)
+
+    kwargs = {}
+    if run_immediately:
+        from datetime import datetime, timezone
+
+        kwargs["next_run_time"] = datetime.now(timezone.utc)
+
     scheduler.add_job(
         scrape_and_record,
         "interval",
@@ -104,6 +111,7 @@ def add_product_job(product: Product) -> None:
         id=job_id,
         args=[product.id],
         replace_existing=True,
+        **kwargs
     )
     logger.debug("Scheduled job %s every %d min", job_id, product.check_interval_minutes)
 
