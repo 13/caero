@@ -161,7 +161,23 @@ export default function AddProduct() {
               required
               type="url"
               value={form.url}
-              onChange={(e) => setForm({ ...form, url: e.target.value })}
+              onChange={(e) => {
+                const newUrl = e.target.value
+                let newSelector = form.selector
+                try {
+                  const hostname = new URL(newUrl).hostname.toLowerCase()
+                  if (hostname.includes('amazon.')) {
+                    newSelector = '.a-offscreen, .a-price-whole, .a-price-fraction'
+                  } else if (hostname.includes('reichelt.')) {
+                    newSelector = '.productPrice'
+                  } else if (hostname.includes('zalando.')) {
+                    newSelector = '[data-testid="pdp-price-container"] span'
+                  }
+                } catch {
+                  // ignore invalid URL
+                }
+                setForm({ ...form, url: newUrl, selector: newSelector })
+              }}
               placeholder="https://example.com/product"
               className={inputCls}
             />
