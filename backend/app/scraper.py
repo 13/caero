@@ -1,14 +1,13 @@
-"""Price scraper using Playwright."""
+"""Price scraper using Patchright."""
 from __future__ import annotations
 
 import json
 import logging
 import re
 
-from playwright.async_api import Browser, Page
+from patchright.async_api import Browser, Page
 
 logger = logging.getLogger(__name__)
-
 
 def _parse_price(raw: str) -> float | None:
     """Normalise European and English price strings to float."""
