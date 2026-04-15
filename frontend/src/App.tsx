@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { LayoutDashboard, Menu, Moon, Plus, Settings, Sun, X, LogOut } from 'lucide-react'
 import { Link, Route, Routes, useLocation } from 'react-router-dom'
 import { logoutClient, useMe } from './api/hooks'
+import { Toaster } from 'react-hot-toast'
 import CaeroBrand from './components/CaeroBrand'
 import AddProduct from './pages/AddProduct'
 import Dashboard from './pages/Dashboard'
@@ -191,6 +192,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-gray-100">
+      <Toaster position="bottom-right" />
       <NavBar theme={theme} onToggleTheme={() => setTheme(theme === 'dark' ? 'light' : 'dark')} />
       <Routes>
         <Route path="/" element={<Dashboard />} />

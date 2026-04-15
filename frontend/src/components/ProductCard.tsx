@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { RefreshCw, X, TrendingDown, TrendingUp, ExternalLink, BellRing } from 'lucide-react'
+import toast from 'react-hot-toast'
 import type { Product } from '../api/types'
 import { useCheckProduct, useDeleteProduct, useSettings } from '../api/hooks'
 import { formatDate, formatIntervalHours, formatPercent, formatPrice } from '../utils/format'
@@ -144,7 +145,18 @@ export default function ProductCard({ product, onKeywordClick, hasActiveAlerts }
         {/* Actions */}
         <div className="flex gap-2 pt-1">
           <button
-            onClick={() => checkMutation.mutate(product.id)}
+            onClick={() => checkMutation.mutate(product.id, {
+              onSuccess: (data) => {
+                if (data.price !== null) {
+                  toast.success('Successfully checked: €' + data.price)
+                } else if (data.error) {
+                  toast.error(data.error)
+                } else {
+                  toast.error('No price found (check selector)')
+                }
+              },
+              onError: (err) => toast.error(err.message || 'Check failed')
+            })}
             disabled={checkMutation.isPending}
             className="flex-1 inline-flex items-center justify-center gap-1.5 text-sm py-2 rounded-xl bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900 disabled:opacity-50 font-medium transition-colors"
           >

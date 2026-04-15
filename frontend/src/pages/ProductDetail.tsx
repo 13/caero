@@ -18,7 +18,7 @@ import {
   useUpdateAlert,
   useUpdateProduct,
 } from '../api/hooks'
-import type { AlertCreate } from '../api/types'
+import type { AlertCreate, User } from '../api/types'
 import PriceChart from '../components/PriceChart'
 import {
   CHECK_INTERVAL_HOUR_STEP,
@@ -32,7 +32,7 @@ import {
   normalizeIntervalHoursToMinutes,
 } from '../utils/format'
 import { getTagColorClass } from '../utils/tags'
-import type { User } from '../api/types'
+import toast from 'react-hot-toast'
 
 const createDefaultAlertForm = (user?: User): AlertCreate => ({
   condition: 'below',
@@ -204,9 +204,20 @@ export default function ProductDetail() {
         </button>
         <div className="flex items-center gap-2">
           <button
-            onClick={() => checkMutation.mutate(productId)}
+            onClick={() => checkMutation.mutate(productId, {
+              onSuccess: (data) => {
+                if (data.price !== null) {
+                  toast.success('Successfully checked: €' + data.price)
+                } else if (data.error) {
+                  toast.error(data.error)
+                } else {
+                  toast.error('No price found (check selector)')
+                }
+              },
+              onError: (err) => toast.error(err.message || 'Check failed')
+            })}
             disabled={checkMutation.isPending}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900 font-medium disabled:opacity-50 transition-colors"
+            className="flex flex-1 items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-50 text-indigo-700 hover:bg-indigo-100 disabled:opacity-50 dark:bg-indigo-900/40 dark:text-indigo-300 dark:hover:bg-indigo-900/60 font-medium transition-colors"
           >
             <RefreshCw className={`h-3.5 w-3.5 ${checkMutation.isPending ? 'animate-spin' : ''}`} />
             {checkMutation.isPending ? 'Checking…' : 'Check now'}
