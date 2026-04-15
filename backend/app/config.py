@@ -33,6 +33,10 @@ class Settings(BaseSettings):
     smtp_tls: bool = Field(default=True)
     telegram_bot_token: str = Field(default="")
 
+    # Scraper
+    scraper_backend: str = Field(default="auto", description="'auto', 'patchright', or 'playwright'")
+    scraper_headless: bool = Field(default=True)
+
     @property
     def database_url(self) -> str:
         if self.db_type == "postgresql":

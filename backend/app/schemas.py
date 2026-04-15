@@ -266,6 +266,8 @@ class SystemInfoOut(BaseModel):
     version: str
     db_type: str
     db_version: str
+    scraper_backend: str = "unknown"
+    scraper_headless: bool = True
 
 class JobOut(BaseModel):
     id: str

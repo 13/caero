@@ -96,25 +96,30 @@ async def scrape_price(browser: Browser, url: str, selector: str) -> float | Non
     Scrape a price from the given URL using the given CSS selector.
     Falls back to ld+json, itemprop, and data-price if selector fails.
     """
+    context = None
     page = None
     try:
-        page = await browser.new_page()
-        await page.set_extra_http_headers(
-            {
-                "User-Agent": (
-                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                    "AppleWebKit/537.36 (KHTML, like Gecko) "
-                    "Chrome/120.0.0.0 Safari/537.36"
-                )
-            }
+        # Create a full context with realistic defaults instead of just setting headers
+        context = await browser.new_context(
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            viewport={"width": 1920, "height": 1080},
+            locale="de-DE",
+            timezone_id="Europe/Rome",
+            has_touch=False,
+            is_mobile=False,
         )
-        await page.goto(url, timeout=15000)
+        page = await context.new_page()
+
+        #await page.goto(url, timeout=30000, wait_until="networkidle")
+        await page.goto(url, timeout=60000, wait_until="domcontentloaded")
+        await page.wait_for_timeout(500)
 
         # Primary: user-supplied CSS selector
         try:
-            await page.wait_for_selector(selector, timeout=8000)
-            el = await page.query_selector(selector)
-            if el:
+            await page.wait_for_selector(selector, timeout=10000)
+            #el = await page.query_selector(selector)
+            el = page.locator(selector).first
+            if await el.count() > 0:
                 text = await el.inner_text()
                 price = _parse_price(text)
                 if price is not None:
@@ -143,5 +148,10 @@ async def scrape_price(browser: Browser, url: str, selector: str) -> float | Non
         if page:
             try:
                 await page.close()
+            except Exception:
+                pass
+        if context:
+            try:
+                await context.close()
             except Exception:
                 pass
