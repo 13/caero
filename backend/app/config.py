@@ -34,7 +34,7 @@ class Settings(BaseSettings):
     telegram_bot_token: str = Field(default="")
 
     # Scraper
-    scraper_headless: bool = Field(default=True)
+    scraper_headless: bool = Field(default=False)
 
     @property
     def database_url(self) -> str:
