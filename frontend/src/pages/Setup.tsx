@@ -286,7 +286,7 @@ export default function Setup() {
                   style={{ colorScheme: 'light dark' }}
                   className={inputCls}
                 >
-                  <option value="DD.MM.YYYY">DD.MM.YYYY (German default)</option>
+                  <option value="DD.MM.YYYY">DD.MM.YYYY</option>
                   <option value="DD/MM/YYYY">DD/MM/YYYY</option>
                   <option value="MM/DD/YYYY">MM/DD/YYYY</option>
                   <option value="YYYY-MM-DD">YYYY-MM-DD</option>
