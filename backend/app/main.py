@@ -93,6 +93,10 @@ app.include_router(prices_router, prefix="/api")
 app.include_router(alerts_router, prefix="/api")
 app.include_router(settings_router, prefix="/api")
 
+# ── Dynamic Product Images ────────────────────────────────────────────────────
+from app.images import get_images_dir
+app.mount("/user_images", StaticFiles(directory=get_images_dir()), name="user_images")
+
 # ── Static assets (JS, CSS, images from built frontend) ───────────────────────
 assets_dir = STATIC_DIR / "assets"
 if assets_dir.exists():

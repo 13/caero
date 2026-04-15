@@ -266,6 +266,7 @@ async def list_products(
 @router.post("", response_model=ProductOut, status_code=status.HTTP_201_CREATED)
 async def create_product(
     body: ProductCreate,
+    background_tasks: BackgroundTasks,
     user: User = Depends(require_user),
     db: AsyncSession = Depends(get_db),
 ) -> ProductOut:
@@ -275,6 +276,11 @@ async def create_product(
     db.add(product)
     await db.flush()
     await db.refresh(product)
+    
+    from app.images import schedule_image_download
+    if product.image_url:
+        schedule_image_download(background_tasks, product.id, product.image_url)
+        
     if product.active:
         add_product_job(product, run_immediately=True)
     return await _to_product_out(product, db)
@@ -294,12 +300,14 @@ async def get_product(
 async def update_product(
     product_id: int,
     body: ProductUpdate,
+    background_tasks: BackgroundTasks,
     user: User = Depends(require_user),
     db: AsyncSession = Depends(get_db),
 ) -> ProductOut:
     product = await _get_product(product_id, user, db)
     old_interval = product.check_interval_minutes
     old_active = product.active
+    old_image_url = product.image_url
 
     updates = body.model_dump(exclude_unset=True)
     if "tags" in updates:
@@ -310,6 +318,10 @@ async def update_product(
 
     await db.flush()
     await db.refresh(product)
+    
+    if "image_url" in updates and product.image_url != old_image_url and product.image_url:
+        from app.images import schedule_image_download
+        schedule_image_download(background_tasks, product.id, product.image_url)
 
     # Reschedule if interval or active state changed
     interval_changed = "check_interval_minutes" in updates and product.check_interval_minutes != old_interval
