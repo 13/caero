@@ -144,9 +144,13 @@ export function useCheckProduct() {
 }
 
 export function useCheckAllProducts() {
+  const qc = useQueryClient()
   return useMutation<{ status: string; message: string }, Error, void>({
     mutationFn: () =>
       apiFetch<{ status: string; message: string }>('/api/products/check-all', { method: 'POST' }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['products'] })
+    },
   })
 }
 
