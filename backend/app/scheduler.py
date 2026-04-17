@@ -8,7 +8,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from sqlalchemy import select
 
 from app.database import AsyncSessionLocal
-from app.models import Alert, PriceHistory, Product
+from app.models import Alert, PriceHistory, Product, User
 from app.notifier import send_alert
 
 logger = logging.getLogger(__name__)
@@ -33,16 +33,49 @@ async def scrape_and_record(product_id: int) -> None:
         from app.scraper import scrape_price
 
         price_float = await scrape_price(browser, product.url, product.selector)
-        if price_float is None:
-            logger.warning("Could not scrape price for product %d (%s)", product_id, product.url)
-            return
-
-        price = Decimal(str(price_float)).quantize(Decimal("0.01"))
 
         # Always update last_checked_at
         from sqlalchemy.sql import func
 
         product.last_checked_at = func.now()
+
+        if price_float is None:
+            logger.warning("Could not scrape price for product %d (%s)", product_id, product.url)
+            product.consecutive_scrape_failures += 1
+            await db.commit()
+
+            if product.consecutive_scrape_failures == 3:
+                user = await db.get(User, product.user_id)
+                if user and (user.default_email or user.default_telegram_chat_id):
+                    # We will send a generic alert by using "changed" and no current_price
+                    subject = f"[Caero] Action Required: Selector broken for '{product.name}'"
+                    body = (
+                        f"Caero has failed to find a valid price using your CSS selector 3 times in a row for '{product.name}'.\n"
+                        f"The webpage layout likely changed, or the item is no longer available.\n\n"
+                        f"Product URL: {product.url}\n"
+                    )
+                    import asyncio
+                    from app.notifier import _build_message, _send_email_alert_sync, _send_telegram_alert, _build_notification
+                    
+                    if user.default_email:
+                        from app.config import settings
+                        if settings.smtp_host:
+                            msg = _build_message(subject, body, user.default_email)
+                            await asyncio.to_thread(_send_email_alert_sync, to_email=user.default_email, msg=msg, product_name=product.name)
+                            
+                    if user.default_telegram_chat_id:
+                        await _send_telegram_alert(
+                            chat_id=user.default_telegram_chat_id,
+                            text=_build_notification(subject, body),
+                        )
+            
+            return
+
+        # If success, reset consecutive failures
+        if product.consecutive_scrape_failures > 0:
+            product.consecutive_scrape_failures = 0
+
+        price = Decimal(str(price_float)).quantize(Decimal("0.01"))
 
         # Get previous price for change detection BEFORE adding the new one
         prev_result = await db.execute(

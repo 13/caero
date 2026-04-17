@@ -92,6 +92,7 @@ class ProductOut(BaseModel):
     url: str
     selector: str
     check_interval_minutes: int
+    consecutive_scrape_failures: int = 0
     active: bool
     created_at: datetime
     latest_price: Decimal | None = None
