@@ -51,6 +51,7 @@ export default function AddProduct() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+    const autoCheckOnLoad = form.active
     createMutation.mutate(
       {
         ...form,
@@ -59,7 +60,12 @@ export default function AddProduct() {
         image_url: form.image_url || null,
         tags: form.tags.split(',').map((t) => t.trim()).filter(Boolean),
       },
-      { onSuccess: (product) => navigate(`/products/${product.id}`) }
+      {
+        onSuccess: (product) =>
+          navigate(`/products/${product.id}`, {
+            state: autoCheckOnLoad ? { autoCheckOnLoad: true } : null,
+          }),
+      }
     )
   }
 

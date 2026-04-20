@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import {
   ArrowLeft, RefreshCw, Pencil, Trash2, ExternalLink,
   Bell, Plus, X, TrendingDown, TrendingUp, BarChart3, ZoomIn,
 } from 'lucide-react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import {
   useAlerts,
   useCheckProduct,
@@ -45,7 +45,11 @@ const createDefaultAlertForm = (user?: User): AlertCreate => ({
 export default function ProductDetail() {
   const { id } = useParams<{ id: string }>()
   const productId = parseInt(id ?? '0')
+  const location = useLocation()
   const navigate = useNavigate()
+  const autoCheckTriggeredRef = useRef(false)
+  const autoCheckOnLoad =
+    (location.state as { autoCheckOnLoad?: boolean } | null)?.autoCheckOnLoad === true
 
   const { data: product, isLoading } = useProduct(productId)
   const { data: prices = [] } = usePrices(productId)
@@ -174,6 +178,32 @@ export default function ProductDetail() {
     )
   }
 
+  const runCheckNow = useCallback(() => {
+    checkMutation.mutate(productId, {
+      onSuccess: (data) => {
+        if (data.price !== null) {
+          toast.success('Successfully checked: €' + data.price)
+        } else if (data.error) {
+          toast.error(data.error)
+        } else {
+          toast.error('No price found (check selector)')
+        }
+      },
+      onError: (err) => toast.error(err.message || 'Check failed'),
+    })
+  }, [checkMutation, productId])
+
+  useEffect(() => {
+    if (!autoCheckOnLoad || autoCheckTriggeredRef.current || isLoading || !product || productId <= 0) {
+      return
+    }
+
+    autoCheckTriggeredRef.current = true
+    runCheckNow()
+    // Consume one-shot navigation state so refresh/back does not auto-trigger again.
+    navigate(location.pathname, { replace: true, state: null })
+  }, [autoCheckOnLoad, isLoading, location.pathname, navigate, product, productId, runCheckNow])
+
   if (isLoading || !product) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -204,18 +234,7 @@ export default function ProductDetail() {
         </button>
         <div className="flex items-center gap-2">
           <button
-            onClick={() => checkMutation.mutate(productId, {
-              onSuccess: (data) => {
-                if (data.price !== null) {
-                  toast.success('Successfully checked: €' + data.price)
-                } else if (data.error) {
-                  toast.error(data.error)
-                } else {
-                  toast.error('No price found (check selector)')
-                }
-              },
-              onError: (err) => toast.error(err.message || 'Check failed')
-            })}
+            onClick={runCheckNow}
             disabled={checkMutation.isPending}
             className="flex flex-1 items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-50 text-indigo-700 hover:bg-indigo-100 disabled:opacity-50 dark:bg-indigo-900/40 dark:text-indigo-300 dark:hover:bg-indigo-900/60 font-medium transition-colors"
           >
