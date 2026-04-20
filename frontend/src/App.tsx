@@ -12,6 +12,27 @@ import Setup from './pages/Setup'
 
 type Theme = 'light' | 'dark'
 
+function applyThemeHeadAssets(theme: Theme) {
+  const isDark = theme === 'dark'
+  const pngFavicon = document.getElementById('app-favicon-png') as HTMLLinkElement | null
+  const svgFavicon = document.getElementById('app-favicon-svg') as HTMLLinkElement | null
+  const appleTouchIcon = document.getElementById('app-apple-touch-icon') as HTMLLinkElement | null
+  const themeColor = document.getElementById('app-theme-color') as HTMLMetaElement | null
+
+  if (pngFavicon) {
+    pngFavicon.href = isDark ? '/favicon-dark-96x96.png' : '/favicon-light-96x96.png'
+  }
+  if (svgFavicon) {
+    svgFavicon.href = isDark ? '/favicon-dark.svg' : '/favicon-light.svg'
+  }
+  if (appleTouchIcon) {
+    appleTouchIcon.href = isDark ? '/apple-touch-icon-dark.png' : '/apple-touch-icon-light.png'
+  }
+  if (themeColor) {
+    themeColor.content = isDark ? '#030712' : '#ffffff'
+  }
+}
+
 function resolveInitialTheme(): Theme {
   try {
     const stored = localStorage.getItem('theme')
@@ -170,6 +191,7 @@ export default function App() {
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', theme === 'dark')
+    applyThemeHeadAssets(theme)
     try {
       localStorage.setItem('theme', theme)
     } catch {

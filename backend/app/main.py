@@ -22,6 +22,36 @@ from app.scheduler import load_all_jobs, scheduler
 logger = logging.getLogger(__name__)
 
 STATIC_DIR = Path(__file__).parent / "static"
+
+# Root-level static files that should bypass SPA index fallback.
+ROOT_STATIC_FILES = {
+    "apple-touch-icon-dark.png",
+    "apple-touch-icon-light.png",
+    "apple-touch-icon.png",
+    "caero-dark.png",
+    "caero-dark.svg",
+    "caero-light.png",
+    "caero-light.svg",
+    "favicon-96x96.png",
+    "favicon-dark-96x96.png",
+    "favicon-dark.ico",
+    "favicon-dark.svg",
+    "favicon-light-96x96.png",
+    "favicon-light.ico"
+    "favicon-light.svg",
+    "favicon.ico",
+    "site.webmanifest",
+    "web-app-manifest-192x192.png",
+    "web-app-manifest-512x512.png",
+}
+
+# Backward-compatible aliases for older icon names.
+LEGACY_STATIC_ALIASES = {
+    "caero.png": "caero-light.png",
+    "caero.svg": "caero-light.svg",
+    "favicon.svg": "favicon-light.svg",
+}
+
 @asynccontextmanager
 async def lifespan(application: FastAPI):
     # ── Startup ──────────────────────────────────────────────────────────────
@@ -106,30 +136,9 @@ if assets_dir.exists():
 # ── SPA fallback ──────────────────────────────────────────────────────────────
 @app.get("/{full_path:path}", include_in_schema=False)
 async def spa_fallback(full_path: str):
-    static_filename: str | None
-    match full_path:
-        case "apple-touch-icon.png":
-            static_filename = "apple-touch-icon.png"
-        case "caero.png":
-            static_filename = "caero.png"
-        case "caero.svg":
-            static_filename = "caero.svg"
-        case "favicon-96x96.png":
-            static_filename = "favicon-96x96.png"
-        case "favicon.ico":
-            static_filename = "favicon.ico"
-        case "favicon.svg":
-            static_filename = "favicon.svg"
-        case "site.webmanifest":
-            static_filename = "site.webmanifest"
-        case "web-app-manifest-192x192.png":
-            static_filename = "web-app-manifest-192x192.png"
-        case "web-app-manifest-512x512.png":
-            static_filename = "web-app-manifest-512x512.png"
-        case _:
-            static_filename = None
+    static_filename = LEGACY_STATIC_ALIASES.get(full_path, full_path)
 
-    if static_filename:
+    if static_filename in ROOT_STATIC_FILES:
         candidate = STATIC_DIR / static_filename
         if candidate.is_file():
             return FileResponse(candidate)
