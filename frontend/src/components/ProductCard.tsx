@@ -67,6 +67,16 @@ export default function ProductCard({ product, onKeywordClick, hasActiveAlerts }
           </div>
         </div>
 
+        {/* Warning banner */}
+        {product.consecutive_scrape_failures > 0 && (
+          <div className="text-xs px-3 py-2 rounded-lg bg-orange-50 text-orange-700 border border-orange-200 dark:bg-orange-900/30 dark:text-orange-300 dark:border-orange-800/50 flex items-center gap-2">
+            <span className="font-semibold px-1.5 py-0.5 rounded bg-orange-100 dark:bg-orange-900 leading-none">
+              {product.consecutive_scrape_failures}
+            </span>
+            <span>Failed checks (selector may be broken)</span>
+          </div>
+        )}
+
         {/* Tags + category */}
         {(product.category || product.tags.length > 0) && (
           <div className="flex flex-wrap items-center gap-1.5">

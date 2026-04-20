@@ -47,6 +47,7 @@ class Product(Base):
     url: Mapped[str] = mapped_column(Text, nullable=False)
     selector: Mapped[str] = mapped_column(String(256), nullable=False)
     check_interval_minutes: Mapped[int] = mapped_column(Integer, default=30)
+    consecutive_scrape_failures: Mapped[int] = mapped_column(Integer, default=0)
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     last_checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(

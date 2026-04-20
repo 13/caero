@@ -23,6 +23,7 @@ export interface Product {
   url: string
   selector: string
   check_interval_minutes: number
+  consecutive_scrape_failures: number
   active: boolean
   latest_price: string | null
   previous_price: string | null
