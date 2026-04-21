@@ -1,4 +1,4 @@
-# <img src="frontend/public/caero.png" width="30" height="30" /> caero
+# <img src="frontend/public/caero.svg" width="30" height="30" /> caero
 
 zero price tracker
 
