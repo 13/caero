@@ -25,20 +25,14 @@ STATIC_DIR = Path(__file__).parent / "static"
 
 # Root-level static files that should bypass SPA index fallback.
 ROOT_STATIC_FILES = {
-    "apple-touch-icon-dark.png",
-    "apple-touch-icon-light.png",
     "apple-touch-icon.png",
     "caero-dark.png",
     "caero-dark.svg",
-    "caero-light.png",
-    "caero-light.svg",
+    "caero.png",
+    "caero.svg",
     "favicon-96x96.png",
-    "favicon-dark-96x96.png",
-    "favicon-dark.ico",
-    "favicon-dark.svg",
-    "favicon-light-96x96.png",
-    "favicon-light.svg",
     "favicon.ico",
+    "favicon.svg",
     "site.webmanifest",
     "web-app-manifest-192x192.png",
     "web-app-manifest-512x512.png",
@@ -46,9 +40,9 @@ ROOT_STATIC_FILES = {
 
 # Backward-compatible aliases for older icon names.
 LEGACY_STATIC_ALIASES = {
-    "caero.png": "caero-light.png",
-    "caero.svg": "caero-light.svg",
-    "favicon.svg": "favicon-light.svg",
+    "caero.png": "caero.png",
+    "caero.svg": "caero.svg",
+    "favicon.svg": "favicon.svg",
 }
 
 @asynccontextmanager
