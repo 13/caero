@@ -23,6 +23,7 @@ import {
 } from '../api/hooks'
 import type { AppSettings } from '../api/types'
 import CaeroBrand from '../components/CaeroBrand'
+import ConfirmDialog from '../components/ConfirmDialog'
 import DbSelector from '../components/DbSelector'
 import { APP_DESCRIPTION, APP_VERSION } from '../constants/appInfo'
 import {
@@ -129,6 +130,8 @@ export default function Setup() {
   const [hideStats, setHideStats] = useState(() => localStorage.getItem('caero_hide_stats') === 'true')
 
   const [toastMsg, setToastMsg] = useState('')
+  const [showDeleteMyProducts, setShowDeleteMyProducts] = useState(false)
+  const [clearUserProductsTarget, setClearUserProductsTarget] = useState<{ id: number; username: string } | null>(null)
 
   const showToast = (msg: string) => {
     setToastMsg(msg)
@@ -210,9 +213,7 @@ export default function Setup() {
   }
 
   const handleDeleteMyProducts = () => {
-    if (confirm('Delete all your products, alerts, and price history? This cannot be undone.')) {
-      deleteMyProductsMutation.mutate()
-    }
+    setShowDeleteMyProducts(true)
   }
 
   const anyError = saveMutation.error || changePasswordMutation.error
@@ -641,11 +642,7 @@ export default function Setup() {
                         <button
                           type="button"
                           disabled={adminDeleteUserProductsMutation.isPending}
-                          onClick={() => {
-                            if (confirm(`Delete all products for "${user.username}"?`)) {
-                              adminDeleteUserProductsMutation.mutate(user.id)
-                            }
-                          }}
+                          onClick={() => setClearUserProductsTarget({ id: user.id, username: user.username })}
                           className="text-xs px-2.5 py-1 rounded-lg text-amber-700 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-900/30 disabled:opacity-50 transition-colors"
                         >
                           Clear products
@@ -732,6 +729,36 @@ export default function Setup() {
             || importDataMutation.error?.message || importMyDataMutation.error?.message}
         </div>
       )}
+
+      <ConfirmDialog
+        open={showDeleteMyProducts}
+        title="Delete all your products?"
+        message="This will remove all your products, alerts, price history, and cached images. This cannot be undone."
+        confirmLabel="Delete all"
+        cancelLabel="Cancel"
+        isDestructive
+        onConfirm={() => {
+          setShowDeleteMyProducts(false)
+          deleteMyProductsMutation.mutate()
+        }}
+        onCancel={() => setShowDeleteMyProducts(false)}
+      />
+
+      <ConfirmDialog
+        open={!!clearUserProductsTarget}
+        title={clearUserProductsTarget ? `Clear products for \"${clearUserProductsTarget.username}\"?` : 'Clear products'}
+        message="This removes the user's products, alerts, price history, and cached images. This cannot be undone."
+        confirmLabel="Clear products"
+        cancelLabel="Cancel"
+        isDestructive
+        onConfirm={() => {
+          if (!clearUserProductsTarget) return
+          const userId = clearUserProductsTarget.id
+          setClearUserProductsTarget(null)
+          adminDeleteUserProductsMutation.mutate(userId)
+        }}
+        onCancel={() => setClearUserProductsTarget(null)}
+      />
 
       {/* Global Toast */}
       {toastMsg && (
