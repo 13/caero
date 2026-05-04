@@ -71,6 +71,39 @@ function Section({ icon: Icon, title, description, children }: {
 const inputCls = 'w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 text-gray-900 dark:text-gray-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500'
 const labelCls = 'text-xs font-medium text-gray-500 dark:text-gray-400 mb-1 block'
 
+const formatErrorMessage = (error: unknown): string | null => {
+  if (!error) return null
+  if (typeof error === 'string') return error
+  if (error instanceof Error) {
+    if (typeof error.message === 'string') return error.message
+    if (error.message && typeof error.message === 'object') {
+      try {
+        return JSON.stringify(error.message)
+      } catch {
+        return 'Request failed.'
+      }
+    }
+    if (error.message) return String(error.message)
+  }
+  if (typeof error === 'object' && error !== null) {
+    const responseMessage = (error as { response?: { data?: { message?: unknown; detail?: unknown } } }).response?.data
+    const message = (error as { message?: unknown; detail?: unknown }).message
+      ?? (error as { detail?: unknown }).detail
+      ?? responseMessage?.message
+      ?? responseMessage?.detail
+    if (typeof message === 'string') return message
+    if (Array.isArray(message)) return message.map((item) => String(item)).join(', ')
+    if (message && typeof message === 'object') {
+      try {
+        return JSON.stringify(message)
+      } catch {
+        return 'Request failed.'
+      }
+    }
+  }
+  return 'Request failed.'
+}
+
 type Tab = 'account' | 'admin'
 
 export default function Setup() {
@@ -132,6 +165,11 @@ export default function Setup() {
   const [toastMsg, setToastMsg] = useState('')
   const [showDeleteMyProducts, setShowDeleteMyProducts] = useState(false)
   const [clearUserProductsTarget, setClearUserProductsTarget] = useState<{ id: number; username: string } | null>(null)
+  const [deleteUserTarget, setDeleteUserTarget] = useState<{ id: number; username: string } | null>(null)
+  const [userDeleteSuccess, setUserDeleteSuccess] = useState<string | null>(null)
+  const [userCreateSuccess, setUserCreateSuccess] = useState<string | null>(null)
+  const [userPasswordSuccess, setUserPasswordSuccess] = useState<string | null>(null)
+  const [passwordError, setPasswordError] = useState<string | null>(null)
 
   const showToast = (msg: string) => {
     setToastMsg(msg)
@@ -171,6 +209,11 @@ export default function Setup() {
 
   const handlePasswordChange = (e: React.FormEvent) => {
     e.preventDefault()
+    setPasswordError(null)
+    if (newPassword.trim().length < 5) {
+      setPasswordError('New password must be at least 5 characters.')
+      return
+    }
     changePasswordMutation.mutate(
       { current_password: currentPassword, new_password: newPassword },
       { onSuccess: () => {
@@ -215,9 +258,6 @@ export default function Setup() {
   const handleDeleteMyProducts = () => {
     setShowDeleteMyProducts(true)
   }
-
-  const anyError = saveMutation.error || changePasswordMutation.error
-    || importDataMutation.error || importMyDataMutation.error
 
   if (isLoading) {
     return (
@@ -342,6 +382,11 @@ export default function Setup() {
                 {changePasswordMutation.isSuccess && (
                   <span className="inline-flex items-center gap-1 text-sm text-green-600 font-medium">
                     <Check className="h-4 w-4" /> Updated
+                  </span>
+                )}
+                {(passwordError ?? formatErrorMessage(changePasswordMutation.error)) && (
+                  <span className="text-sm text-red-600 font-medium">
+                    {passwordError ?? formatErrorMessage(changePasswordMutation.error)}
                   </span>
                 )}
               </div>
@@ -598,9 +643,17 @@ export default function Setup() {
               <form
                 onSubmit={(e) => {
                   e.preventDefault()
+                  setUserCreateSuccess(null)
                   createUserMutation.mutate(
                     { username: newUserName, password: newUserPassword, is_admin: newUserAdmin },
-                    { onSuccess: () => { setNewUserName(''); setNewUserPassword(''); setNewUserAdmin(false) } }
+                    {
+                      onSuccess: () => {
+                        setNewUserName('')
+                        setNewUserPassword('')
+                        setNewUserAdmin(false)
+                        setUserCreateSuccess('User created.')
+                      },
+                    }
                   )
                 }}
                 className="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end"
@@ -621,6 +674,12 @@ export default function Setup() {
                   {createUserMutation.isPending ? 'Adding…' : 'Add user'}
                 </button>
               </form>
+              {formatErrorMessage(createUserMutation.error) && (
+                <p className="text-xs text-red-600 dark:text-red-400">{formatErrorMessage(createUserMutation.error)}</p>
+              )}
+              {userCreateSuccess && (
+                <p className="text-xs text-green-600 dark:text-green-400">{userCreateSuccess}</p>
+              )}
             </div>
 
             {/* User list */}
@@ -650,7 +709,10 @@ export default function Setup() {
                         <button
                           type="button"
                           disabled={user.id === me?.id || deleteUserMutation.isPending}
-                          onClick={() => deleteUserMutation.mutate(user.id)}
+                          onClick={() => {
+                            setUserDeleteSuccess(null)
+                            setDeleteUserTarget({ id: user.id, username: user.username })
+                          }}
                           className="text-xs px-2.5 py-1 rounded-lg text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950 disabled:opacity-50 transition-colors"
                         >
                           Delete
@@ -668,10 +730,15 @@ export default function Setup() {
                       <button
                         type="button"
                         disabled={!resetPasswordByUserId[user.id]?.trim()}
-                        onClick={() => adminPasswordMutation.mutate({
-                          userId: user.id,
-                          body: { new_password: resetPasswordByUserId[user.id] ?? '' },
-                        })}
+                        onClick={() => {
+                          setUserPasswordSuccess(null)
+                          adminPasswordMutation.mutate({
+                            userId: user.id,
+                            body: { new_password: resetPasswordByUserId[user.id] ?? '' },
+                          }, {
+                            onSuccess: () => setUserPasswordSuccess(`Password updated for ${user.username}.`),
+                          })
+                        }}
                         className="px-3 py-1.5 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 disabled:opacity-50 transition-colors"
                       >
                         Set password
@@ -680,6 +747,18 @@ export default function Setup() {
                   </li>
                 ))}
               </ul>
+            )}
+            {formatErrorMessage(adminPasswordMutation.error) && (
+              <p className="text-xs text-red-600 dark:text-red-400">{formatErrorMessage(adminPasswordMutation.error)}</p>
+            )}
+            {formatErrorMessage(deleteUserMutation.error) && (
+              <p className="text-xs text-red-600 dark:text-red-400">{formatErrorMessage(deleteUserMutation.error)}</p>
+            )}
+            {userPasswordSuccess && (
+              <p className="text-xs text-green-600 dark:text-green-400">{userPasswordSuccess}</p>
+            )}
+            {userDeleteSuccess && (
+              <p className="text-xs text-green-600 dark:text-green-400">{userDeleteSuccess}</p>
             )}
           </Section>
 
@@ -722,13 +801,24 @@ export default function Setup() {
         </div>
       )}
 
-      {/* Global error */}
-      {anyError && (
-        <div className="bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 px-4 py-3 rounded-xl text-sm">
-          {saveMutation.error?.message || changePasswordMutation.error?.message
-            || importDataMutation.error?.message || importMyDataMutation.error?.message}
-        </div>
-      )}
+      <ConfirmDialog
+        open={!!deleteUserTarget}
+        title={deleteUserTarget ? `Delete user \"${deleteUserTarget.username}\"?` : 'Delete user'}
+        message="This will delete the user account. This action cannot be undone."
+        confirmLabel="Delete user"
+        cancelLabel="Cancel"
+        isDestructive
+        onConfirm={() => {
+          if (!deleteUserTarget) return
+          const userId = deleteUserTarget.id
+          const username = deleteUserTarget.username
+          setDeleteUserTarget(null)
+          deleteUserMutation.mutate(userId, {
+            onSuccess: () => setUserDeleteSuccess(`Deleted ${username}.`),
+          })
+        }}
+        onCancel={() => setDeleteUserTarget(null)}
+      />
 
       <ConfirmDialog
         open={showDeleteMyProducts}
