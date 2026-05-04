@@ -369,11 +369,11 @@ export default function Setup() {
             <form onSubmit={handlePasswordChange} className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className={labelCls}>Current password</label>
-                <input type="password" required value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} className={inputCls} />
+                <input type="password" required minLength={5} value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} className={inputCls} />
               </div>
               <div>
                 <label className={labelCls}>New password</label>
-                <input type="password" required value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className={inputCls} />
+                <input type="password" required minLength={5} value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className={inputCls} />
               </div>
               <div className="sm:col-span-2 flex items-center gap-3">
                 <button type="submit" disabled={changePasswordMutation.isPending} className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 transition-colors">
@@ -664,7 +664,7 @@ export default function Setup() {
                 </div>
                 <div>
                   <label className={labelCls}>Password</label>
-                  <input required type="password" value={newUserPassword} onChange={(e) => setNewUserPassword(e.target.value)} className={inputCls} />
+                  <input required type="password" minLength={5} value={newUserPassword} onChange={(e) => setNewUserPassword(e.target.value)} className={inputCls} />
                 </div>
                 <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer pb-0.5">
                   <input type="checkbox" checked={newUserAdmin} onChange={(e) => setNewUserAdmin(e.target.checked)} className="rounded text-indigo-600" />
@@ -725,11 +725,12 @@ export default function Setup() {
                         placeholder="New password"
                         value={resetPasswordByUserId[user.id] ?? ''}
                         onChange={(e) => setResetPasswordByUserId({ ...resetPasswordByUserId, [user.id]: e.target.value })}
+                        minLength={5}
                         className="flex-1 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 text-gray-900 dark:text-gray-100 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                       />
                       <button
                         type="button"
-                        disabled={!resetPasswordByUserId[user.id]?.trim()}
+                        disabled={(resetPasswordByUserId[user.id] ?? '').trim().length < 5}
                         onClick={() => {
                           setUserPasswordSuccess(null)
                           adminPasswordMutation.mutate({

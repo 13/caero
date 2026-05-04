@@ -218,8 +218,8 @@ class CheckResult(BaseModel):
 
 
 class ChangePasswordRequest(BaseModel):
-    current_password: str = Field(min_length=6)
-    new_password: str = Field(min_length=6)
+    current_password: str = Field(min_length=5)
+    new_password: str = Field(min_length=5)
 
 
 class NotificationDefaultsUpdate(BaseModel):
@@ -229,12 +229,12 @@ class NotificationDefaultsUpdate(BaseModel):
 
 class AdminUserCreate(BaseModel):
     username: str = Field(min_length=3, max_length=64)
-    password: str = Field(min_length=6)
+    password: str = Field(min_length=5)
     is_admin: bool = False
 
 
 class AdminUserPasswordUpdate(BaseModel):
-    new_password: str = Field(min_length=6)
+    new_password: str = Field(min_length=5)
 
 
 class ProductStatisticsOut(BaseModel):
