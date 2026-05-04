@@ -20,7 +20,7 @@ export default function CaeroBrand({
   return (
     <div className={`inline-flex items-center gap-2 ${className}`}>
       <img
-        src="/caero-light.svg"
+        src="/caero.svg"
         aria-hidden={logoAriaHidden}
         alt={logoAriaHidden ? '' : logoTitle}
         className={`${logoSizeClassName} rounded-md dark:hidden`}

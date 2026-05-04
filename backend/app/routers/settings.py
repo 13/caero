@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from email.message import EmailMessage
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -31,6 +31,7 @@ from app.schemas import (
     SystemInfoOut,
     JobOut,
 )
+from app.images import schedule_image_download
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/settings", tags=["settings"])
@@ -371,6 +372,7 @@ async def export_my_data(
 @router.post("/import")
 async def import_data(
     payload: DataExportPayload,
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
     _admin: User = Depends(require_admin),
 ) -> dict[str, str]:
@@ -461,6 +463,7 @@ async def import_data(
     for product in imported_products:
         if product.active:
             add_product_job(product)
+        schedule_image_download(background_tasks, product.id, product.image_url)
 
     if skipped_price_rows:
         logger.warning("Skipped %s imported price history row(s) with null price", skipped_price_rows)
@@ -495,6 +498,7 @@ async def admin_delete_user_products(
 @router.post("/import/mine")
 async def import_my_data(
     payload: UserDataExportPayload,
+    background_tasks: BackgroundTasks,
     user: User = Depends(require_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, str]:
@@ -579,6 +583,7 @@ async def import_my_data(
     for product in imported_products:
         if product.active:
             add_product_job(product)
+        schedule_image_download(background_tasks, product.id, product.image_url)
 
     if skipped_price_rows:
         logger.warning(

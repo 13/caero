@@ -20,13 +20,13 @@ function applyThemeHeadAssets(theme: Theme) {
   const themeColor = document.getElementById('app-theme-color') as HTMLMetaElement | null
 
   if (pngFavicon) {
-    pngFavicon.href = isDark ? '/favicon-dark-96x96.png' : '/favicon-light-96x96.png'
+    pngFavicon.href = isDark ? '/favicon-96x96.png' : '/favicon-96x96.png'
   }
   if (svgFavicon) {
-    svgFavicon.href = isDark ? '/favicon-dark.svg' : '/favicon-light.svg'
+    svgFavicon.href = isDark ? '/favicon.svg' : '/favicon.svg'
   }
   if (appleTouchIcon) {
-    appleTouchIcon.href = isDark ? '/apple-touch-icon-dark.png' : '/apple-touch-icon-light.png'
+    appleTouchIcon.href = isDark ? '/apple-touch-icon.png' : '/apple-touch-icon.png'
   }
   if (themeColor) {
     themeColor.content = isDark ? '#030712' : '#ffffff'
