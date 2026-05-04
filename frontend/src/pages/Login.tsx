@@ -12,10 +12,12 @@ export default function Login() {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [registerPasswordError, setRegisterPasswordError] = useState<string | null>(null)
+  const [registerSuccess, setRegisterSuccess] = useState<string | null>(null)
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     setRegisterPasswordError(null)
+    setRegisterSuccess(null)
     if (mode === 'login') {
       loginMutation.mutate({ username, password }, { onSuccess: () => navigate('/') })
     } else {
@@ -26,7 +28,12 @@ export default function Login() {
       }
       registerMutation.mutate(
         { username, password },
-        { onSuccess: () => setMode('login') }
+        {
+          onSuccess: () => {
+            setRegisterSuccess('Account created. Please sign in.')
+            setMode('login')
+          },
+        }
       )
     }
   }
@@ -43,6 +50,12 @@ export default function Login() {
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm mb-4">
             {error}
+          </div>
+        )}
+
+        {registerSuccess && (
+          <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 px-4 py-3 rounded-lg text-sm mb-4">
+            {registerSuccess}
           </div>
         )}
 
@@ -85,7 +98,10 @@ export default function Login() {
                 <>
                   No account?{' '}
                   <button
-                    onClick={() => setMode('register')}
+                    onClick={() => {
+                      setRegisterSuccess(null)
+                      setMode('register')
+                    }}
                     className="text-indigo-500 hover:underline"
                   >
                     Register
@@ -99,7 +115,10 @@ export default function Login() {
             <>
               Already have an account?{' '}
               <button
-                onClick={() => setMode('login')}
+                onClick={() => {
+                  setRegisterSuccess(null)
+                  setMode('login')
+                }}
                 className="text-indigo-500 hover:underline"
               >
                 Sign in
