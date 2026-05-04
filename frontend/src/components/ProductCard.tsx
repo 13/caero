@@ -1,10 +1,12 @@
 import { Link } from 'react-router-dom'
 import { RefreshCw, X, TrendingDown, TrendingUp, ExternalLink, BellRing } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { useState } from 'react'
 import type { Product } from '../api/types'
 import { useCheckProduct, useDeleteProduct, useSettings } from '../api/hooks'
 import { formatDate, formatIntervalHours, formatPercent, formatPrice } from '../utils/format'
 import { getTagColorClass } from '../utils/tags'
+import ConfirmDialog from './ConfirmDialog'
 
 interface ProductCardProps {
   product: Product
@@ -16,6 +18,7 @@ export default function ProductCard({ product, onKeywordClick, hasActiveAlerts }
   const deleteMutation = useDeleteProduct()
   const checkMutation = useCheckProduct()
   const { data: settings } = useSettings()
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const isTrackingActive = product.active && product.check_interval_minutes > 0
   const checkIntervalHours = formatIntervalHours(product.check_interval_minutes)
   const intervalLabel = product.check_interval_minutes > 0
@@ -24,10 +27,15 @@ export default function ProductCard({ product, onKeywordClick, hasActiveAlerts }
   const pct = product.last_price_change_percent !== null ? parseFloat(product.last_price_change_percent) : null
 
   const handleDelete = () => {
-    if (confirm(`Delete "${product.name}"?`)) {
-      deleteMutation.mutate(product.id)
-    }
+    setShowDeleteConfirm(true)
   }
+
+  const confirmDelete = () => {
+    deleteMutation.mutate(product.id)
+    setShowDeleteConfirm(false)
+  }
+
+  const cancelDelete = () => setShowDeleteConfirm(false)
 
   return (
     <div className="group bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 flex flex-col overflow-hidden hover:border-indigo-300 dark:hover:border-indigo-700 hover:shadow-md transition-all duration-200">
@@ -193,6 +201,17 @@ export default function ProductCard({ product, onKeywordClick, hasActiveAlerts }
           </button>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={showDeleteConfirm}
+        title={`Delete "${product.name}"?`}
+        message="This will remove the product and its cached image."
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        isDestructive
+        onConfirm={confirmDelete}
+        onCancel={cancelDelete}
+      />
     </div>
   )
 }

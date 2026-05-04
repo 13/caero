@@ -32,6 +32,7 @@ import {
 } from '../utils/format'
 import { getTagColorClass } from '../utils/tags'
 import toast from 'react-hot-toast'
+import ConfirmDialog from '../components/ConfirmDialog'
 
 const createDefaultAlertForm = (user?: User): AlertCreate => ({
   condition: 'below',
@@ -82,6 +83,7 @@ export default function ProductDetail() {
   const [alertEditForm, setAlertEditForm] = useState<AlertCreate>(createDefaultAlertForm())
   const [showAddAlert, setShowAddAlert] = useState(false)
   const [imageZoomed, setImageZoomed] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
   useEffect(() => {
     if (me) {
@@ -133,10 +135,15 @@ export default function ProductDetail() {
   }
 
   const handleDelete = () => {
-    if (confirm(`Delete "${product?.name}"?`)) {
-      deleteMutation.mutate(productId, { onSuccess: () => navigate('/') })
-    }
+    setShowDeleteConfirm(true)
   }
+
+  const confirmDelete = () => {
+    deleteMutation.mutate(productId, { onSuccess: () => navigate('/') })
+    setShowDeleteConfirm(false)
+  }
+
+  const cancelDelete = () => setShowDeleteConfirm(false)
 
   const handleAddAlert = (e: React.FormEvent) => {
     e.preventDefault()
@@ -482,6 +489,17 @@ export default function ProductDetail() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        open={showDeleteConfirm}
+        title={`Delete "${product.name}"?`}
+        message="This will remove the product and its cached image."
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        isDestructive
+        onConfirm={confirmDelete}
+        onCancel={cancelDelete}
+      />
 
       {/* ── Stats strip ── */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
