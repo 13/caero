@@ -43,7 +43,7 @@ class ProductCreate(BaseModel):
     image_url: str | None = None
     url: str = Field(min_length=1)
     selector: str = Field(min_length=1, max_length=256)
-    check_interval_minutes: int = Field(default=30, ge=1)
+    check_interval_minutes: int = Field(default=1440, ge=0)
     active: bool = True
 
     @field_validator("tags", mode="before")
@@ -66,7 +66,7 @@ class ProductUpdate(BaseModel):
     image_url: str | None = None
     url: str | None = None
     selector: str | None = Field(default=None, min_length=1, max_length=256)
-    check_interval_minutes: int | None = Field(default=None, ge=1)
+    check_interval_minutes: int | None = Field(default=None, ge=0)
     active: bool | None = None
 
     @field_validator("tags", mode="before")

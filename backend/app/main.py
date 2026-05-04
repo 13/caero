@@ -37,7 +37,6 @@ ROOT_STATIC_FILES = {
     "favicon-dark.ico",
     "favicon-dark.svg",
     "favicon-light-96x96.png",
-    "favicon-light.ico"
     "favicon-light.svg",
     "favicon.ico",
     "site.webmanifest",

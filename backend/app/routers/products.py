@@ -276,12 +276,13 @@ async def create_product(
     db.add(product)
     await db.flush()
     await db.refresh(product)
-    
+    await db.commit()
+
     from app.images import schedule_image_download
     if product.image_url:
         schedule_image_download(background_tasks, product.id, product.image_url)
-        
-    if product.active:
+
+    if product.active and product.check_interval_minutes > 0:
         add_product_job(product, run_immediately=True)
     return await _to_product_out(product, db)
 
@@ -318,18 +319,21 @@ async def update_product(
 
     await db.flush()
     await db.refresh(product)
-    
-    if "image_url" in updates and product.image_url != old_image_url and product.image_url:
-        from app.images import schedule_image_download
-        schedule_image_download(background_tasks, product.id, product.image_url)
+    await db.commit()
+
+    if "image_url" in updates and product.image_url != old_image_url:
+        from app.images import delete_local_image, schedule_image_download
+        delete_local_image(old_image_url)
+        if product.image_url:
+            schedule_image_download(background_tasks, product.id, product.image_url)
 
     # Reschedule if interval or active state changed
     interval_changed = "check_interval_minutes" in updates and product.check_interval_minutes != old_interval
     active_changed = "active" in updates and product.active != old_active
 
-    if product.active and (interval_changed or active_changed):
+    if product.active and product.check_interval_minutes > 0 and (interval_changed or active_changed):
         add_product_job(product)
-    elif not product.active and active_changed:
+    elif (not product.active or product.check_interval_minutes <= 0) and (interval_changed or active_changed):
         remove_product_job(product_id)
 
     return await _to_product_out(product, db)
@@ -343,6 +347,8 @@ async def delete_product(
 ) -> None:
     product = await _get_product(product_id, user, db)
     remove_product_job(product_id)
+    from app.images import delete_local_image
+    delete_local_image(product.image_url)
     await db.delete(product)
 
 

@@ -56,10 +56,11 @@ export function intervalMinutesToHours(minutes: number) {
 }
 
 export function normalizeIntervalHoursToMinutes(hours: number) {
-  if (Number.isNaN(hours)) return DEFAULT_CHECK_INTERVAL_MINUTES
+  if (!Number.isFinite(hours) || hours <= 0) return 0
   return Math.max(MIN_CHECK_INTERVAL_MINUTES, Math.round(hours * 60))
 }
 
 export function formatIntervalHours(minutes: number) {
+  if (minutes <= 0) return 'Disabled'
   return intervalMinutesToHours(minutes).toFixed(1).replace(/\.0$/, '')
 }

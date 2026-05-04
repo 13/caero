@@ -22,7 +22,6 @@ import type { AlertCreate, User } from '../api/types'
 import PriceChart from '../components/PriceChart'
 import {
   CHECK_INTERVAL_HOUR_STEP,
-  MIN_CHECK_INTERVAL_HOURS,
   DEFAULT_CHECK_INTERVAL_MINUTES,
   formatDate,
   formatDateTime,
@@ -110,7 +109,7 @@ export default function ProductDetail() {
           url: product.url,
           selector: product.selector,
           check_interval_minutes: product.check_interval_minutes,
-        active: product.active,
+        active: product.active && product.check_interval_minutes > 0,
       })
     }
     setEditMode(true)
@@ -219,6 +218,8 @@ export default function ProductDetail() {
   const inputCls =
     'w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 text-gray-900 dark:text-gray-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500'
   const labelCls = 'text-xs font-medium text-gray-500 dark:text-gray-400 mb-1 block'
+  const isTrackingActive = product.active && product.check_interval_minutes > 0
+  const isEditIntervalDisabled = editForm.check_interval_minutes <= 0
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
@@ -302,11 +303,11 @@ export default function ProductDetail() {
                 {product.name}
               </h1>
               <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                product.active
+                isTrackingActive
                   ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300'
                   : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'
               }`}>
-                {product.active ? 'Active' : 'Paused'}
+                {isTrackingActive ? 'Active' : 'Paused'}
               </span>
             </div>
 
@@ -426,13 +427,21 @@ export default function ProductDetail() {
                   <input type="text" value={editForm.category} onChange={(e) => setEditForm({ ...editForm, category: e.target.value })} className={inputCls} />
                 </div>
                 <div>
-                  <label className={labelCls}>Interval (hrs)</label>
+                  <label className={labelCls}>Interval (hrs, 0=disabled)</label>
                   <input
                     type="number"
-                    min={MIN_CHECK_INTERVAL_HOURS}
+                    min={0}
                     step={CHECK_INTERVAL_HOUR_STEP}
-                    value={intervalMinutesToHours(editForm.check_interval_minutes)}
-                    onChange={(e) => setEditForm({ ...editForm, check_interval_minutes: normalizeIntervalHoursToMinutes(parseFloat(e.target.value)) })}
+                    value={editForm.check_interval_minutes > 0 ? intervalMinutesToHours(editForm.check_interval_minutes) : ''}
+                    onChange={(e) => {
+                      const rawValue = e.target.value
+                      const nextMinutes = rawValue === '' ? 0 : normalizeIntervalHoursToMinutes(parseFloat(rawValue))
+                      setEditForm({
+                        ...editForm,
+                        check_interval_minutes: nextMinutes,
+                        active: nextMinutes > 0 ? editForm.active : false,
+                      })
+                    }}
                     className={inputCls}
                   />
                 </div>
@@ -454,11 +463,11 @@ export default function ProductDetail() {
                 </div>
                 <div className="col-span-2">
                   <label className={labelCls}>Image URL</label>
-                  <input type="url" value={editForm.image_url} onChange={(e) => setEditForm({ ...editForm, image_url: e.target.value })} className={inputCls} />
+                  <input type="text" value={editForm.image_url} onChange={(e) => setEditForm({ ...editForm, image_url: e.target.value })} placeholder="https://example.com/image.jpg or /user_images/..." className={inputCls} />
                 </div>
               </div>
               <label className="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
-                <input type="checkbox" id="edit-active" checked={editForm.active} onChange={(e) => setEditForm({ ...editForm, active: e.target.checked })} className="rounded text-indigo-600" />
+                <input type="checkbox" id="edit-active" checked={isEditIntervalDisabled ? false : editForm.active} disabled={isEditIntervalDisabled} onChange={(e) => setEditForm({ ...editForm, active: e.target.checked })} className="rounded text-indigo-600 disabled:cursor-not-allowed" />
                 Active
               </label>
               <div className="flex gap-2 pt-1 pb-4">

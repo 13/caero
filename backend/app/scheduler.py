@@ -131,6 +131,10 @@ def add_product_job(product: Product, run_immediately: bool = False) -> None:
     if scheduler.get_job(job_id):
         scheduler.remove_job(job_id)
 
+    if not product.active or product.check_interval_minutes <= 0:
+        logger.debug("Skipping job %s (inactive or disabled interval)", job_id)
+        return
+
     kwargs = {}
     if run_immediately:
         from datetime import datetime, timezone
@@ -162,5 +166,6 @@ async def load_all_jobs() -> None:
         result = await db.execute(select(Product).where(Product.active == True))  # noqa: E712
         products = result.scalars().all()
         for product in products:
-            add_product_job(product)
+            if product.check_interval_minutes > 0:
+                add_product_job(product)
     logger.info("Loaded %d product jobs into scheduler", len(products))

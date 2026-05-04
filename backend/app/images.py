@@ -3,7 +3,6 @@ import logging
 import mimetypes
 import os
 import uuid
-import uuid
 import httpx
 import aiofiles
 from pathlib import Path
@@ -73,3 +72,14 @@ def schedule_image_download(background_tasks: BackgroundTasks, product_id: int, 
     if image_url and not image_url.startswith("/user_images/"):
         background_tasks.add_task(download_image_task, product_id, image_url)
 
+def delete_local_image(image_url: str | None) -> None:
+    if not image_url or not image_url.startswith("/user_images/"):
+        return
+    images_dir = get_images_dir()
+    image_path = images_dir / Path(image_url).name
+    try:
+        if image_path.exists():
+            os.remove(image_path)
+            logger.info("Deleted cached image %s", image_path)
+    except OSError as exc:
+        logger.warning("Failed to delete cached image %s: %s", image_path, exc)

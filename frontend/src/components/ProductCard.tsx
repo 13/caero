@@ -16,7 +16,11 @@ export default function ProductCard({ product, onKeywordClick, hasActiveAlerts }
   const deleteMutation = useDeleteProduct()
   const checkMutation = useCheckProduct()
   const { data: settings } = useSettings()
+  const isTrackingActive = product.active && product.check_interval_minutes > 0
   const checkIntervalHours = formatIntervalHours(product.check_interval_minutes)
+  const intervalLabel = product.check_interval_minutes > 0
+    ? `Every ${checkIntervalHours}h`
+    : checkIntervalHours
   const pct = product.last_price_change_percent !== null ? parseFloat(product.last_price_change_percent) : null
 
   const handleDelete = () => {
@@ -58,11 +62,11 @@ export default function ProductCard({ product, onKeywordClick, hasActiveAlerts }
               </span>
             )}
             <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-              product.active
+              isTrackingActive
                 ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300'
                 : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'
             }`}>
-              {product.active ? 'Active' : 'Paused'}
+              {isTrackingActive ? 'Active' : 'Paused'}
             </span>
           </div>
         </div>
@@ -124,7 +128,7 @@ export default function ProductCard({ product, onKeywordClick, hasActiveAlerts }
             <p className="text-2xl font-extrabold text-indigo-600 dark:text-indigo-400 tracking-tight">
               {formatPrice(product.latest_price, settings?.date_format)}
             </p>
-            <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">Every {checkIntervalHours}h</p>
+            <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">{intervalLabel}</p>
           </div>
           <div className="text-right">
             {pct !== null ? (

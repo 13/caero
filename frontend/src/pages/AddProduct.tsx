@@ -4,7 +4,6 @@ import { useCreateProduct } from '../api/hooks'
 import { ArrowLeft, Package, Link as LinkIcon, Code, Clock, Image, Tag, FileText, FolderOpen } from 'lucide-react'
 import {
   CHECK_INTERVAL_HOUR_STEP,
-  MIN_CHECK_INTERVAL_HOURS,
   DEFAULT_CHECK_INTERVAL_MINUTES,
   intervalMinutesToHours,
   normalizeIntervalHoursToMinutes,
@@ -48,6 +47,8 @@ export default function AddProduct() {
     check_interval_minutes: DEFAULT_CHECK_INTERVAL_MINUTES,
     active: true,
   })
+
+  const isIntervalDisabled = form.check_interval_minutes <= 0
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -205,16 +206,21 @@ export default function AddProduct() {
             />
           </Field>
 
-          <Field icon={Clock} label="Check interval (hours)">
+          <Field icon={Clock} label="Check interval (hours)" hint="0 or empty disables scheduling">
             <input
               type="number"
-              min={MIN_CHECK_INTERVAL_HOURS}
+              min={0}
               step={CHECK_INTERVAL_HOUR_STEP}
-              value={intervalMinutesToHours(form.check_interval_minutes)}
-              onChange={(e) => setForm({
-                ...form,
-                check_interval_minutes: normalizeIntervalHoursToMinutes(parseFloat(e.target.value)),
-              })}
+              value={form.check_interval_minutes > 0 ? intervalMinutesToHours(form.check_interval_minutes) : ''}
+              onChange={(e) => {
+                const rawValue = e.target.value
+                const nextMinutes = rawValue === '' ? 0 : normalizeIntervalHoursToMinutes(parseFloat(rawValue))
+                setForm({
+                  ...form,
+                  check_interval_minutes: nextMinutes,
+                  active: nextMinutes > 0 ? form.active : false,
+                })
+              }}
               className={inputCls}
             />
           </Field>
@@ -227,9 +233,10 @@ export default function AddProduct() {
             <input
               type="checkbox"
               id="active"
-              checked={form.active}
+              checked={isIntervalDisabled ? false : form.active}
+              disabled={isIntervalDisabled}
               onChange={(e) => setForm({ ...form, active: e.target.checked })}
-              className="rounded text-indigo-600 focus:ring-indigo-500 h-4 w-4"
+              className="rounded text-indigo-600 focus:ring-indigo-500 h-4 w-4 disabled:cursor-not-allowed"
             />
           </label>
         </div>
