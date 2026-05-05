@@ -1,9 +1,12 @@
 # <img src="assets/caero.svg" width="30" height="30" /> caero
 
-**Caero (zero), a self-hosted price tracker to help you catch the best deals.**
+<br>
+<center><strong>Caero (zero), a self-hosted price tracker to help you catch the best deals.</strong></center>
+<br>
+<br>
 
 <p align="center">
-  <img src="assets/screenshot.png" width="640" alt="caero dashboard" />
+  <img src="assets/screenshot.gif" width="640" alt="caero dashboard" />
 </p>
 
 ## Features
@@ -40,4 +43,3 @@ Don't let "CSS Selectors" scare you—it's just a way to point **caero** to the 
 1.  **Find the Price:** Go to your product page (e.g., Amazon, BestBuy).
 2.  **Copy the Path:** Right-click the price on the page → **Inspect**. In the window that opens, right-click the highlighted code → **Copy** → **Copy selector**.
 3.  **Paste & Save:** Paste that into **caero** along with the URL.
-
