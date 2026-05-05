@@ -2,8 +2,8 @@ name: Build Docker Image
 
 on:
   push:
-    branches:
-      - main
+    tags:
+      - 'v*'
     paths:
       - 'backend/**'
       - 'frontend/**'
@@ -18,7 +18,6 @@ on:
       - 'frontend/**'
       - 'docker-compose.yml'
       - 'Dockerfile'
-  workflow_dispatch:
 
 env:
   REGISTRY: ghcr.io
@@ -51,18 +50,16 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=ref,event=branch
-            type=sha,prefix={{branch}}-
+            type=ref,event=tag
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
-            type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
           file: backend/Dockerfile
-          push: ${{ github.event_name != 'pull_request' }}
+          push: ${{ github.event_name == 'push' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
@@ -87,4 +84,5 @@ jobs:
           push: false
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
 
