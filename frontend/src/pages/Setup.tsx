@@ -187,6 +187,24 @@ export default function Setup() {
     }
   }, [me])
 
+  useEffect(() => {
+    if (importMyDataMutation.isSuccess) {
+      showToast('My data imported successfully.')
+    }
+  }, [importMyDataMutation.isSuccess])
+
+  useEffect(() => {
+    if (checkAllProductsMutation.isSuccess) {
+      showToast(checkAllProductsMutation.data?.message ?? 'Check completed.')
+    }
+  }, [checkAllProductsMutation.isSuccess, checkAllProductsMutation.data?.message])
+
+  useEffect(() => {
+    if (importDataMutation.isSuccess) {
+      showToast('Full data imported successfully.')
+    }
+  }, [importDataMutation.isSuccess])
+
   const handleSaveSettings = (e: React.FormEvent) => {
     e.preventDefault()
     if (currentSettings && form.db_type !== currentSettings.db_type) {
@@ -217,9 +235,9 @@ export default function Setup() {
     changePasswordMutation.mutate(
       { current_password: currentPassword, new_password: newPassword },
       { onSuccess: () => {
+          showToast('Password updated.')
           setCurrentPassword('')
           setNewPassword('')
-          showToast('Password updated.')
         }
       }
     )
@@ -231,7 +249,9 @@ export default function Setup() {
       default_email: defaultEmail || null,
       default_telegram_chat_id: defaultTelegram || null,
     }, {
-      onSuccess: () => showToast('Notification defaults saved.')
+      onSuccess: () => {
+        showToast('Notification defaults saved.')
+      }
     })
   }
 
@@ -454,7 +474,7 @@ export default function Setup() {
             )}
             {checkAllProductsMutation.isSuccess && (
               <p className="inline-flex items-center gap-1 text-sm text-green-600 font-medium mt-2">
-                <Check className="h-4 w-4" /> {checkAllProductsMutation.data.message}
+                <Check className="h-4 w-4" /> {checkAllProductsMutation.data?.message}
               </p>
             )}
           </Section>
@@ -651,6 +671,7 @@ export default function Setup() {
                         setNewUserName('')
                         setNewUserPassword('')
                         setNewUserAdmin(false)
+                          showToast('User created.')
                         setUserCreateSuccess('User created.')
                       },
                     }
@@ -737,7 +758,10 @@ export default function Setup() {
                             userId: user.id,
                             body: { new_password: resetPasswordByUserId[user.id] ?? '' },
                           }, {
-                            onSuccess: () => setUserPasswordSuccess(`Password updated for ${user.username}.`),
+                            onSuccess: () => {
+                              showToast(`Password updated for ${user.username}.`)
+                              setUserPasswordSuccess(`Password updated for ${user.username}.`)
+                            },
                           })
                         }}
                         className="px-3 py-1.5 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 disabled:opacity-50 transition-colors"
