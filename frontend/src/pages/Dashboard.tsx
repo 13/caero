@@ -322,8 +322,8 @@ export default function Dashboard() {
                         >
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-3">
-                              {p.image_url ? (
-                                <img src={p.image_url} alt="" className="w-10 h-10 object-cover rounded-md border border-gray-200 dark:border-gray-700" />
+                              {(p.cached_image_url ?? p.image_url) ? (
+                                <img src={(p.cached_image_url ?? p.image_url) || undefined} alt="" className="w-10 h-10 object-cover rounded-md border border-gray-200 dark:border-gray-700" />
                               ) : (
                                 <div className="w-10 h-10 rounded-md bg-gray-100 dark:bg-gray-800 flex items-center justify-center border border-gray-200 dark:border-gray-700">
                                   <ImageIcon className="h-5 w-5 text-gray-400" />

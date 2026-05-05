@@ -25,13 +25,21 @@ export default function ProductCard({ product, onKeywordClick, hasActiveAlerts }
     ? `Every ${checkIntervalHours}h`
     : checkIntervalHours
   const pct = product.last_price_change_percent !== null ? parseFloat(product.last_price_change_percent) : null
+  const displaySrc = (product as any).cached_image_url ?? product.image_url
 
   const handleDelete = () => {
     setShowDeleteConfirm(true)
   }
 
   const confirmDelete = () => {
-    deleteMutation.mutate(product.id)
+    deleteMutation.mutate(product.id, {
+      onSuccess: () => {
+        toast.success(`Deleted ${product.name}`)
+      },
+      onError: (err: any) => {
+        toast.error(err?.message ?? 'Delete failed')
+      },
+    })
     setShowDeleteConfirm(false)
   }
 
@@ -41,10 +49,10 @@ export default function ProductCard({ product, onKeywordClick, hasActiveAlerts }
     <div className="group bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 flex flex-col overflow-hidden hover:border-indigo-300 dark:hover:border-indigo-700 hover:shadow-md transition-all duration-200">
 
       {/* Image */}
-      {product.image_url && (
+      {displaySrc && (
         <Link to={`/products/${product.id}`} className="block w-full h-36 bg-gray-50 dark:bg-gray-800 flex items-center justify-center border-b border-gray-100 dark:border-gray-800 px-4 py-3 hover:opacity-90 transition-opacity">
           <img
-            src={product.image_url}
+            src={displaySrc}
             alt={product.name}
             className="max-w-full max-h-full w-auto h-auto object-contain"
             loading="lazy"

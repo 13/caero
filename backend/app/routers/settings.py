@@ -227,8 +227,14 @@ async def _list_user_products(db: AsyncSession, user_id: int) -> list[Product]:
 
 
 async def _delete_products(products: list[Product], db: AsyncSession) -> int:
+    from app.images import delete_local_image
     for product in products:
         remove_product_job(product.id)
+        # remove cached local image if present
+        try:
+            delete_local_image(getattr(product, 'cached_image_url', None))
+        except Exception:
+            pass
         await db.delete(product)
     await db.flush()
     return len(products)
@@ -419,6 +425,7 @@ async def import_data(
                 memo=product.get("memo"),
                 tags=tags_value,
                 image_url=product.get("image_url"),
+                cached_image_url=None,
                 url=product["url"],
                 selector=product["selector"],
                 check_interval_minutes=product.get("check_interval_minutes", 30),
@@ -524,6 +531,7 @@ async def import_my_data(
             memo=product.get("memo"),
             tags=tags_value,
             image_url=product.get("image_url"),
+            cached_image_url=None,
             url=product["url"],
             selector=product["selector"],
             check_interval_minutes=product.get("check_interval_minutes", 30),

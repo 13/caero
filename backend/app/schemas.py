@@ -89,6 +89,7 @@ class ProductOut(BaseModel):
     memo: str | None = None
     tags: list[str] = Field(default_factory=list)
     image_url: str | None = None
+    cached_image_url: str | None = None
     url: str
     selector: str
     check_interval_minutes: int

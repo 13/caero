@@ -44,6 +44,8 @@ class Product(Base):
     memo: Mapped[str | None] = mapped_column(Text, nullable=True)
     tags: Mapped[str] = mapped_column(Text, default="", nullable=False)
     image_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Local cached image (stored as /user_images/...) — keep original image_url as the source of truth
+    cached_image_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     url: Mapped[str] = mapped_column(Text, nullable=False)
     selector: Mapped[str] = mapped_column(String(256), nullable=False)
     check_interval_minutes: Mapped[int] = mapped_column(Integer, default=30)

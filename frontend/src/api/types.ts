@@ -20,6 +20,7 @@ export interface Product {
   memo: string | null
   tags: string[]
   image_url: string | null
+  cached_image_url?: string | null
   url: string
   selector: string
   check_interval_minutes: number

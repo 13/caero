@@ -830,7 +830,10 @@ export default function Setup() {
         isDestructive
         onConfirm={() => {
           setShowDeleteMyProducts(false)
-          deleteMyProductsMutation.mutate()
+          deleteMyProductsMutation.mutate(undefined, {
+            onSuccess: () => showToast('Deleted all your products.'),
+            onError: (err: any) => showToast((err && err.message) || 'Delete failed'),
+          })
         }}
         onCancel={() => setShowDeleteMyProducts(false)}
       />
@@ -846,7 +849,10 @@ export default function Setup() {
           if (!clearUserProductsTarget) return
           const userId = clearUserProductsTarget.id
           setClearUserProductsTarget(null)
-          adminDeleteUserProductsMutation.mutate(userId)
+          adminDeleteUserProductsMutation.mutate(userId, {
+            onSuccess: (data) => showToast(data?.message ?? 'Cleared products.'),
+            onError: (err: any) => showToast((err && err.message) || 'Clear failed'),
+          })
         }}
         onCancel={() => setClearUserProductsTarget(null)}
       />
