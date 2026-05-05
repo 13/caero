@@ -346,7 +346,11 @@ export default function Dashboard() {
                                 </div>
                               )}
                               <div className="flex flex-col gap-0.5">
-                                <Link to={`/products/${p.id}`} onClick={(e) => e.stopPropagation()} className="font-medium text-indigo-600 dark:text-indigo-400 hover:underline line-clamp-1">
+                                <Link
+                                  to={`/products/${p.id}${location.search}`}
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="font-medium text-indigo-600 dark:text-indigo-400 hover:underline line-clamp-1"
+                                >
                                   {p.name}
                                 </Link>
                                 <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
