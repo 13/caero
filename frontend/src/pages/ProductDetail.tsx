@@ -18,11 +18,12 @@ import {
   useUpdateAlert,
   useUpdateProduct,
 } from '../api/hooks'
-import type { AlertCreate, User } from '../api/types'
+import type { Alert, AlertCreate, User } from '../api/types'
 import PriceChart from '../components/PriceChart'
 import {
   CHECK_INTERVAL_HOUR_STEP,
   DEFAULT_CHECK_INTERVAL_MINUTES,
+  MIN_CHECK_INTERVAL_HOURS,
   formatDate,
   formatDateTime,
   formatPercent,
@@ -84,6 +85,7 @@ export default function ProductDetail() {
   const [showAddAlert, setShowAddAlert] = useState(false)
   const [imageZoomed, setImageZoomed] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [alertDeleteTarget, setAlertDeleteTarget] = useState<Alert | null>(null)
   const [editImageError, setEditImageError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -136,7 +138,13 @@ export default function ProductDetail() {
           .map((tag) => tag.trim())
           .filter(Boolean),
       },
-      { onSuccess: () => setEditMode(false) }
+      {
+        onSuccess: () => {
+          toast.success('Product updated')
+          setEditMode(false)
+        },
+        onError: (err: any) => toast.error(err?.message ?? 'Save failed'),
+      }
     )
   }
 
@@ -161,9 +169,11 @@ export default function ProductDetail() {
     e.preventDefault()
     createAlertMutation.mutate(alertForm, {
       onSuccess: () => {
+        toast.success('Alert added')
         setAlertForm(createDefaultAlertForm(me))
         setShowAddAlert(false)
       },
+      onError: (err: any) => toast.error(err?.message ?? 'Add alert failed'),
     })
   }
 
@@ -192,9 +202,33 @@ export default function ProductDetail() {
     if (!editingAlertId) return
     updateAlertMutation.mutate(
       { alertId: editingAlertId, body: alertEditForm },
-      { onSuccess: () => setEditingAlertId(null) }
+      {
+        onSuccess: () => {
+          toast.success('Alert updated')
+          setEditingAlertId(null)
+        },
+        onError: (err: any) => toast.error(err?.message ?? 'Update alert failed'),
+      }
     )
   }
+
+  const startDeleteAlert = (alert: Alert) => {
+    setAlertDeleteTarget(alert)
+  }
+
+  const confirmDeleteAlert = () => {
+    if (!alertDeleteTarget) return
+    const target = alertDeleteTarget
+    setAlertDeleteTarget(null)
+    deleteAlertMutation.mutate(target.id, {
+      onSuccess: () => {
+        toast.success('Alert deleted')
+      },
+      onError: (err: any) => toast.error(err?.message ?? 'Delete alert failed'),
+    })
+  }
+
+  const cancelDeleteAlert = () => setAlertDeleteTarget(null)
 
   const runCheckNow = useCallback(() => {
     checkMutation.mutate(productId, {
@@ -237,8 +271,6 @@ export default function ProductDetail() {
   const inputCls =
     'w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 text-gray-900 dark:text-gray-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500'
   const labelCls = 'text-xs font-medium text-gray-500 dark:text-gray-400 mb-1 block'
-  const isTrackingActive = product.active && product.check_interval_minutes > 0
-  const isEditIntervalDisabled = editForm.check_interval_minutes <= 0
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
@@ -281,7 +313,7 @@ export default function ProductDetail() {
       {/* ── Hero card ── */}
       <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-6">
         <div className="flex gap-6 items-start">
-          {((product as any).cached_image_url ?? product.image_url) && (
+          {product.image_url && (
             <>
               {/* Lightbox */}
               {imageZoomed && (
@@ -297,7 +329,7 @@ export default function ProductDetail() {
                     <X className="h-5 w-5" />
                   </button>
                   <img
-                    src={(product as any).cached_image_url ?? product.image_url}
+                    src={product.image_url}
                     alt={product.name}
                     className="max-w-[90vw] max-h-[90vh] object-contain rounded-xl shadow-2xl"
                   />
@@ -305,7 +337,7 @@ export default function ProductDetail() {
               )}
               <div className="shrink-0 relative group cursor-zoom-in" onClick={() => setImageZoomed(true)}>
                 <img
-                  src={(product as any).cached_image_url ?? product.image_url}
+                  src={product.image_url}
                   alt={product.name}
                   className="w-28 h-28 object-contain rounded-xl border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800 transition-opacity group-hover:opacity-80"
                   loading="lazy"
@@ -322,11 +354,11 @@ export default function ProductDetail() {
                 {product.name}
               </h1>
               <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                isTrackingActive
+                product.active
                   ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300'
                   : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'
               }`}>
-                {isTrackingActive ? 'Active' : 'Paused'}
+                {product.active ? 'Active' : 'Paused'}
               </span>
             </div>
 
@@ -446,21 +478,13 @@ export default function ProductDetail() {
                   <input type="text" value={editForm.category} onChange={(e) => setEditForm({ ...editForm, category: e.target.value })} className={inputCls} />
                 </div>
                 <div>
-                  <label className={labelCls}>Interval (hrs, 0=disabled)</label>
+                  <label className={labelCls}>Interval (hrs)</label>
                   <input
                     type="number"
-                    min={0}
+                    min={MIN_CHECK_INTERVAL_HOURS}
                     step={CHECK_INTERVAL_HOUR_STEP}
-                    value={editForm.check_interval_minutes > 0 ? intervalMinutesToHours(editForm.check_interval_minutes) : ''}
-                    onChange={(e) => {
-                      const rawValue = e.target.value
-                      const nextMinutes = rawValue === '' ? 0 : normalizeIntervalHoursToMinutes(parseFloat(rawValue))
-                      setEditForm({
-                        ...editForm,
-                        check_interval_minutes: nextMinutes,
-                        active: nextMinutes > 0 ? editForm.active : false,
-                      })
-                    }}
+                    value={intervalMinutesToHours(editForm.check_interval_minutes)}
+                    onChange={(e) => setEditForm({ ...editForm, check_interval_minutes: normalizeIntervalHoursToMinutes(parseFloat(e.target.value)) })}
                     className={inputCls}
                   />
                 </div>
@@ -482,12 +506,20 @@ export default function ProductDetail() {
                 </div>
                 <div className="col-span-2">
                   <label className={labelCls}>Image URL</label>
-                  <input type="text" value={editForm.image_url} onChange={(e) => { setEditForm({ ...editForm, image_url: e.target.value }); setEditImageError(null); }} placeholder="https://example.com/image.jpg" className={inputCls} />
-                  {editImageError && <p className="text-xs text-red-600 mt-1">{editImageError}</p>}
+                  <input
+                    type="url"
+                    value={editForm.image_url}
+                    onChange={(e) => {
+                      setEditForm({ ...editForm, image_url: e.target.value })
+                      setEditImageError(null)
+                    }}
+                    className={inputCls}
+                  />
+                  {editImageError && <p className="mt-1 text-xs text-red-600">{editImageError}</p>}
                 </div>
               </div>
               <label className="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
-                <input type="checkbox" id="edit-active" checked={isEditIntervalDisabled ? false : editForm.active} disabled={isEditIntervalDisabled} onChange={(e) => setEditForm({ ...editForm, active: e.target.checked })} className="rounded text-indigo-600 disabled:cursor-not-allowed" />
+                <input type="checkbox" id="edit-active" checked={editForm.active} onChange={(e) => setEditForm({ ...editForm, active: e.target.checked })} className="rounded text-indigo-600" />
                 Active
               </label>
               <div className="flex gap-2 pt-1 pb-4">
@@ -512,6 +544,21 @@ export default function ProductDetail() {
         isDestructive
         onConfirm={confirmDelete}
         onCancel={cancelDelete}
+      />
+
+      <ConfirmDialog
+        open={alertDeleteTarget !== null}
+        title="Delete this alert?"
+        message={
+          alertDeleteTarget
+            ? `Condition: ${alertDeleteTarget.condition.replace('_', ' ')}${alertDeleteTarget.threshold_price ? ` • €${parseFloat(alertDeleteTarget.threshold_price).toFixed(2)}` : ''}`
+            : undefined
+        }
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        isDestructive
+        onConfirm={confirmDeleteAlert}
+        onCancel={cancelDeleteAlert}
       />
 
       {/* ── Stats strip ── */}
@@ -631,7 +678,7 @@ export default function ProductDetail() {
                       <Pencil className="h-3.5 w-3.5" />
                     </button>
                     <button
-                      onClick={() => deleteAlertMutation.mutate(alert.id)}
+                      onClick={() => startDeleteAlert(alert)}
                       title="Delete alert"
                       aria-label="Delete alert"
                       className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950 transition-colors"

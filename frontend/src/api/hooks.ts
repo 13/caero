@@ -192,7 +192,10 @@ export function useCreateAlert(productId: number) {
         method: 'POST',
         body: JSON.stringify(body),
       }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['alerts', productId] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['alerts', productId] })
+      qc.invalidateQueries({ queryKey: ['alerts_all'] })
+    },
   })
 }
 
@@ -200,7 +203,10 @@ export function useDeleteAlert(productId: number) {
   const qc = useQueryClient()
   return useMutation<void, Error, number>({
     mutationFn: (alertId) => apiFetch<void>(`/api/alerts/${alertId}`, { method: 'DELETE' }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['alerts', productId] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['alerts', productId] })
+      qc.invalidateQueries({ queryKey: ['alerts_all'] })
+    },
   })
 }
 
@@ -212,7 +218,10 @@ export function useUpdateAlert(productId: number) {
         method: 'PATCH',
         body: JSON.stringify(body),
       }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['alerts', productId] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['alerts', productId] })
+      qc.invalidateQueries({ queryKey: ['alerts_all'] })
+    },
   })
 }
 
