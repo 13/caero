@@ -1,57 +1,43 @@
 # <img src="assets/caero.svg" width="30" height="30" /> caero
 
-zero price tracker
+**Caero (zero), a self-hosted price tracker to help you catch the best deals.**
 
 <p align="center">
-  <img src="assets/screenshot.png" width="640" />
+  <img src="assets/screenshot.png" width="640" alt="caero dashboard" />
 </p>
 
 ## Features
 
-- Product tracking with:
-  - URL + CSS selector based price extraction
-  - optional category, memo, tags, and product image
-  - per-product check interval and enable/disable toggle
-- Product detail page with:
-  - current price, all-time low, and last change summary
-  - historical price chart
-  - statistics (average/current/lowest/highest/total change/data points)
-- Alerts:
-  - conditions: below threshold, lowered, changed, any change
-  - channels: email and Telegram
-  - per-alert activate/deactivate, edit, and delete
+- **Track Anything** – Works on any website using URL + CSS selectors.
+- **Smart Insights** – View historical price charts, all-time lows, and average costs.
+- **Instant Alerts** – Get notified via **Telegram** or **Email** the moment a price changes.
 
-## Run with Docker (recommended)
+---
 
-1. Copy environment file:
-   - `cp .env.example .env`
-2. Start the app:
-   - `docker compose up --build`
-3. Open:
-   - `http://localhost:8000`
+## Quick Start (Docker)
 
-## Run locally (development)
+The fastest way to get started is with Docker.
 
-### Backend
+1.  **Set up your settings:**
+    ```bash
+    cp .env.example .env
+    ```
+2.  **Launch the app:**
+    ```bash
+    docker compose up -d
+    ```
+3.  **Start tracking:**
+    Open [http://localhost:8000](http://localhost:8000) in your browser.
 
-1. Copy environment file:
-   - `cp .env.example .env`
-2. Install dependencies:
-   - `cd backend`
-   - `uv sync`
-3. Install Playwright browser:
-   - `uv run playwright install chromium --with-deps`
-4. Start API server:
-   - `uv run fastapi run app/main.py --host 0.0.0.0 --port 8000`
+_Pull the latest image directly:_ `docker pull ghcr.io/13/caero:latest`
 
-### Frontend (dev server)
+---
 
-1. Install dependencies:
-   - `cd frontend`
-   - `npm ci`
-2. Start Vite dev server:
-   - `npm run dev`
-3. Open:
-   - `http://localhost:5173`
+## How to Track a Product
 
-The frontend proxies `/api` requests to `http://localhost:8000` in development.
+Don't let "CSS Selectors" scare you—it's just a way to point **caero** to the price.
+
+1.  **Find the Price:** Go to your product page (e.g., Amazon, BestBuy).
+2.  **Copy the Path:** Right-click the price on the page → **Inspect**. In the window that opens, right-click the highlighted code → **Copy** → **Copy selector**.
+3.  **Paste & Save:** Paste that into **caero** along with the URL.
+
