@@ -48,6 +48,7 @@ export default function ProductDetail() {
   const productId = parseInt(id ?? '0')
   const location = useLocation()
   const navigate = useNavigate()
+  const dashboardSearch = location.search || ''
   const autoCheckTriggeredRef = useRef(false)
   const autoCheckOnLoad =
     (location.state as { autoCheckOnLoad?: boolean } | null)?.autoCheckOnLoad === true
@@ -156,7 +157,7 @@ export default function ProductDetail() {
     deleteMutation.mutate(productId, {
       onSuccess: () => {
         toast.success('Deleted product')
-        navigate('/')
+        navigate(`/${dashboardSearch}`)
       },
       onError: (err: any) => toast.error(err?.message ?? 'Delete failed'),
     })
@@ -278,7 +279,7 @@ export default function ProductDetail() {
       {/* ── Top nav ── */}
       <div className="flex items-center justify-between gap-3">
         <button
-          onClick={() => navigate('/')}
+          onClick={() => navigate(`/${dashboardSearch}`)}
           className="inline-flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-100 transition-colors"
         >
           <ArrowLeft className="h-4 w-4" />

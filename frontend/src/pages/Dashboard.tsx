@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect } from 'react'
 import { ArrowDown, ArrowUp, Grid2x2, List, Plus, X, Search, Package, Image as ImageIcon, BellRing } from 'lucide-react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useProducts, useSettings, useAllAlerts } from '../api/hooks'
 import { formatDateTime, formatPercent, formatPrice } from '../utils/format'
 import { getTagColorClass } from '../utils/tags'
@@ -20,6 +20,8 @@ export default function Dashboard() {
   const { data: settings } = useSettings()
   const { data: alerts } = useAllAlerts()
   const navigate = useNavigate()
+  const location = useLocation()
+  const [searchParams, setSearchParams] = useSearchParams()
 
   const [view, setView] = useState<'grid' | 'list'>(() =>
     (localStorage.getItem('caero_view') as 'grid' | 'list') || 'grid'
@@ -30,7 +32,15 @@ export default function Dashboard() {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>(() =>
     (localStorage.getItem('caero_sort_direction') as 'asc' | 'desc') || 'asc'
   )
-  const [searchTerm, setSearchTerm] = useState('')
+  const searchTerm = searchParams.get('q') ?? ''
+
+  const updateSearchTerm = (value: string) => {
+    const nextParams = new URLSearchParams(searchParams)
+    const next = value.trim()
+    if (next) nextParams.set('q', next)
+    else nextParams.delete('q')
+    setSearchParams(nextParams, { replace: true })
+  }
 
   useEffect(() => {
     localStorage.setItem('caero_view', view)
@@ -182,7 +192,7 @@ export default function Dashboard() {
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400 pointer-events-none" />
           <input
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => updateSearchTerm(e.target.value)}
             placeholder="Search…"
             aria-label="Search products"
             className="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 pl-8 pr-7 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
@@ -190,7 +200,7 @@ export default function Dashboard() {
           {searchTerm && (
             <button
               type="button"
-              onClick={() => setSearchTerm('')}
+              onClick={() => updateSearchTerm('')}
               aria-label="Clear search"
               className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
             >
@@ -275,7 +285,13 @@ export default function Dashboard() {
             {view === 'grid' ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {sortedProducts.map((p) => (
-                  <ProductCard key={p.id} product={p} onKeywordClick={setSearchTerm} hasActiveAlerts={hasAlertsActive(p.id)} />
+                  <ProductCard
+                    key={p.id}
+                    product={p}
+                    onKeywordClick={updateSearchTerm}
+                    hasActiveAlerts={hasAlertsActive(p.id)}
+                    searchSuffix={location.search}
+                  />
                 ))}
               </div>
             ) : (
@@ -317,7 +333,7 @@ export default function Dashboard() {
                       {sortedProducts.map((p) => (
                         <tr
                           key={p.id}
-                          onClick={() => navigate(`/products/${p.id}`)}
+                          onClick={() => navigate(`/products/${p.id}${location.search}`)}
                           className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
                         >
                           <td className="px-4 py-3">
@@ -353,7 +369,7 @@ export default function Dashboard() {
                           <td className="px-4 py-3 text-gray-500 dark:text-gray-400">
                             {p.category ? (
                               <button
-                                onClick={(e) => { e.stopPropagation(); setSearchTerm(p.category!) }}
+                                onClick={(e) => { e.stopPropagation(); updateSearchTerm(p.category!) }}
                                 className="hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
                               >
                                 {p.category}
@@ -367,7 +383,7 @@ export default function Dashboard() {
                               {p.tags.slice(0, 3).map(tag => (
                                 <button
                                   key={tag}
-                                  onClick={(e) => { e.stopPropagation(); setSearchTerm(tag) }}
+                                  onClick={(e) => { e.stopPropagation(); updateSearchTerm(tag) }}
                                   className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${getTagColorClass(tag)} cursor-pointer hover:opacity-80`}
                                 >
                                   {tag}

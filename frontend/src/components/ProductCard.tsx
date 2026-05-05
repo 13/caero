@@ -12,9 +12,10 @@ interface ProductCardProps {
   product: Product
   onKeywordClick?: (keyword: string) => void
   hasActiveAlerts?: boolean
+  searchSuffix?: string
 }
 
-export default function ProductCard({ product, onKeywordClick, hasActiveAlerts }: ProductCardProps) {
+export default function ProductCard({ product, onKeywordClick, hasActiveAlerts, searchSuffix = '' }: ProductCardProps) {
   const deleteMutation = useDeleteProduct()
   const checkMutation = useCheckProduct()
   const { data: settings } = useSettings()
@@ -50,7 +51,7 @@ export default function ProductCard({ product, onKeywordClick, hasActiveAlerts }
 
       {/* Image */}
       {displaySrc && (
-        <Link to={`/products/${product.id}`} className="block w-full h-36 bg-gray-50 dark:bg-gray-800 flex items-center justify-center border-b border-gray-100 dark:border-gray-800 px-4 py-3 hover:opacity-90 transition-opacity">
+        <Link to={`/products/${product.id}${searchSuffix}`} className="block w-full h-36 bg-gray-50 dark:bg-gray-800 flex items-center justify-center border-b border-gray-100 dark:border-gray-800 px-4 py-3 hover:opacity-90 transition-opacity">
           <img
             src={displaySrc}
             alt={product.name}
@@ -66,7 +67,7 @@ export default function ProductCard({ product, onKeywordClick, hasActiveAlerts }
         {/* Title + status */}
         <div className="flex items-start justify-between gap-2">
           <Link
-            to={`/products/${product.id}`}
+            to={`/products/${product.id}${searchSuffix}`}
             className="text-base font-semibold text-gray-900 dark:text-gray-100 hover:text-indigo-600 dark:hover:text-indigo-400 leading-snug line-clamp-2 transition-colors"
           >
             {product.name}
@@ -194,7 +195,7 @@ export default function ProductCard({ product, onKeywordClick, hasActiveAlerts }
             {checkMutation.isPending ? 'Checking…' : 'Check'}
           </button>
           <Link
-            to={`/products/${product.id}`}
+            to={`/products/${product.id}${searchSuffix}`}
             className="flex-1 text-sm py-2 rounded-xl bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 font-medium text-center transition-colors"
           >
             Details
