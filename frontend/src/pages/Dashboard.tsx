@@ -376,6 +376,25 @@ export default function Dashboard() {
               Add your first product
             </Link>
           </div>
+        ) : !sortedProducts.length ? (
+          <div className="flex flex-col items-center justify-center py-24 text-center">
+            <div className="w-16 h-16 rounded-2xl bg-gray-50 dark:bg-gray-800 flex items-center justify-center mb-4">
+              <Search className="h-8 w-8 text-gray-400" />
+            </div>
+            <p className="text-lg font-semibold text-gray-700 dark:text-gray-200">Nothing found</p>
+            <p className="text-sm text-gray-400 dark:text-gray-500 mt-1 mb-5">
+              {searchTerm ? `No products match "${searchTerm}"` : 'No products in this view'}
+            </p>
+            {searchTerm && (
+              <button
+                onClick={() => updateSearchTerm('')}
+                className="inline-flex items-center gap-1.5 bg-indigo-600 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-indigo-700 transition-colors"
+              >
+                <X className="h-4 w-4" />
+                Clear search
+              </button>
+            )}
+          </div>
         ) : (
           <>
             {view === 'grid' ? (
