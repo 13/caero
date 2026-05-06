@@ -1,7 +1,11 @@
 import { useMemo, useState, useEffect } from 'react'
 import { ArrowDown, ArrowUp, Grid2x2, List, Plus, X, Search, Package, Image as ImageIcon, BellRing } from 'lucide-react'
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import toast from 'react-hot-toast'
+import apiFetch from '../api/client'
 import { useProducts, useSettings, useAllAlerts } from '../api/hooks'
+import type { ProductUpdate } from '../api/types'
 import { formatDateTime, formatPercent, formatPrice } from '../utils/format'
 import { getTagColorClass } from '../utils/tags'
 import ProductCard from '../components/ProductCard'
@@ -22,6 +26,18 @@ export default function Dashboard() {
   const navigate = useNavigate()
   const location = useLocation()
   const [searchParams, setSearchParams] = useSearchParams()
+  const [updatingProductIds, setUpdatingProductIds] = useState<Set<number>>(new Set())
+  const qc = useQueryClient()
+
+  // Create a reusable mutation for updating any product
+  const updateProductMutation = useMutation<any, Error, { id: number; body: ProductUpdate }>({
+    mutationFn: ({ id, body }) =>
+      apiFetch<any>(`/api/products/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+    onSuccess: (_data, variables) => {
+      qc.invalidateQueries({ queryKey: ['products'] })
+      qc.invalidateQueries({ queryKey: ['products', variables.id] })
+    },
+  })
 
   const [view, setView] = useState<'grid' | 'list'>(() =>
     (localStorage.getItem('caero_view') as 'grid' | 'list') || 'grid'
@@ -40,6 +56,29 @@ export default function Dashboard() {
     if (next) nextParams.set('q', next)
     else nextParams.delete('q')
     setSearchParams(nextParams, { replace: true })
+  }
+
+  const handleToggleActive = (productId: number, productName: string, currentActive: boolean) => {
+    setUpdatingProductIds(prev => new Set(prev).add(productId))
+
+    updateProductMutation.mutate(
+      { id: productId, body: { active: !currentActive } },
+      {
+        onSuccess: () => {
+          toast.success(currentActive ? `Paused ${productName}` : `Activated ${productName}`)
+        },
+        onError: (err: any) => {
+          toast.error(err?.message ?? 'Failed to update product')
+        },
+        onSettled: () => {
+          setUpdatingProductIds(prev => {
+            const next = new Set(prev)
+            next.delete(productId)
+            return next
+          })
+        },
+      }
+    )
   }
 
   useEffect(() => {
@@ -291,6 +330,8 @@ export default function Dashboard() {
                     onKeywordClick={updateSearchTerm}
                     hasActiveAlerts={hasAlertsActive(p.id)}
                     searchSuffix={location.search}
+                    onToggleActive={handleToggleActive}
+                    isUpdating={updatingProductIds.has(p.id)}
                   />
                 ))}
               </div>
@@ -354,13 +395,27 @@ export default function Dashboard() {
                                   {p.name}
                                 </Link>
                                 <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
-                                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
+                              <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium cursor-pointer transition-opacity hover:opacity-80 ${
                                     p.active
                                       ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300'
                                       : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'
-                                  }`}>
-                                    {p.active ? 'Active' : 'Paused'}
-                                  </span>
+                                  }`}
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  handleToggleActive(p.id, p.name, p.active)
+                                }}
+                                role="button"
+                                tabIndex={0}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter' || e.key === ' ') {
+                                    e.preventDefault()
+                                    e.stopPropagation()
+                                    handleToggleActive(p.id, p.name, p.active)
+                                  }
+                                }}
+                              >
+                                {p.active ? 'Active' : 'Paused'}
+                              </span>
                                   {hasAlertsActive(p.id) && (
                                     <span title="Alerts active" className="flex items-center justify-center bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300 px-1 py-0.5 rounded-full">
                                       <BellRing className="h-3 w-3" />

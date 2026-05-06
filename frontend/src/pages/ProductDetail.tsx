@@ -4,6 +4,7 @@ import {
   Bell, Plus, X, TrendingDown, TrendingUp, BarChart3, ZoomIn,
 } from 'lucide-react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   useAlerts,
   useCheckProduct,
@@ -19,6 +20,7 @@ import {
   useUpdateProduct,
 } from '../api/hooks'
 import type { Alert, AlertCreate, User } from '../api/types'
+import apiFetch from '../api/client'
 import PriceChart from '../components/PriceChart'
 import {
   CHECK_INTERVAL_HOUR_STEP,
@@ -66,6 +68,17 @@ export default function ProductDetail() {
   const deleteAlertMutation = useDeleteAlert(productId)
   const createAlertMutation = useCreateAlert(productId)
   const updateAlertMutation = useUpdateAlert(productId)
+  const qc = useQueryClient()
+
+  // Create a reusable mutation for toggling active status
+  const toggleActiveMutation = useMutation<any, Error, { id: number; active: boolean }>({
+    mutationFn: ({ id, active }) =>
+      apiFetch<any>(`/api/products/${id}`, { method: 'PATCH', body: JSON.stringify({ active }) }),
+    onSuccess: (_data, variables) => {
+      qc.invalidateQueries({ queryKey: ['products'] })
+      qc.invalidateQueries({ queryKey: ['products', variables.id] })
+    },
+  })
 
   const [editMode, setEditMode] = useState(false)
   const [editForm, setEditForm] = useState({
@@ -156,7 +169,7 @@ export default function ProductDetail() {
   const confirmDelete = () => {
     deleteMutation.mutate(productId, {
       onSuccess: () => {
-        toast.success('Deleted product')
+        toast.success(`Deleted ${product?.name ?? 'product'}`)
         navigate(`/${dashboardSearch}`)
       },
       onError: (err: any) => toast.error(err?.message ?? 'Delete failed'),
@@ -165,6 +178,20 @@ export default function ProductDetail() {
   }
 
   const cancelDelete = () => setShowDeleteConfirm(false)
+
+  const handleToggleActive = (productName: string, currentActive: boolean) => {
+    toggleActiveMutation.mutate(
+      { id: productId, active: !currentActive },
+      {
+        onSuccess: () => {
+          toast.success(currentActive ? `Paused ${productName}` : `Activated ${productName}`)
+        },
+        onError: (err: any) => {
+          toast.error(err?.message ?? 'Failed to update product')
+        },
+      }
+    )
+  }
 
   const handleAddAlert = (e: React.FormEvent) => {
     e.preventDefault()
@@ -354,12 +381,23 @@ export default function ProductDetail() {
               <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100 leading-tight">
                 {product.name}
               </h1>
-              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+              <span className={`text-xs px-2 py-0.5 rounded-full font-medium cursor-pointer transition-opacity hover:opacity-80 ${
                 product.active
                   ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300'
                   : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'
-              }`}>
-                {product.active ? 'Active' : 'Paused'}
+              }`}
+              onClick={() => handleToggleActive(product.name, product.active)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  handleToggleActive(product.name, product.active)
+                }
+              }}
+              title={`Click to ${product.active ? 'pause' : 'activate'} tracking`}
+              >
+                {toggleActiveMutation.isPending ? '…' : (product.active ? 'Active' : 'Paused')}
               </span>
             </div>
 

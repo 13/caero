@@ -13,9 +13,11 @@ interface ProductCardProps {
   onKeywordClick?: (keyword: string) => void
   hasActiveAlerts?: boolean
   searchSuffix?: string
+  onToggleActive?: (productId: number, productName: string, currentActive: boolean) => void
+  isUpdating?: boolean
 }
 
-export default function ProductCard({ product, onKeywordClick, hasActiveAlerts, searchSuffix = '' }: ProductCardProps) {
+export default function ProductCard({ product, onKeywordClick, hasActiveAlerts, searchSuffix = '', onToggleActive, isUpdating = false }: ProductCardProps) {
   const deleteMutation = useDeleteProduct()
   const checkMutation = useCheckProduct()
   const { data: settings } = useSettings()
@@ -78,12 +80,26 @@ export default function ProductCard({ product, onKeywordClick, hasActiveAlerts, 
                 <BellRing className="h-3.5 w-3.5" />
               </span>
             )}
-            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+            <span className={`text-xs px-2 py-0.5 rounded-full font-medium cursor-pointer transition-opacity hover:opacity-80 disabled:opacity-50 ${
               isTrackingActive
                 ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300'
                 : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'
-            }`}>
-              {isTrackingActive ? 'Active' : 'Paused'}
+            }`}
+            onClick={(e) => {
+              e.preventDefault()
+              onToggleActive?.(product.id, product.name, product.active)
+            }}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault()
+                onToggleActive?.(product.id, product.name, product.active)
+              }
+            }}
+            title={onToggleActive ? `Click to ${product.active ? 'pause' : 'activate'} tracking` : undefined}
+            >
+              {isUpdating ? '…' : (isTrackingActive ? 'Active' : 'Paused')}
             </span>
           </div>
         </div>
