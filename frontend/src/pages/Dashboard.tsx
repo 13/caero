@@ -49,12 +49,20 @@ export default function Dashboard() {
     (localStorage.getItem('caero_sort_direction') as 'asc' | 'desc') || 'asc'
   )
   const searchTerm = searchParams.get('q') ?? ''
+  const status = (searchParams.get('status') as 'all' | 'active' | 'paused' | null) ?? 'all'
 
   const updateSearchTerm = (value: string) => {
     const nextParams = new URLSearchParams(searchParams)
     const next = value.trim()
     if (next) nextParams.set('q', next)
     else nextParams.delete('q')
+    setSearchParams(nextParams, { replace: true })
+  }
+
+  const setStatus = (s: 'all' | 'active' | 'paused') => {
+    const nextParams = new URLSearchParams(searchParams)
+    if (s === 'all') nextParams.delete('status')
+    else nextParams.set('status', s)
     setSearchParams(nextParams, { replace: true })
   }
 
@@ -98,13 +106,23 @@ export default function Dashboard() {
 
   const filteredProducts = useMemo(() => {
     if (!products) return []
+    let items = products
+
+    // Apply status filter
+    if (status === 'active') {
+      items = items.filter((p) => p.active)
+    } else if (status === 'paused') {
+      items = items.filter((p) => !p.active)
+    }
+
+    // Apply search filter
     const query = searchTerm.trim().toLowerCase()
-    if (!query) return products
-    return products.filter((p) => {
+    if (!query) return items
+    return items.filter((p) => {
       const haystack = [p.name, p.category ?? '', p.memo ?? '', p.url, ...p.tags].join(' ').toLowerCase()
       return haystack.includes(query)
     })
-  }, [products, searchTerm])
+  }, [products, searchTerm, status])
 
   const handleSort = (nextSortBy: SortBy) => {
     if (sortBy === nextSortBy) {
@@ -300,8 +318,47 @@ export default function Dashboard() {
         </div>
       </div>
 
-
-      {/* ── Product List ── */}
+      {/* ── Status Tabs ── */}
+      {products && products.length > 0 && (
+        <div className="flex gap-2 border-b border-gray-200 dark:border-gray-800">
+          <button
+            onClick={() => setStatus('all')}
+            className={`px-3 py-2 text-sm font-medium transition-colors ${
+              status === 'all'
+                ? 'text-indigo-600 dark:text-indigo-400 border-b-2 border-indigo-600 dark:border-indigo-400'
+                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+            }`}
+            role="tab"
+            aria-selected={status === 'all'}
+          >
+            All ({products.length})
+          </button>
+          <button
+            onClick={() => setStatus('active')}
+            className={`px-3 py-2 text-sm font-medium transition-colors ${
+              status === 'active'
+                ? 'text-indigo-600 dark:text-indigo-400 border-b-2 border-indigo-600 dark:border-indigo-400'
+                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+            }`}
+            role="tab"
+            aria-selected={status === 'active'}
+          >
+            Active ({activeCount})
+          </button>
+          <button
+            onClick={() => setStatus('paused')}
+            className={`px-3 py-2 text-sm font-medium transition-colors ${
+              status === 'paused'
+                ? 'text-indigo-600 dark:text-indigo-400 border-b-2 border-indigo-600 dark:border-indigo-400'
+                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+            }`}
+            role="tab"
+            aria-selected={status === 'paused'}
+          >
+            Paused ({inactiveCount})
+          </button>
+        </div>
+      )}
       <>
         {/* ── Empty state ── */}
         {!products?.length ? (
@@ -486,7 +543,7 @@ export default function Dashboard() {
               <span className="w-1 h-1 rounded-full bg-gray-300 dark:bg-gray-700"></span>
               <p>Active: <span className="font-medium text-green-600 dark:text-green-400">{activeCount}</span></p>
               <span className="w-1 h-1 rounded-full bg-gray-300 dark:bg-gray-700"></span>
-              <p>Inactive: <span className="font-medium text-red-500 dark:text-red-400">{inactiveCount}</span></p>
+              <p>Paused: <span className="font-medium text-gray-500 dark:text-gray-400">{inactiveCount}</span></p>
             </div>
           </>
         )}
