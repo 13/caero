@@ -49,7 +49,8 @@ export default function Dashboard() {
     (localStorage.getItem('caero_sort_direction') as 'asc' | 'desc') || 'asc'
   )
   const searchTerm = searchParams.get('q') ?? ''
-  const status = (searchParams.get('status') as 'all' | 'active' | 'paused' | null) ?? 'all'
+  // Default to 'active' view when no status query param is present
+  const status = (searchParams.get('status') as 'all' | 'active' | 'paused' | null) ?? 'active'
 
   const updateSearchTerm = (value: string) => {
     const nextParams = new URLSearchParams(searchParams)
@@ -322,18 +323,6 @@ export default function Dashboard() {
       {products && products.length > 0 && (
         <div className="flex gap-2 border-b border-gray-200 dark:border-gray-800">
           <button
-            onClick={() => setStatus('all')}
-            className={`px-3 py-2 text-sm font-medium transition-colors ${
-              status === 'all'
-                ? 'text-indigo-600 dark:text-indigo-400 border-b-2 border-indigo-600 dark:border-indigo-400'
-                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
-            }`}
-            role="tab"
-            aria-selected={status === 'all'}
-          >
-            All ({products.length})
-          </button>
-          <button
             onClick={() => setStatus('active')}
             className={`px-3 py-2 text-sm font-medium transition-colors ${
               status === 'active'
@@ -356,6 +345,18 @@ export default function Dashboard() {
             aria-selected={status === 'paused'}
           >
             Paused ({inactiveCount})
+          </button>
+          <button
+            onClick={() => setStatus('all')}
+            className={`px-3 py-2 text-sm font-medium transition-colors ${
+              status === 'all'
+                ? 'text-indigo-600 dark:text-indigo-400 border-b-2 border-indigo-600 dark:border-indigo-400'
+                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+            }`}
+            role="tab"
+            aria-selected={status === 'all'}
+          >
+            All ({products.length})
           </button>
         </div>
       )}
