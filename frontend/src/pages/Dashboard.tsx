@@ -49,7 +49,6 @@ export default function Dashboard() {
     (localStorage.getItem('caero_sort_direction') as 'asc' | 'desc') || 'asc'
   )
   const searchTerm = searchParams.get('q') ?? ''
-  // Default to 'active' view when no status query param is present
   const status = (searchParams.get('status') as 'all' | 'active' | 'paused' | null) ?? 'active'
 
   const updateSearchTerm = (value: string) => {
@@ -62,9 +61,8 @@ export default function Dashboard() {
 
   const setStatus = (s: 'all' | 'active' | 'paused') => {
     const nextParams = new URLSearchParams(searchParams)
-    if (s === 'all') nextParams.delete('status')
-    else nextParams.set('status', s)
-    setSearchParams(nextParams, { replace: true })
+     nextParams.set('status', s)
+     setSearchParams(nextParams, { replace: true })
   }
 
   const handleToggleActive = (productId: number, productName: string, currentActive: boolean) => {
