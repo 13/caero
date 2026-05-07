@@ -127,6 +127,9 @@ async def scrape_and_record(product_id: int) -> None:
 
 
 def add_product_job(product: Product, run_immediately: bool = False) -> None:
+    from datetime import datetime, timezone
+    from app.schedule_utils import get_next_run_time
+
     job_id = f"product_{product.id}"
     if scheduler.get_job(job_id):
         scheduler.remove_job(job_id)
@@ -135,11 +138,11 @@ def add_product_job(product: Product, run_immediately: bool = False) -> None:
         logger.debug("Skipping job %s (inactive or disabled interval)", job_id)
         return
 
-    kwargs = {}
-    if run_immediately:
-        from datetime import datetime, timezone
-
-        kwargs["next_run_time"] = datetime.now(timezone.utc)
+    next_run = (
+        datetime.now(timezone.utc)
+        if run_immediately
+        else get_next_run_time(product.check_time_hhmm)
+    )
 
     scheduler.add_job(
         scrape_and_record,
@@ -148,9 +151,9 @@ def add_product_job(product: Product, run_immediately: bool = False) -> None:
         id=job_id,
         args=[product.id],
         replace_existing=True,
-        **kwargs
+        next_run_time=next_run,
     )
-    logger.debug("Scheduled job %s every %d min", job_id, product.check_interval_minutes)
+    logger.debug("Scheduled job %s every %d min, next run %s", job_id, product.check_interval_minutes, next_run)
 
 
 def remove_product_job(product_id: int) -> None:

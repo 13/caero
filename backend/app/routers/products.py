@@ -270,8 +270,10 @@ async def create_product(
     user: User = Depends(require_user),
     db: AsyncSession = Depends(get_db),
 ) -> ProductOut:
+    from app.schedule_utils import normalize_check_time_hhmm
     payload = body.model_dump()
     payload["tags"] = _tags_to_string(payload.get("tags"))
+    payload["check_time_hhmm"] = normalize_check_time_hhmm(payload.get("check_time_hhmm"))
     product = Product(**payload, user_id=user.id)
     db.add(product)
     await db.flush()
@@ -311,9 +313,12 @@ async def update_product(
     old_image_url = product.image_url
     old_check_time_hhmm = product.check_time_hhmm
 
+    from app.schedule_utils import normalize_check_time_hhmm
     updates = body.model_dump(exclude_unset=True)
     if "tags" in updates:
         updates["tags"] = _tags_to_string(updates["tags"])
+    if "check_time_hhmm" in updates:
+        updates["check_time_hhmm"] = normalize_check_time_hhmm(updates["check_time_hhmm"])
 
     image_changed = "image_url" in updates and updates.get("image_url") != old_image_url
     if image_changed:
@@ -334,14 +339,13 @@ async def update_product(
         if product.image_url:
             schedule_image_download(background_tasks, product.id, product.image_url)
 
-    # Reschedule if interval or active state changed
     interval_changed = "check_interval_minutes" in updates and product.check_interval_minutes != old_interval
     active_changed = "active" in updates and product.active != old_active
-    time_changed = "check_time_hhmm" in updates and product.check_time_hhmm != old_check_time_hhmm
+    time_changed = "check_time_hhmm" in updates  # always reschedule when time is submitted
 
     if product.active and product.check_interval_minutes > 0 and (interval_changed or active_changed or time_changed):
         add_product_job(product)
-    elif (not product.active or product.check_interval_minutes <= 0) and (interval_changed or active_changed or time_changed):
+    elif (not product.active or product.check_interval_minutes <= 0) and (active_changed or interval_changed):
         remove_product_job(product_id)
 
     return await _to_product_out(product, db)
