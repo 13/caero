@@ -12,12 +12,19 @@ export default function Login() {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [registerPasswordError, setRegisterPasswordError] = useState<string | null>(null)
-  const [registerSuccess, setRegisterSuccess] = useState<string | null>(null)
+  const [registrationSuccess, setRegistrationSuccess] = useState(false)
+
+  const switchMode = (nextMode: 'login' | 'register') => {
+    setMode(nextMode)
+    setRegisterPasswordError(null)
+    setRegistrationSuccess(false)
+    loginMutation.reset()
+    registerMutation.reset()
+  }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     setRegisterPasswordError(null)
-    setRegisterSuccess(null)
     if (mode === 'login') {
       loginMutation.mutate({ username, password }, { onSuccess: () => navigate('/') })
     } else {
@@ -28,17 +35,16 @@ export default function Login() {
       }
       registerMutation.mutate(
         { username, password },
-        {
-          onSuccess: () => {
-            setRegisterSuccess('Account created. Please sign in.')
-            setMode('login')
-          },
-        }
+        { onSuccess: () => {
+          setRegistrationSuccess(true)
+          setMode('login')
+        } }
       )
     }
   }
 
   const error = registerPasswordError ?? loginMutation.error?.message ?? registerMutation.error?.message
+  const message = registrationSuccess ? 'Account created, please login' : null
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950 px-4">
@@ -47,15 +53,15 @@ export default function Login() {
           <CaeroBrand showText={false} logoSizeClassName="h-32 w-32 sm:h-40 sm:w-40" className="justify-center" />
         </div>
 
-        {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm mb-4">
-            {error}
+        {message && (
+          <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg text-sm mb-4">
+            {message}
           </div>
         )}
 
-        {registerSuccess && (
-          <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 px-4 py-3 rounded-lg text-sm mb-4">
-            {registerSuccess}
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm mb-4">
+            {error}
           </div>
         )}
 
@@ -98,10 +104,8 @@ export default function Login() {
                 <>
                   No account?{' '}
                   <button
-                    onClick={() => {
-                      setRegisterSuccess(null)
-                      setMode('register')
-                    }}
+                    type="button"
+                    onClick={() => switchMode('register')}
                     className="text-indigo-500 hover:underline"
                   >
                     Register
@@ -115,10 +119,8 @@ export default function Login() {
             <>
               Already have an account?{' '}
               <button
-                onClick={() => {
-                  setRegisterSuccess(null)
-                  setMode('login')
-                }}
+                type="button"
+                onClick={() => switchMode('login')}
                 className="text-indigo-500 hover:underline"
               >
                 Sign in

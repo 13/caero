@@ -4,6 +4,9 @@ export const DEFAULT_CHECK_INTERVAL_MINUTES = 1440
 export const MIN_CHECK_INTERVAL_MINUTES = 30
 export const MIN_CHECK_INTERVAL_HOURS = 0.5
 export const CHECK_INTERVAL_HOUR_STEP = 0.5
+export const DEFAULT_CHECK_TIME_HHMM = '10:00'
+
+const CHECK_TIME_HHMM_RE = /^(?:[01]\d|2[0-3]):[0-5]\d$/
 
 export function localeFromDateFormat(format?: DateFormat) {
   if (format === 'DD.MM.YYYY') return 'de-DE'
@@ -64,3 +67,10 @@ export function formatIntervalHours(minutes: number) {
   if (minutes <= 0) return 'Disabled'
   return intervalMinutesToHours(minutes).toFixed(1).replace(/\.0$/, '')
 }
+
+export function normalizeCheckTimeHHMM(value?: string | null) {
+  const trimmed = (value ?? '').trim()
+  if (!trimmed) return DEFAULT_CHECK_TIME_HHMM
+  return CHECK_TIME_HHMM_RE.test(trimmed) ? trimmed : DEFAULT_CHECK_TIME_HHMM
+}
+

@@ -1,13 +1,16 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useCreateProduct } from '../api/hooks'
+import { useCreateProduct, useSettings } from '../api/hooks'
 import { ArrowLeft, Package, Link as LinkIcon, Code, Clock, Image, Tag, FileText, FolderOpen } from 'lucide-react'
 import {
+  DEFAULT_CHECK_TIME_HHMM,
   CHECK_INTERVAL_HOUR_STEP,
   DEFAULT_CHECK_INTERVAL_MINUTES,
+  normalizeCheckTimeHHMM,
   intervalMinutesToHours,
   normalizeIntervalHoursToMinutes,
 } from '../utils/format'
+import TimePicker from '../components/TimePicker'
 import toast from 'react-hot-toast'
 
 const inputCls = 'w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-950 text-gray-900 dark:text-gray-100 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors placeholder:text-gray-400 dark:placeholder:text-gray-600'
@@ -36,6 +39,7 @@ function Field({ icon: Icon, label, required, hint, children }: {
 export default function AddProduct() {
   const navigate = useNavigate()
   const createMutation = useCreateProduct()
+  const { data: settings } = useSettings()
 
   const [form, setForm] = useState({
     name: '',
@@ -43,6 +47,7 @@ export default function AddProduct() {
     memo: '',
     tags: '',
     image_url: '',
+    check_time_hhmm: DEFAULT_CHECK_TIME_HHMM,
     url: '',
     selector: '',
     check_interval_minutes: DEFAULT_CHECK_INTERVAL_MINUTES,
@@ -60,6 +65,7 @@ export default function AddProduct() {
         category: form.category || null,
         memo: form.memo || null,
         image_url: form.image_url || null,
+        check_time_hhmm: normalizeCheckTimeHHMM(form.check_time_hhmm),
         tags: form.tags.split(',').map((t) => t.trim()).filter(Boolean),
       },
       {
@@ -157,6 +163,15 @@ export default function AddProduct() {
               value={form.image_url}
               onChange={(e) => setForm({ ...form, image_url: e.target.value })}
               placeholder="https://example.com/image.jpg"
+              className={inputCls}
+            />
+          </Field>
+
+          <Field icon={Clock} label="Check time" hint="Optional — defaults to 10:00">
+            <TimePicker
+              value={form.check_time_hhmm}
+              onChange={(value) => setForm({ ...form, check_time_hhmm: value })}
+              format={settings?.time_format ?? '24h'}
               className={inputCls}
             />
           </Field>

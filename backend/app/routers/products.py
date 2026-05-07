@@ -283,7 +283,7 @@ async def create_product(
         schedule_image_download(background_tasks, product.id, product.image_url)
 
     if product.active and product.check_interval_minutes > 0:
-        add_product_job(product, run_immediately=True)
+        add_product_job(product)
     return await _to_product_out(product, db)
 
 
@@ -309,10 +309,18 @@ async def update_product(
     old_interval = product.check_interval_minutes
     old_active = product.active
     old_image_url = product.image_url
+    old_check_time_hhmm = getattr(product, "check_time_hhmm", None)
 
     updates = body.model_dump(exclude_unset=True)
     if "tags" in updates:
         updates["tags"] = _tags_to_string(updates["tags"])
+
+    image_changed = "image_url" in updates and updates.get("image_url") != old_image_url
+    if image_changed:
+        from app.images import delete_local_image
+
+        delete_local_image(product.cached_image_url)
+        product.cached_image_url = None
 
     for key, value in updates.items():
         setattr(product, key, value)
@@ -321,19 +329,19 @@ async def update_product(
     await db.refresh(product)
     await db.commit()
 
-    if "image_url" in updates and product.image_url != old_image_url:
-        from app.images import delete_local_image, schedule_image_download
-        delete_local_image(old_image_url)
+    if image_changed:
+        from app.images import schedule_image_download
         if product.image_url:
             schedule_image_download(background_tasks, product.id, product.image_url)
 
     # Reschedule if interval or active state changed
     interval_changed = "check_interval_minutes" in updates and product.check_interval_minutes != old_interval
     active_changed = "active" in updates and product.active != old_active
+    time_changed = "check_time_hhmm" in updates and getattr(product, "check_time_hhmm", None) != old_check_time_hhmm
 
-    if product.active and product.check_interval_minutes > 0 and (interval_changed or active_changed):
+    if product.active and product.check_interval_minutes > 0 and (interval_changed or active_changed or time_changed):
         add_product_job(product)
-    elif (not product.active or product.check_interval_minutes <= 0) and (interval_changed or active_changed):
+    elif (not product.active or product.check_interval_minutes <= 0) and (interval_changed or active_changed or time_changed):
         remove_product_job(product_id)
 
     return await _to_product_out(product, db)
@@ -348,7 +356,7 @@ async def delete_product(
     product = await _get_product(product_id, user, db)
     remove_product_job(product_id)
     from app.images import delete_local_image
-    delete_local_image(product.image_url)
+    delete_local_image(product.cached_image_url)
     await db.delete(product)
 
 

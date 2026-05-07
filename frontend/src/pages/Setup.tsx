@@ -140,6 +140,7 @@ export default function Setup() {
     pg_password: '',
     allow_registration: true,
     date_format: 'DD.MM.YYYY',
+    time_format: '24h',
     updated_at: null,
   })
 
@@ -332,57 +333,74 @@ export default function Setup() {
       {activeTab === 'account' && (
         <div className="space-y-4">
 
-          {/* Preferences */}
-          <Section icon={User} title="Preferences" description="Customize your experience">
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Date format</label>
-                <select
-                  value={form.date_format}
-                  onChange={(e) => {
-                    const nextForm = { ...form, date_format: e.target.value as AppSettings['date_format'] }
-                    setForm(nextForm)
-                    saveSettings(nextForm)
-                  }}
-                  style={{ colorScheme: 'light dark' }}
-                  className={inputCls}
-                >
-                  <option value="DD.MM.YYYY">DD.MM.YYYY</option>
-                  <option value="DD/MM/YYYY">DD/MM/YYYY</option>
-                  <option value="MM/DD/YYYY">MM/DD/YYYY</option>
-                  <option value="YYYY-MM-DD">YYYY-MM-DD</option>
-                </select>
-              </div>
+           {/* Preferences */}
+           <Section icon={User} title="Preferences" description="Customize your experience">
+             <div className="space-y-4">
+               <div>
+                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Date format</label>
+                 <select
+                   value={form.date_format}
+                   onChange={(e) => {
+                     const nextForm = { ...form, date_format: e.target.value as AppSettings['date_format'] }
+                     setForm(nextForm)
+                     saveSettings(nextForm)
+                   }}
+                   style={{ colorScheme: 'light dark' }}
+                   className={inputCls}
+                 >
+                   <option value="DD.MM.YYYY">DD.MM.YYYY</option>
+                   <option value="DD/MM/YYYY">DD/MM/YYYY</option>
+                   <option value="MM/DD/YYYY">MM/DD/YYYY</option>
+                   <option value="YYYY-MM-DD">YYYY-MM-DD</option>
+                 </select>
+               </div>
 
-              <div className="space-y-2 pt-2 border-t border-gray-100 dark:border-gray-800">
-                <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Dashboard visibility</p>
-                <label className="flex items-center gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={hideStats}
-                    onChange={(e) => {
-                      setHideStats(e.target.checked)
-                      localStorage.setItem('caero_hide_stats', e.target.checked ? 'true' : 'false')
-                    }}
-                    className="rounded text-indigo-600 h-4 w-4"
-                  />
-                  <span className="text-sm text-gray-800 dark:text-gray-200">Hide total tracked stats (active, price drops)</span>
-                </label>
-                <label className="flex items-center gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={hideHeader}
-                    onChange={(e) => {
-                      setHideHeader(e.target.checked)
-                      localStorage.setItem('caero_hide_header', e.target.checked ? 'true' : 'false')
-                    }}
-                    className="rounded text-indigo-600 h-4 w-4"
-                  />
-                  <span className="text-sm text-gray-800 dark:text-gray-200">Hide header on products list</span>
-                </label>
-              </div>
-            </div>
-          </Section>
+               <div>
+                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Time format</label>
+                 <select
+                   value={form.time_format}
+                   onChange={(e) => {
+                     const nextForm = { ...form, time_format: e.target.value as AppSettings['time_format'] }
+                     setForm(nextForm)
+                     saveSettings(nextForm)
+                   }}
+                   style={{ colorScheme: 'light dark' }}
+                   className={inputCls}
+                 >
+                   <option value="24h">24-hour (HH:MM)</option>
+                   <option value="12h">12-hour (HH:MM AM/PM)</option>
+                 </select>
+               </div>
+
+               <div className="space-y-2 pt-2 border-t border-gray-100 dark:border-gray-800">
+                 <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Dashboard visibility</p>
+                 <label className="flex items-center gap-3 cursor-pointer">
+                   <input
+                     type="checkbox"
+                     checked={hideStats}
+                     onChange={(e) => {
+                       setHideStats(e.target.checked)
+                       localStorage.setItem('caero_hide_stats', e.target.checked ? 'true' : 'false')
+                     }}
+                     className="rounded text-indigo-600 h-4 w-4"
+                   />
+                   <span className="text-sm text-gray-800 dark:text-gray-200">Hide total tracked stats (active, price drops)</span>
+                 </label>
+                 <label className="flex items-center gap-3 cursor-pointer">
+                   <input
+                     type="checkbox"
+                     checked={hideHeader}
+                     onChange={(e) => {
+                       setHideHeader(e.target.checked)
+                       localStorage.setItem('caero_hide_header', e.target.checked ? 'true' : 'false')
+                     }}
+                     className="rounded text-indigo-600 h-4 w-4"
+                   />
+                   <span className="text-sm text-gray-800 dark:text-gray-200">Hide header on products list</span>
+                 </label>
+               </div>
+             </div>
+           </Section>
 
           {/* Change password */}
           <Section icon={KeyRound} title="Change password" description="Update your login credentials">

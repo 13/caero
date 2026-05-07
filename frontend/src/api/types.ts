@@ -21,6 +21,7 @@ export interface Product {
   tags: string[]
   image_url: string | null
   cached_image_url?: string | null
+  check_time_hhmm?: string | null
   url: string
   selector: string
   check_interval_minutes: number
@@ -45,6 +46,7 @@ export interface ProductCreate {
   memo?: string | null
   tags?: string[]
   image_url?: string | null
+  check_time_hhmm?: string | null
   url: string
   selector: string
   check_interval_minutes?: number
@@ -57,6 +59,7 @@ export interface ProductUpdate {
   memo?: string | null
   tags?: string[]
   image_url?: string | null
+  check_time_hhmm?: string | null
   url?: string
   selector?: string
   check_interval_minutes?: number
@@ -99,6 +102,7 @@ export interface AppSettings {
   pg_password: string
   allow_registration: boolean
   date_format: 'DD.MM.YYYY' | 'DD/MM/YYYY' | 'MM/DD/YYYY' | 'YYYY-MM-DD'
+  time_format: '12h' | '24h'
   updated_at: string | null
 }
 

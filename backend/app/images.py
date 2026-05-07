@@ -50,17 +50,16 @@ async def download_image_task(product_id: int, url: str) -> None:
             async with aiofiles.open(filepath, "wb") as f:
                 await f.write(resp.content)
 
-            # Update database: set cached_image_url, keep original image_url untouched
+            # Update database
             async with AsyncSessionLocal() as db:
                 product = await db.get(Product, product_id)
                 if product:
-                    old_cached = product.cached_image_url if hasattr(product, 'cached_image_url') else None
-                    product.cached_image_url = f"/user_images/{filename}"
+                    old_image = product.image_url
+                    product.image_url = f"/user_images/{filename}"
                     await db.commit()
 
-                    # Remove previous cached file if it existed
-                    if old_cached and old_cached.startswith("/user_images/"):
-                        old_path = images_dir / Path(old_cached).name
+                    if old_image and old_image.startswith("/user_images/"):
+                        old_path = images_dir / Path(old_image).name
                         if old_path.exists():
                             os.remove(old_path)
 

@@ -80,26 +80,12 @@ export default function ProductCard({ product, onKeywordClick, hasActiveAlerts, 
                 <BellRing className="h-3.5 w-3.5" />
               </span>
             )}
-            <span className={`text-xs px-2 py-0.5 rounded-full font-medium cursor-pointer transition-opacity hover:opacity-80 disabled:opacity-50 ${
+            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
               isTrackingActive
                 ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300'
                 : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'
-            }`}
-            onClick={(e) => {
-              e.preventDefault()
-              onToggleActive?.(product.id, product.name, product.active)
-            }}
-            role="button"
-            tabIndex={0}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault()
-                onToggleActive?.(product.id, product.name, product.active)
-              }
-            }}
-            title={onToggleActive ? `Click to ${product.active ? 'pause' : 'activate'} tracking` : undefined}
-            >
-              {isUpdating ? '…' : (isTrackingActive ? 'Active' : 'Paused')}
+            }`}>
+              {isTrackingActive ? 'Active' : 'Paused'}
             </span>
           </div>
         </div>
@@ -205,11 +191,26 @@ export default function ProductCard({ product, onKeywordClick, hasActiveAlerts, 
               onError: (err) => toast.error(err.message || 'Check failed')
             })}
             disabled={checkMutation.isPending}
+            title={isUpdating ? 'Updating status…' : 'Check price now'}
             className="flex-1 inline-flex items-center justify-center gap-1.5 text-sm py-2 rounded-xl bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900 disabled:opacity-50 font-medium transition-colors"
           >
             <RefreshCw className={`h-3.5 w-3.5 ${checkMutation.isPending ? 'animate-spin' : ''}`} />
             {checkMutation.isPending ? 'Checking…' : 'Check'}
           </button>
+          {onToggleActive && (
+            <button
+              onClick={() => onToggleActive(product.id, product.name, product.active)}
+              disabled={isUpdating}
+              title={product.active ? 'Pause tracking' : 'Resume tracking'}
+              className={`flex-1 text-sm py-2 rounded-xl font-medium transition-colors ${
+                product.active
+                  ? 'bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300 hover:bg-green-100 dark:hover:bg-green-900'
+                  : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
+              } disabled:opacity-50`}
+            >
+              {isUpdating ? '…' : (product.active ? 'Pause' : 'Resume')}
+            </button>
+          )}
           <Link
             to={`/products/${product.id}${searchSuffix}`}
             className="flex-1 text-sm py-2 rounded-xl bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 font-medium text-center transition-colors"

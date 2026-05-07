@@ -22,10 +22,13 @@ import {
 import type { Alert, AlertCreate, User } from '../api/types'
 import apiFetch from '../api/client'
 import PriceChart from '../components/PriceChart'
+import TimePicker from '../components/TimePicker'
 import {
+  DEFAULT_CHECK_TIME_HHMM,
   CHECK_INTERVAL_HOUR_STEP,
   DEFAULT_CHECK_INTERVAL_MINUTES,
   MIN_CHECK_INTERVAL_HOURS,
+  normalizeCheckTimeHHMM,
   formatDate,
   formatDateTime,
   formatPercent,
@@ -87,6 +90,7 @@ export default function ProductDetail() {
     memo: '',
     tags: '',
     image_url: '',
+    check_time_hhmm: DEFAULT_CHECK_TIME_HHMM,
     url: '',
     selector: '',
     check_interval_minutes: DEFAULT_CHECK_INTERVAL_MINUTES,
@@ -125,6 +129,7 @@ export default function ProductDetail() {
           memo: product.memo ?? '',
           tags: product.tags.join(', '),
           image_url: product.image_url ?? '',
+          check_time_hhmm: product.check_time_hhmm ?? DEFAULT_CHECK_TIME_HHMM,
           url: product.url,
           selector: product.selector,
           check_interval_minutes: product.check_interval_minutes,
@@ -147,6 +152,7 @@ export default function ProductDetail() {
         category: editForm.category || null,
         memo: editForm.memo || null,
         image_url: editForm.image_url || null,
+        check_time_hhmm: normalizeCheckTimeHHMM(editForm.check_time_hhmm),
         tags: editForm.tags
           .split(',')
           .map((tag) => tag.trim())
@@ -527,6 +533,15 @@ export default function ProductDetail() {
                     className={inputCls}
                   />
                 </div>
+                <div>
+                  <label className={labelCls}>Check time</label>
+                  <TimePicker
+                    value={editForm.check_time_hhmm}
+                    onChange={(value) => setEditForm({ ...editForm, check_time_hhmm: value })}
+                    format={settings?.time_format ?? '24h'}
+                    className={inputCls}
+                  />
+                 </div>
                 <div className="col-span-2">
                   <label className={labelCls}>Tags <span className="font-normal text-gray-400">(comma-separated)</span></label>
                   <input type="text" value={editForm.tags} onChange={(e) => setEditForm({ ...editForm, tags: e.target.value })} className={inputCls} />
