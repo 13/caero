@@ -23,10 +23,8 @@ def normalize_check_time_hhmm(value: object | None) -> str:
 
 
 def get_next_run_time(check_time_hhmm: object | None, now: datetime | None = None) -> datetime:
-    """Compute the next UTC run time for a daily check anchored to HH:mm."""
-    current = now or datetime.now(timezone.utc)
-    if current.tzinfo is None:
-        current = current.replace(tzinfo=timezone.utc)
+    """Compute the next run time anchored to HH:mm in the server's local timezone."""
+    current = now or datetime.now().astimezone()
 
     hhmm = normalize_check_time_hhmm(check_time_hhmm)
     hour, minute = map(int, hhmm.split(":"))
