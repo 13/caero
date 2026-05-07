@@ -100,9 +100,6 @@ export default function Dashboard() {
     localStorage.setItem('caero_sort_direction', sortDirection)
   }, [sortDirection])
 
-  const hideStats = localStorage.getItem('caero_hide_stats') === 'true'
-  const hideHeader = localStorage.getItem('caero_hide_header') === 'true'
-
   const filteredProducts = useMemo(() => {
     if (!products) return []
     let items = products
@@ -176,11 +173,6 @@ export default function Dashboard() {
   // Summary stats
   const activeCount = products?.filter((p) => p.active).length ?? 0
   const inactiveCount = (products?.length ?? 0) - activeCount
-  const droppedCount = products?.filter((p) => {
-    const pct = p.last_price_change_percent ? parseFloat(p.last_price_change_percent) : null
-    return pct !== null && pct < 0
-  }).length ?? 0
-
   const hasAlertsActive = (productId: number) => {
     return alerts?.some(a => a.product_id === productId && a.active) || false
   }
@@ -203,43 +195,6 @@ export default function Dashboard() {
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-6 space-y-5">
-
-      {/* ── Page header ── */}
-      {!hideHeader && (
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Tracked Products</h1>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
-              {products?.length ?? 0} product{products?.length !== 1 ? 's' : ''}
-            </p>
-          </div>
-          <Link
-            to="/add"
-            className="inline-flex items-center gap-1.5 bg-indigo-600 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-indigo-700 transition-colors shadow-sm"
-          >
-            <Plus className="h-4 w-4" aria-hidden />
-            Add product
-          </Link>
-        </div>
-      )}
-
-      {/* ── Summary strip ── */}
-      {!hideStats && (products?.length ?? 0) > 0 && (
-        <div className="grid grid-cols-3 gap-3">
-          <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 px-4 py-3">
-            <p className="text-xs text-gray-400 dark:text-gray-500">Total tracked</p>
-            <p className="text-xl font-bold text-gray-900 dark:text-gray-100">{products?.length ?? 0}</p>
-          </div>
-          <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 px-4 py-3">
-            <p className="text-xs text-gray-400 dark:text-gray-500">Active</p>
-            <p className="text-xl font-bold text-green-600 dark:text-green-400">{activeCount}</p>
-          </div>
-          <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 px-4 py-3">
-            <p className="text-xs text-gray-400 dark:text-gray-500">Price drops</p>
-            <p className="text-xl font-bold text-indigo-600 dark:text-indigo-400">{droppedCount}</p>
-          </div>
-        </div>
-      )}
 
       {/* ── Toolbar ── */}
       <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-3 flex flex-wrap items-center gap-2">

@@ -152,16 +152,11 @@ export default function Setup() {
   const [newUserPassword, setNewUserPassword] = useState('')
   const [newUserAdmin, setNewUserAdmin] = useState(false)
   const [resetPasswordByUserId, setResetPasswordByUserId] = useState<Record<number, string>>({})
-  const [adminImportError, setAdminImportError] = useState<string | null>(null)
-  const [myImportError, setMyImportError] = useState<string | null>(null)
   const [testEmail, setTestEmail] = useState('')
   const [testTelegramChatId, setTestTelegramChatId] = useState('')
 
   const [defaultEmail, setDefaultEmail] = useState('')
   const [defaultTelegram, setDefaultTelegram] = useState('')
-
-  const [hideHeader, setHideHeader] = useState(() => localStorage.getItem('caero_hide_header') === 'true')
-  const [hideStats, setHideStats] = useState(() => localStorage.getItem('caero_hide_stats') === 'true')
 
   const [toastMsg, setToastMsg] = useState('')
   const [showDeleteMyProducts, setShowDeleteMyProducts] = useState(false)
@@ -260,9 +255,10 @@ export default function Setup() {
     const file = e.target.files?.[0]
     if (!file) return
     try {
-      importDataMutation.mutate(JSON.parse(await file.text()))
-      setAdminImportError(null)
-    } catch { setAdminImportError('Invalid JSON file') }
+      importDataMutation.mutate(JSON.parse(await file.text()), {
+        onError: (err: any) => showToast((err && err.message) || 'Import failed'),
+      })
+    } catch { showToast('Invalid JSON file') }
     e.target.value = ''
   }
 
@@ -270,9 +266,10 @@ export default function Setup() {
     const file = e.target.files?.[0]
     if (!file) return
     try {
-      importMyDataMutation.mutate(JSON.parse(await file.text()))
-      setMyImportError(null)
-    } catch { setMyImportError('Invalid JSON file') }
+      importMyDataMutation.mutate(JSON.parse(await file.text()), {
+        onError: (err: any) => showToast((err && err.message) || 'Import failed'),
+      })
+    } catch { showToast('Invalid JSON file') }
     e.target.value = ''
   }
 
@@ -372,33 +369,6 @@ export default function Setup() {
                  </select>
                </div>
 
-               <div className="space-y-2 pt-2 border-t border-gray-100 dark:border-gray-800">
-                 <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Dashboard visibility</p>
-                 <label className="flex items-center gap-3 cursor-pointer">
-                   <input
-                     type="checkbox"
-                     checked={hideStats}
-                     onChange={(e) => {
-                       setHideStats(e.target.checked)
-                       localStorage.setItem('caero_hide_stats', e.target.checked ? 'true' : 'false')
-                     }}
-                     className="rounded text-indigo-600 h-4 w-4"
-                   />
-                   <span className="text-sm text-gray-800 dark:text-gray-200">Hide total tracked stats (active, price drops)</span>
-                 </label>
-                 <label className="flex items-center gap-3 cursor-pointer">
-                   <input
-                     type="checkbox"
-                     checked={hideHeader}
-                     onChange={(e) => {
-                       setHideHeader(e.target.checked)
-                       localStorage.setItem('caero_hide_header', e.target.checked ? 'true' : 'false')
-                     }}
-                     className="rounded text-indigo-600 h-4 w-4"
-                   />
-                   <span className="text-sm text-gray-800 dark:text-gray-200">Hide header on products list</span>
-                 </label>
-               </div>
              </div>
            </Section>
 
@@ -461,7 +431,8 @@ export default function Setup() {
               <button
                 type="button"
                 onClick={() => exportMyDataMutation.mutate(undefined, {
-                  onSuccess: (data) => downloadJson(data, `caero-my-products-export-${exportDateSuffix()}.json`),
+                  onSuccess: (data) => { downloadJson(data, `caero-my-products-export-${exportDateSuffix()}.json`); showToast('Export successful.') },
+                  onError: (err: any) => showToast((err && err.message) || 'Export failed'),
                 })}
                 disabled={exportMyDataMutation.isPending}
                 className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50 transition-colors"
@@ -484,17 +455,6 @@ export default function Setup() {
                 {checkAllProductsMutation.isPending ? 'Checking…' : 'Check all prices'}
               </button>
             </div>
-            {myImportError && <p className="text-sm text-red-600 dark:text-red-400">{myImportError}</p>}
-            {importMyDataMutation.isSuccess && (
-              <p className="inline-flex items-center gap-1 text-sm text-green-600 font-medium">
-                <Check className="h-4 w-4" /> Import successful
-              </p>
-            )}
-            {checkAllProductsMutation.isSuccess && (
-              <p className="inline-flex items-center gap-1 text-sm text-green-600 font-medium mt-2">
-                <Check className="h-4 w-4" /> {checkAllProductsMutation.data?.message}
-              </p>
-            )}
           </Section>
 
           {/* Danger zone */}
@@ -633,7 +593,8 @@ export default function Setup() {
               <button
                 type="button"
                 onClick={() => exportDataMutation.mutate(undefined, {
-                  onSuccess: (data) => downloadJson(data, `caero-export-all-${exportDateSuffix()}.json`),
+                  onSuccess: (data) => { downloadJson(data, `caero-export-all-${exportDateSuffix()}.json`); showToast('Export successful.') },
+                  onError: (err: any) => showToast((err && err.message) || 'Export failed'),
                 })}
                 disabled={exportDataMutation.isPending}
                 className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50 transition-colors"
@@ -647,12 +608,6 @@ export default function Setup() {
                 <input type="file" accept="application/json" onChange={handleAdminImportFile} className="hidden" />
               </label>
             </div>
-            {adminImportError && <p className="text-sm text-red-600 dark:text-red-400">{adminImportError}</p>}
-            {importDataMutation.isSuccess && (
-              <p className="inline-flex items-center gap-1 text-sm text-green-600 dark:text-green-400 font-medium">
-                <Check className="h-4 w-4" /> Import successful
-              </p>
-            )}
           </Section>
 
           {/* User management */}
