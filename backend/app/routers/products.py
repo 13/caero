@@ -309,7 +309,7 @@ async def update_product(
     old_interval = product.check_interval_minutes
     old_active = product.active
     old_image_url = product.image_url
-    old_check_time_hhmm = getattr(product, "check_time_hhmm", None)
+    old_check_time_hhmm = product.check_time_hhmm
 
     updates = body.model_dump(exclude_unset=True)
     if "tags" in updates:
@@ -337,7 +337,7 @@ async def update_product(
     # Reschedule if interval or active state changed
     interval_changed = "check_interval_minutes" in updates and product.check_interval_minutes != old_interval
     active_changed = "active" in updates and product.active != old_active
-    time_changed = "check_time_hhmm" in updates and getattr(product, "check_time_hhmm", None) != old_check_time_hhmm
+    time_changed = "check_time_hhmm" in updates and product.check_time_hhmm != old_check_time_hhmm
 
     if product.active and product.check_interval_minutes > 0 and (interval_changed or active_changed or time_changed):
         add_product_job(product)

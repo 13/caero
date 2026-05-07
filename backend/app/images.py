@@ -54,12 +54,12 @@ async def download_image_task(product_id: int, url: str) -> None:
             async with AsyncSessionLocal() as db:
                 product = await db.get(Product, product_id)
                 if product:
-                    old_image = product.image_url
-                    product.image_url = f"/user_images/{filename}"
+                    old_cached = product.cached_image_url
+                    product.cached_image_url = f"/user_images/{filename}"
                     await db.commit()
 
-                    if old_image and old_image.startswith("/user_images/"):
-                        old_path = images_dir / Path(old_image).name
+                    if old_cached and old_cached.startswith("/user_images/"):
+                        old_path = images_dir / Path(old_cached).name
                         if old_path.exists():
                             os.remove(old_path)
 

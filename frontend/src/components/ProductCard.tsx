@@ -80,12 +80,19 @@ export default function ProductCard({ product, onKeywordClick, hasActiveAlerts, 
                 <BellRing className="h-3.5 w-3.5" />
               </span>
             )}
-            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-              isTrackingActive
-                ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300'
-                : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'
-            }`}>
-              {isTrackingActive ? 'Active' : 'Paused'}
+            <span
+              className={`text-xs px-2 py-0.5 rounded-full font-medium transition-opacity ${
+                isTrackingActive
+                  ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300'
+                  : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'
+              } ${onToggleActive ? 'cursor-pointer hover:opacity-70' : ''}`}
+              onClick={onToggleActive ? () => onToggleActive(product.id, product.name, product.active) : undefined}
+              role={onToggleActive ? 'button' : undefined}
+              tabIndex={onToggleActive ? 0 : undefined}
+              onKeyDown={onToggleActive ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggleActive(product.id, product.name, product.active) } } : undefined}
+              title={onToggleActive ? `Click to ${product.active ? 'pause' : 'activate'} tracking` : undefined}
+            >
+              {isUpdating ? '…' : (isTrackingActive ? 'Active' : 'Paused')}
             </span>
           </div>
         </div>
@@ -197,20 +204,6 @@ export default function ProductCard({ product, onKeywordClick, hasActiveAlerts, 
             <RefreshCw className={`h-3.5 w-3.5 ${checkMutation.isPending ? 'animate-spin' : ''}`} />
             {checkMutation.isPending ? 'Checking…' : 'Check'}
           </button>
-          {onToggleActive && (
-            <button
-              onClick={() => onToggleActive(product.id, product.name, product.active)}
-              disabled={isUpdating}
-              title={product.active ? 'Pause tracking' : 'Resume tracking'}
-              className={`flex-1 text-sm py-2 rounded-xl font-medium transition-colors ${
-                product.active
-                  ? 'bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300 hover:bg-green-100 dark:hover:bg-green-900'
-                  : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
-              } disabled:opacity-50`}
-            >
-              {isUpdating ? '…' : (product.active ? 'Pause' : 'Resume')}
-            </button>
-          )}
           <Link
             to={`/products/${product.id}${searchSuffix}`}
             className="flex-1 text-sm py-2 rounded-xl bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 font-medium text-center transition-colors"

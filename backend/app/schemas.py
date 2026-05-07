@@ -44,6 +44,7 @@ class ProductCreate(BaseModel):
     url: str = Field(min_length=1)
     selector: str = Field(min_length=1, max_length=256)
     check_interval_minutes: int = Field(default=1440, ge=0)
+    check_time_hhmm: str | None = None
     active: bool = True
 
     @field_validator("tags", mode="before")
@@ -67,6 +68,7 @@ class ProductUpdate(BaseModel):
     url: str | None = None
     selector: str | None = Field(default=None, min_length=1, max_length=256)
     check_interval_minutes: int | None = Field(default=None, ge=0)
+    check_time_hhmm: str | None = None
     active: bool | None = None
 
     @field_validator("tags", mode="before")
@@ -93,6 +95,7 @@ class ProductOut(BaseModel):
     url: str
     selector: str
     check_interval_minutes: int
+    check_time_hhmm: str = "10:00"
     consecutive_scrape_failures: int = 0
     active: bool
     created_at: datetime
