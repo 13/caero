@@ -78,6 +78,20 @@ export function useRegisterEnabled() {
   })
 }
 
+export function useUpdateStarred() {
+  const qc = useQueryClient()
+  return useMutation<User, Error, number[]>({
+    mutationFn: (starred_product_ids) =>
+      apiFetch<User>('/api/auth/me/starred', {
+        method: 'PATCH',
+        body: JSON.stringify({ starred_product_ids }),
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['me'] })
+    },
+  })
+}
+
 // ── Products ──────────────────────────────────────────────────────────────────
 
 export function useProducts() {
@@ -139,6 +153,7 @@ export function useCheckProduct() {
       qc.invalidateQueries({ queryKey: ['products'] })
       qc.invalidateQueries({ queryKey: ['products', id] })
       qc.invalidateQueries({ queryKey: ['prices', id] })
+      qc.invalidateQueries({ queryKey: ['product-stats', id] })
     },
   })
 }

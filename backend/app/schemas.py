@@ -18,7 +18,17 @@ class UserOut(BaseModel):
     is_admin: bool
     default_email: str | None = None
     default_telegram_chat_id: str | None = None
+    starred_product_ids: list[int] = []
     created_at: datetime
+
+    @field_validator("starred_product_ids", mode="before")
+    @classmethod
+    def parse_starred_ids(cls, value: Any) -> list[int]:
+        if value is None or value == "":
+            return []
+        if isinstance(value, str):
+            return [int(i) for i in value.split(",") if i.strip().isdigit()]
+        return list(value)
 
     model_config = {"from_attributes": True}
 
@@ -231,6 +241,10 @@ class ChangePasswordRequest(BaseModel):
 class NotificationDefaultsUpdate(BaseModel):
     default_email: str | None = None
     default_telegram_chat_id: str | None = None
+
+
+class StarredProductsUpdate(BaseModel):
+    starred_product_ids: list[int] = Field(default_factory=list)
 
 
 class AdminUserCreate(BaseModel):

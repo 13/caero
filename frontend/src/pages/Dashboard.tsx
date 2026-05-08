@@ -4,7 +4,7 @@ import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-do
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import apiFetch from '../api/client'
-import { useProducts, useSettings, useAllAlerts } from '../api/hooks'
+import { useProducts, useSettings, useAllAlerts, useMe, useUpdateStarred } from '../api/hooks'
 import type { ProductUpdate } from '../api/types'
 import { formatDateTime, formatPercent, formatPrice } from '../utils/format'
 import { getTagColorClass } from '../utils/tags'
@@ -23,6 +23,8 @@ export default function Dashboard() {
   const { data: products, isLoading, error } = useProducts()
   const { data: settings } = useSettings()
   const { data: alerts } = useAllAlerts()
+  const { data: me } = useMe()
+  const updateStarredMutation = useUpdateStarred()
   const navigate = useNavigate()
   const location = useLocation()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -48,13 +50,12 @@ export default function Dashboard() {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>(() =>
     (localStorage.getItem('caero_sort_direction') as 'asc' | 'desc') || 'asc'
   )
-  const [starredIds, setStarredIds] = useState<number[]>(() => {
-    try {
-      return JSON.parse(localStorage.getItem('caero_starred') ?? '[]')
-    } catch {
-      return []
-    }
-  })
+  const serverStarredIds = me?.starred_product_ids ?? []
+  const [starredIds, setStarredIds] = useState<number[]>([])
+  useEffect(() => {
+    setStarredIds(serverStarredIds)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [me])
   const searchTerm = searchParams.get('q') ?? ''
   const status = (searchParams.get('status') as 'all' | 'active' | 'paused' | null) ?? 'active'
 
@@ -107,24 +108,26 @@ export default function Dashboard() {
     localStorage.setItem('caero_sort_direction', sortDirection)
   }, [sortDirection])
 
-  useEffect(() => {
-    localStorage.setItem('caero_starred', JSON.stringify(starredIds))
-  }, [starredIds])
-
   const handleToggleStar = (productId: number) => {
     const product = products?.find(p => p.id === productId)
     const name = product?.name ?? 'Product'
-    setStarredIds(prev => {
-      if (prev.includes(productId)) {
-        toast.success(`Removed "${name}" from favourites`)
-        return prev.filter(id => id !== productId)
-      }
-      if (prev.length >= 3) {
-        toast.error('Maximum 3 starred products allowed')
-        return prev
-      }
+    let nextIds: number[]
+    if (starredIds.includes(productId)) {
+      nextIds = starredIds.filter(id => id !== productId)
+      toast.success(`Removed "${name}" from favourites`)
+    } else if (starredIds.length >= 3) {
+      toast.error('Maximum 3 starred products allowed')
+      return
+    } else {
+      nextIds = [...starredIds, productId]
       toast.success(`Added "${name}" to favourites`)
-      return [...prev, productId]
+    }
+    setStarredIds(nextIds)
+    updateStarredMutation.mutate(nextIds, {
+      onError: () => {
+        setStarredIds(starredIds)
+        toast.error('Failed to save favourite')
+      },
     })
   }
 

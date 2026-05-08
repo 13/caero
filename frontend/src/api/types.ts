@@ -4,6 +4,7 @@ export interface User {
   is_admin: boolean
   default_email: string | null
   default_telegram_chat_id: string | null
+  starred_product_ids: number[]
   created_at: string
 }
 

@@ -15,6 +15,7 @@ from app.schemas import (
     AdminUserPasswordUpdate,
     ChangePasswordRequest,
     NotificationDefaultsUpdate,
+    StarredProductsUpdate,
     Token,
     UserCreate,
     UserOut,
@@ -133,6 +134,20 @@ async def change_password(
     user.hashed_password = hash_password(body.new_password)
     await db.flush()
     return {"message": "Password changed"}
+
+
+@router.patch("/me/starred", response_model=UserOut)
+async def update_starred_products(
+    body: StarredProductsUpdate,
+    user: User = Depends(require_user),
+    db: AsyncSession = Depends(get_db),
+) -> User:
+    if len(body.starred_product_ids) > 3:
+        raise HTTPException(status_code=400, detail="Maximum 3 starred products allowed")
+    user.starred_product_ids = ",".join(str(i) for i in body.starred_product_ids) if body.starred_product_ids else None
+    await db.flush()
+    await db.refresh(user)
+    return user
 
 
 @router.patch("/me/notification-defaults")
