@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect } from 'react'
-import { ArrowDown, ArrowUp, Grid2x2, List, Plus, X, Search, Package, Image as ImageIcon, BellRing } from 'lucide-react'
+import { ArrowDown, ArrowUp, Grid2x2, List, Plus, X, Search, Package, Image as ImageIcon, BellRing, Star } from 'lucide-react'
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
@@ -48,6 +48,13 @@ export default function Dashboard() {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>(() =>
     (localStorage.getItem('caero_sort_direction') as 'asc' | 'desc') || 'asc'
   )
+  const [starredIds, setStarredIds] = useState<number[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem('caero_starred') ?? '[]')
+    } catch {
+      return []
+    }
+  })
   const searchTerm = searchParams.get('q') ?? ''
   const status = (searchParams.get('status') as 'all' | 'active' | 'paused' | null) ?? 'active'
 
@@ -99,6 +106,27 @@ export default function Dashboard() {
   useEffect(() => {
     localStorage.setItem('caero_sort_direction', sortDirection)
   }, [sortDirection])
+
+  useEffect(() => {
+    localStorage.setItem('caero_starred', JSON.stringify(starredIds))
+  }, [starredIds])
+
+  const handleToggleStar = (productId: number) => {
+    const product = products?.find(p => p.id === productId)
+    const name = product?.name ?? 'Product'
+    setStarredIds(prev => {
+      if (prev.includes(productId)) {
+        toast.success(`Removed "${name}" from favourites`)
+        return prev.filter(id => id !== productId)
+      }
+      if (prev.length >= 3) {
+        toast.error('Maximum 3 starred products allowed')
+        return prev
+      }
+      toast.success(`Added "${name}" to favourites`)
+      return [...prev, productId]
+    })
+  }
 
   const filteredProducts = useMemo(() => {
     if (!products) return []
@@ -167,8 +195,14 @@ export default function Dashboard() {
         return compareNullableNumbers(aDate, bDate) * direction
       })
     }
+    // Starred items always appear first
+    items.sort((a, b) => {
+      const aStarred = starredIds.includes(a.id) ? 0 : 1
+      const bStarred = starredIds.includes(b.id) ? 0 : 1
+      return aStarred - bStarred
+    })
     return items
-  }, [filteredProducts, sortBy, sortDirection])
+  }, [filteredProducts, sortBy, sortDirection, starredIds])
 
   // Summary stats
   const activeCount = products?.filter((p) => p.active).length ?? 0
@@ -362,6 +396,8 @@ export default function Dashboard() {
                     searchSuffix={location.search}
                     onToggleActive={handleToggleActive}
                     isUpdating={updatingProductIds.has(p.id)}
+                    isStarred={starredIds.includes(p.id)}
+                    onToggleStar={handleToggleStar}
                   />
                 ))}
               </div>
@@ -409,6 +445,14 @@ export default function Dashboard() {
                         >
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-3">
+                              <button
+                                onClick={(e) => { e.stopPropagation(); handleToggleStar(p.id) }}
+                                aria-label={starredIds.includes(p.id) ? 'Unstar product' : 'Star product'}
+                                title={starredIds.includes(p.id) ? 'Remove from favourites' : 'Add to favourites'}
+                                className={`shrink-0 p-0.5 rounded transition-colors ${starredIds.includes(p.id) ? 'text-yellow-400 hover:text-yellow-500' : 'text-gray-300 dark:text-gray-600 hover:text-yellow-400 dark:hover:text-yellow-400'}`}
+                              >
+                                <Star className={`h-4 w-4 ${starredIds.includes(p.id) ? 'fill-yellow-400' : ''}`} />
+                              </button>
                               {(p.cached_image_url ?? p.image_url) ? (
                                 <img src={(p.cached_image_url ?? p.image_url) || undefined} alt="" className="w-10 h-10 object-cover rounded-md border border-gray-200 dark:border-gray-700" />
                               ) : (

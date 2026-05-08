@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { RefreshCw, X, TrendingDown, TrendingUp, ExternalLink, BellRing } from 'lucide-react'
+import { RefreshCw, X, TrendingDown, TrendingUp, ExternalLink, BellRing, Star } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useState } from 'react'
 import type { Product } from '../api/types'
@@ -15,9 +15,11 @@ interface ProductCardProps {
   searchSuffix?: string
   onToggleActive?: (productId: number, productName: string, currentActive: boolean) => void
   isUpdating?: boolean
+  isStarred?: boolean
+  onToggleStar?: (productId: number) => void
 }
 
-export default function ProductCard({ product, onKeywordClick, hasActiveAlerts, searchSuffix = '', onToggleActive, isUpdating = false }: ProductCardProps) {
+export default function ProductCard({ product, onKeywordClick, hasActiveAlerts, searchSuffix = '', onToggleActive, isUpdating = false, isStarred = false, onToggleStar }: ProductCardProps) {
   const deleteMutation = useDeleteProduct()
   const checkMutation = useCheckProduct()
   const { data: settings } = useSettings()
@@ -75,6 +77,16 @@ export default function ProductCard({ product, onKeywordClick, hasActiveAlerts, 
             {product.name}
           </Link>
           <div className="flex items-center gap-1.5 shrink-0">
+            {onToggleStar && (
+              <button
+                onClick={(e) => { e.preventDefault(); onToggleStar(product.id) }}
+                aria-label={isStarred ? 'Unstar product' : 'Star product'}
+                title={isStarred ? 'Remove from favourites' : 'Add to favourites'}
+                className={`p-0.5 rounded transition-colors ${isStarred ? 'text-yellow-400 hover:text-yellow-500' : 'text-gray-300 dark:text-gray-600 hover:text-yellow-400 dark:hover:text-yellow-400'}`}
+              >
+                <Star className={`h-4 w-4 ${isStarred ? 'fill-yellow-400' : ''}`} />
+              </button>
+            )}
             {hasActiveAlerts && (
               <span title="Alerts active" className="flex items-center justify-center bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300 px-1.5 py-0.5 rounded-full">
                 <BellRing className="h-3.5 w-3.5" />
