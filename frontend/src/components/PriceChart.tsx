@@ -78,8 +78,8 @@ export default function PriceChart({ data, currency = 'EUR' }: PriceChartProps) 
           width={96}
         />
         <Tooltip
-          formatter={(value: number) => [formatCurrency(value), 'Price']}
-          labelFormatter={(value: number) => formatDateTime(new Date(value).toISOString(), settings?.date_format)}
+          formatter={(value) => [formatCurrency(Number(value)), 'Price']}
+          labelFormatter={(value) => formatDateTime(new Date(Number(value)).toISOString(), settings?.date_format)}
           contentStyle={{
             backgroundColor: 'var(--chart-tooltip-bg)',
             borderColor: 'var(--chart-tooltip-border)',
