@@ -347,7 +347,7 @@ export default function ProductDetail() {
       {/* ── Hero card ── */}
       <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-6">
         <div className="flex gap-6 items-start">
-          {product.image_url && (
+          {(product.cached_image_url ?? product.image_url) && (
             <>
               {/* Lightbox */}
               {imageZoomed && (
@@ -363,7 +363,7 @@ export default function ProductDetail() {
                     <X className="h-5 w-5" />
                   </button>
                   <img
-                    src={product.image_url}
+                    src={product.cached_image_url ?? product.image_url!}
                     alt={product.name}
                     className="max-w-[90vw] max-h-[90vh] object-contain rounded-xl shadow-2xl"
                   />
@@ -371,7 +371,7 @@ export default function ProductDetail() {
               )}
               <div className="shrink-0 relative group cursor-zoom-in" onClick={() => setImageZoomed(true)}>
                 <img
-                  src={product.image_url}
+                  src={product.cached_image_url ?? product.image_url!}
                   alt={product.name}
                   className="w-28 h-28 object-contain rounded-xl border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800 transition-opacity group-hover:opacity-80"
                   loading="lazy"
