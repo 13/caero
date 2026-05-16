@@ -383,6 +383,9 @@ async def check_product_now(
     if price_float is None:
         return CheckResult(product_id=product_id, price=None, error="Could not scrape price")
 
+    if product.consecutive_scrape_failures > 0:
+        product.consecutive_scrape_failures = 0
+
     price = Decimal(str(price_float)).quantize(Decimal("0.01"))
     record = PriceHistory(product_id=product_id, price=price)
     db.add(record)
