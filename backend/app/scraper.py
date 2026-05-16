@@ -1,6 +1,7 @@
 """Price scraper using Patchright."""
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import re
@@ -8,6 +9,8 @@ import re
 from patchright.async_api import Browser, Page
 
 logger = logging.getLogger(__name__)
+
+_scrape_sem = asyncio.Semaphore(4)
 
 def _parse_price(raw: str) -> float | None:
     """Normalise European and English price strings to float."""
@@ -95,6 +98,11 @@ async def scrape_price(browser: Browser, url: str, selector: str) -> float | Non
     Scrape a price from the given URL using the given CSS selector.
     Falls back to ld+json, itemprop, and data-price if selector fails.
     """
+    async with _scrape_sem:
+        return await _scrape_price(browser, url, selector)
+
+
+async def _scrape_price(browser: Browser, url: str, selector: str) -> float | None:
     context = None
     page = None
     try:
