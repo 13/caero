@@ -158,6 +158,17 @@ export function useCheckProduct() {
   })
 }
 
+export function useDownloadAllImages() {
+  const qc = useQueryClient()
+  return useMutation<{ status: string; message: string }, Error, void>({
+    mutationFn: () =>
+      apiFetch<{ status: string; message: string }>('/api/products/download-all-images', { method: 'POST' }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['products'] })
+    },
+  })
+}
+
 export function useCheckAllProducts() {
   const qc = useQueryClient()
   return useMutation<{ status: string; message: string }, Error, void>({

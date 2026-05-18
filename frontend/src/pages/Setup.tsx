@@ -14,6 +14,7 @@ import {
   useSettings,
   useSaveSettings,
   useCheckAllProducts,
+  useDownloadAllImages,
   useSystemInfo,
   useTestDb,
   useTestEmail,
@@ -128,6 +129,7 @@ export default function Setup() {
   const deleteMyProductsMutation = useDeleteMyProducts()
   const adminDeleteUserProductsMutation = useAdminDeleteUserProducts()
   const checkAllProductsMutation = useCheckAllProducts()
+  const downloadAllImagesMutation = useDownloadAllImages()
 
   const [activeTab, setActiveTab] = useState<Tab>('account')
   const [form, setForm] = useState<AppSettings>({
@@ -194,6 +196,12 @@ export default function Setup() {
       showToast(checkAllProductsMutation.data?.message ?? 'Check completed.')
     }
   }, [checkAllProductsMutation.isSuccess, checkAllProductsMutation.data?.message])
+
+  useEffect(() => {
+    if (downloadAllImagesMutation.isSuccess) {
+      showToast(downloadAllImagesMutation.data?.message ?? 'Image download started.')
+    }
+  }, [downloadAllImagesMutation.isSuccess, downloadAllImagesMutation.data?.message])
 
   useEffect(() => {
     if (importDataMutation.isSuccess) {
@@ -445,6 +453,15 @@ export default function Setup() {
                 Import my data
                 <input type="file" accept="application/json" onChange={handleMyImportFile} className="hidden" />
               </label>
+              <button
+                type="button"
+                onClick={() => downloadAllImagesMutation.mutate()}
+                disabled={downloadAllImagesMutation.isPending}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50 transition-colors"
+              >
+                <Download className={`h-3.5 w-3.5 ${downloadAllImagesMutation.isPending ? 'animate-pulse' : ''}`} />
+                {downloadAllImagesMutation.isPending ? 'Downloading…' : 'Download missing images'}
+              </button>
               <button
                 type="button"
                 onClick={() => checkAllProductsMutation.mutate()}

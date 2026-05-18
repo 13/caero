@@ -394,6 +394,38 @@ async def check_product_now(
     return CheckResult(product_id=product_id, price=price)
 
 
+@router.post("/download-all-images", status_code=status.HTTP_202_ACCEPTED)
+async def download_all_missing_images(
+    background_tasks: BackgroundTasks,
+    user: User = Depends(require_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, str]:
+    from pathlib import Path
+    from app.images import download_image_task, get_images_dir
+
+    result = await db.execute(select(Product).where(Product.user_id == user.id))
+    products = result.scalars().all()
+
+    images_dir = get_images_dir()
+    missing = [
+        p for p in products
+        if p.image_url
+        and not (
+            p.cached_image_url
+            and p.cached_image_url.startswith("/user_images/")
+            and (images_dir / Path(p.cached_image_url).name).exists()
+        )
+    ]
+
+    for p in missing:
+        background_tasks.add_task(download_image_task, p.id, p.image_url)
+
+    return {
+        "status": "ok",
+        "message": f"Downloading images for {len(missing)} product(s) in the background.",
+    }
+
+
 @router.post("/check-all", status_code=status.HTTP_202_ACCEPTED)
 async def check_all_products_now(
     background_tasks: BackgroundTasks,
