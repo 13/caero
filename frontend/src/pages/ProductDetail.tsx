@@ -407,7 +407,13 @@ export default function ProductDetail() {
               </span>
             </div>
 
-            {/* Warning banner */}
+            {/* Warning banners */}
+            {product.url_redirected && (
+              <div className="mt-3 text-sm px-3 py-2 rounded-lg bg-yellow-50 text-yellow-800 border border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-300 dark:border-yellow-800/50 flex items-center gap-2 max-w-max">
+                <span className="font-semibold">URL redirected</span>
+                <span>— This product URL is redirecting to a different page. The product may have changed. Please update the URL.</span>
+              </div>
+            )}
             {product.consecutive_scrape_failures > 0 && (
               <div className="mt-3 text-sm px-3 py-2 rounded-lg bg-orange-50 text-orange-700 border border-orange-200 dark:bg-orange-900/30 dark:text-orange-300 dark:border-orange-800/50 flex items-center gap-2 max-w-max">
                 <span className="font-semibold px-2 py-0.5 rounded bg-orange-100 dark:bg-orange-900 leading-none">

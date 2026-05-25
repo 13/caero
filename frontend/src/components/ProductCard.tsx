@@ -110,6 +110,12 @@ export default function ProductCard({ product, onKeywordClick, hasActiveAlerts, 
         </div>
 
         {/* Warning banner */}
+        {product.url_redirected && (
+          <div className="text-xs px-3 py-2 rounded-lg bg-yellow-50 text-yellow-800 border border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-300 dark:border-yellow-800/50 flex items-center gap-2">
+            <span className="font-semibold">URL redirected</span>
+            <span>— product may have changed, please update the URL</span>
+          </div>
+        )}
         {product.consecutive_scrape_failures > 0 && (
           <div className="text-xs px-3 py-2 rounded-lg bg-orange-50 text-orange-700 border border-orange-200 dark:bg-orange-900/30 dark:text-orange-300 dark:border-orange-800/50 flex items-center gap-2">
             <span className="font-semibold px-1.5 py-0.5 rounded bg-orange-100 dark:bg-orange-900 leading-none">

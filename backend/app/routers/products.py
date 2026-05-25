@@ -320,6 +320,9 @@ async def update_product(
     if "check_time_hhmm" in updates:
         updates["check_time_hhmm"] = normalize_check_time_hhmm(updates["check_time_hhmm"])
 
+    if "url" in updates and updates["url"] != product.url:
+        updates["url_redirected"] = False
+
     image_changed = "image_url" in updates and updates.get("image_url") != old_image_url
     if image_changed:
         from app.images import delete_local_image
@@ -379,7 +382,7 @@ async def check_product_now(
 
     from app.scraper import scrape_price
 
-    price_float = await scrape_price(browser, product.url, product.selector)
+    price_float, _ = await scrape_price(browser, product.url, product.selector)
     if price_float is None:
         return CheckResult(product_id=product_id, price=None, error="Could not scrape price")
 

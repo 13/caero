@@ -52,6 +52,7 @@ class Product(Base):
     check_interval_minutes: Mapped[int] = mapped_column(Integer, default=30)
     check_time_hhmm: Mapped[str] = mapped_column(String(5), server_default="10:00", default="10:00", nullable=False)
     consecutive_scrape_failures: Mapped[int] = mapped_column(Integer, default=0)
+    url_redirected: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     last_checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(

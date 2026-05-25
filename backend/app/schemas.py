@@ -107,6 +107,7 @@ class ProductOut(BaseModel):
     check_interval_minutes: int
     check_time_hhmm: str = "10:00"
     consecutive_scrape_failures: int = 0
+    url_redirected: bool = False
     active: bool
     created_at: datetime
     latest_price: Decimal | None = None

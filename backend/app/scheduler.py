@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 from decimal import Decimal
+from urllib.parse import urlparse
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from sqlalchemy import select
@@ -14,6 +15,19 @@ from app.notifier import send_alert
 logger = logging.getLogger(__name__)
 
 scheduler = AsyncIOScheduler()
+
+
+def _urls_same_resource(url1: str, url2: str) -> bool:
+    """Return True if two URLs point to the same resource (same host + path, ignoring query/fragment)."""
+    try:
+        p1 = urlparse(url1)
+        p2 = urlparse(url2)
+        return (
+            p1.netloc.lower() == p2.netloc.lower()
+            and p1.path.rstrip("/").lower() == p2.path.rstrip("/").lower()
+        )
+    except Exception:
+        return True
 
 
 async def scrape_and_record(product_id: int) -> None:
@@ -32,12 +46,43 @@ async def scrape_and_record(product_id: int) -> None:
 
         from app.scraper import scrape_price
 
-        price_float = await scrape_price(browser, product.url, product.selector)
+        price_float, final_url = await scrape_price(browser, product.url, product.selector)
 
         # Always update last_checked_at
         from sqlalchemy.sql import func
 
         product.last_checked_at = func.now()
+
+        # Detect if the URL was silently redirected to a different page
+        if final_url and not _urls_same_resource(product.url, final_url):
+            if not product.url_redirected:
+                product.url_redirected = True
+                user = await db.get(User, product.user_id)
+                if user and (user.default_email or user.default_telegram_chat_id):
+                    subject = f"[Caero] URL Redirected: '{product.name}' now points to a different product"
+                    body = (
+                        f"Caero detected that the URL for '{product.name}' is redirecting to a different page.\n\n"
+                        f"Original URL: {product.url}\n"
+                        f"Redirected to: {final_url}\n\n"
+                        f"The product may no longer be available and has been replaced by a different item. "
+                        f"Please update the product URL in Caero."
+                    )
+                    import asyncio
+                    from app.notifier import _build_message, _send_email_alert_sync, _send_telegram_alert, _build_notification
+
+                    if user.default_email:
+                        from app.config import settings
+                        if settings.smtp_host:
+                            msg = _build_message(subject, body, user.default_email)
+                            await asyncio.to_thread(_send_email_alert_sync, to_email=user.default_email, msg=msg, product_name=product.name)
+
+                    if user.default_telegram_chat_id:
+                        await _send_telegram_alert(
+                            chat_id=user.default_telegram_chat_id,
+                            text=_build_notification(subject, body),
+                        )
+        elif final_url and product.url_redirected:
+            product.url_redirected = False
 
         if price_float is None:
             logger.warning("Could not scrape price for product %d (%s)", product_id, product.url)

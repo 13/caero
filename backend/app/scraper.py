@@ -93,16 +93,17 @@ async def _try_data_price(page: Page) -> float | None:
     return None
 
 
-async def scrape_price(browser: Browser, url: str, selector: str) -> float | None:
+async def scrape_price(browser: Browser, url: str, selector: str) -> tuple[float | None, str | None]:
     """
     Scrape a price from the given URL using the given CSS selector.
     Falls back to ld+json, itemprop, and data-price if selector fails.
+    Returns (price, final_url) where final_url is the URL after any redirects.
     """
     async with _scrape_sem:
         return await _scrape_price(browser, url, selector)
 
 
-async def _scrape_price(browser: Browser, url: str, selector: str) -> float | None:
+async def _scrape_price(browser: Browser, url: str, selector: str) -> tuple[float | None, str | None]:
     context = None
     page = None
     try:
@@ -121,6 +122,8 @@ async def _scrape_price(browser: Browser, url: str, selector: str) -> float | No
         await page.goto(url, timeout=60000, wait_until="domcontentloaded")
         await page.wait_for_timeout(500)
 
+        final_url = page.url
+
         # Primary: user-supplied CSS selector
         try:
             await page.wait_for_selector(selector, timeout=10000)
@@ -130,27 +133,27 @@ async def _scrape_price(browser: Browser, url: str, selector: str) -> float | No
                 text = await el.inner_text()
                 price = _parse_price(text)
                 if price is not None:
-                    return price
+                    return price, final_url
         except Exception:
             pass
 
         # Fallback 1: ld+json
         price = await _try_ld_json(page)
         if price is not None:
-            return price
+            return price, final_url
 
         # Fallback 2: itemprop="price"
         price = await _try_itemprop(page)
         if price is not None:
-            return price
+            return price, final_url
 
         # Fallback 3: data-price attribute
         price = await _try_data_price(page)
-        return price
+        return price, final_url
 
     except Exception as exc:
         logger.warning("scrape_price failed for %s: %s", url, exc)
-        return None
+        return None, None
     finally:
         if page:
             try:
