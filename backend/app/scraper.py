@@ -122,7 +122,7 @@ async def _scrape_price(browser: Browser, url: str, selector: str) -> tuple[floa
         await page.goto(url, timeout=60000, wait_until="domcontentloaded")
         await page.wait_for_timeout(500)
 
-        final_url = page.url
+        price = None
 
         # Primary: user-supplied CSS selector
         try:
@@ -132,23 +132,27 @@ async def _scrape_price(browser: Browser, url: str, selector: str) -> tuple[floa
             if await el.count() > 0:
                 text = await el.inner_text()
                 price = _parse_price(text)
-                if price is not None:
-                    return price, final_url
         except Exception:
             pass
 
         # Fallback 1: ld+json
-        price = await _try_ld_json(page)
-        if price is not None:
-            return price, final_url
+        if price is None:
+            price = await _try_ld_json(page)
 
         # Fallback 2: itemprop="price"
-        price = await _try_itemprop(page)
-        if price is not None:
-            return price, final_url
+        if price is None:
+            price = await _try_itemprop(page)
 
         # Fallback 3: data-price attribute
-        price = await _try_data_price(page)
+        if price is None:
+            price = await _try_data_price(page)
+
+        # Capture URL after all scraping so JS-based redirects (including pushState) are reflected.
+        # page.url is a cached Python-side property; evaluate forces a browser round-trip.
+        try:
+            final_url = await page.evaluate("window.location.href")
+        except Exception:
+            final_url = page.url
         return price, final_url
 
     except Exception as exc:

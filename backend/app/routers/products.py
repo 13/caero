@@ -381,8 +381,13 @@ async def check_product_now(
         return CheckResult(product_id=product_id, price=None, error="Browser not available")
 
     from app.scraper import scrape_price
+    from app.scheduler import check_url_redirect
 
-    price_float, _ = await scrape_price(browser, product.url, product.selector)
+    price_float, final_url = await scrape_price(browser, product.url, product.selector)
+
+    await check_url_redirect(product, final_url, db)
+    await db.commit()
+
     if price_float is None:
         return CheckResult(product_id=product_id, price=None, error="Could not scrape price")
 
@@ -392,7 +397,7 @@ async def check_product_now(
     price = Decimal(str(price_float)).quantize(Decimal("0.01"))
     record = PriceHistory(product_id=product_id, price=price)
     db.add(record)
-    await db.flush()
+    await db.commit()
 
     return CheckResult(product_id=product_id, price=price)
 
