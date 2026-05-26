@@ -10,7 +10,7 @@ RUN npm run build
 # so the output lands at /backend/app/static
 
 # ── Stage 2: Python app ──────────────────────────────────────────────────────
-FROM python:3.13-slim
+FROM python:3.14-slim
 WORKDIR /app
 
 ARG SCRAPER_HEADLESS=false
