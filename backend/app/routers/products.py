@@ -388,6 +388,9 @@ async def check_product_now(
     await check_url_redirect(product, final_url, db)
     await db.commit()
 
+    if product.url_redirected:
+        return CheckResult(product_id=product_id, price=None, error="URL redirected")
+
     if price_float is None:
         return CheckResult(product_id=product_id, price=None, error="Could not scrape price")
 

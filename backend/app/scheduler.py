@@ -91,6 +91,11 @@ async def scrape_and_record(product_id: int) -> None:
 
         await check_url_redirect(product, final_url, db)
 
+        if product.url_redirected:
+            logger.debug("Skipping price record for product %d — URL redirected", product_id)
+            await db.commit()
+            return
+
         if price_float is None:
             logger.warning("Could not scrape price for product %d (%s)", product_id, product.url)
             product.consecutive_scrape_failures += 1
