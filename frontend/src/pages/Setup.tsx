@@ -48,7 +48,19 @@ function downloadJson(data: unknown, filename: string) {
 }
 
 function exportDateSuffix() {
-  return new Date().toISOString().slice(0, 10)
+  const now = new Date();
+
+  const date =
+    now.getFullYear() +
+    String(now.getMonth() + 1).padStart(2, '0') +
+    String(now.getDate()).padStart(2, '0');
+
+  const time =
+    String(now.getHours()).padStart(2, '0') +
+    String(now.getMinutes()).padStart(2, '0') +
+    String(now.getSeconds()).padStart(2, '0');
+
+  return `${date}-${time}`;
 }
 
 // Reusable section card
@@ -625,7 +637,7 @@ export default function Setup() {
               <button
                 type="button"
                 onClick={() => exportMyDataMutation.mutate(undefined, {
-                  onSuccess: (data) => { downloadJson(data, `caero-my-products-export-${exportDateSuffix()}.json`); showToast('Export successful.') },
+                  onSuccess: (data) => { downloadJson(data, `caero-export-${exportDateSuffix()}.json`); showToast('Export successful.') },
                   onError: (err: any) => showToast((err && err.message) || 'Export failed'),
                 })}
                 disabled={exportMyDataMutation.isPending}
