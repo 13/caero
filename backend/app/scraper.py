@@ -38,6 +38,37 @@ def _parse_price(raw: str) -> float | None:
         return None
 
 
+async def _is_unavailable(page: Page) -> bool:
+    """Detect an explicit "product unavailable" state (Amazon-style pages).
+
+    Returns True only on a positive unavailability signal — the availability box
+    says so AND there's no active buy box — so it stays a no-op for sites that
+    don't render these markers and for in-stock products.
+    """
+    try:
+        avail = await page.query_selector("#availability")
+        if avail is None:
+            return False
+        text = (await avail.inner_text() or "").strip().lower()
+        markers = (
+            "non disponibile",        # IT — "Attualmente non disponibile"
+            "currently unavailable",  # EN
+            "nicht verfügbar",        # DE
+            "no disponible",          # ES
+            "non disponible",         # FR
+        )
+        if not any(marker in text for marker in markers):
+            return False
+        # Confirm there's no purchasable buy box, to avoid false positives where
+        # the unavailable text refers to one shipping option but the item sells.
+        buy_box = await page.query_selector(
+            "#add-to-cart-button, #buy-now-button, #addToCart_feature_div input[name='submit.add-to-cart']"
+        )
+        return buy_box is None
+    except Exception:
+        return False
+
+
 async def _try_ld_json(page: Page) -> float | None:
     try:
         scripts = await page.query_selector_all("script[type='application/ld+json']")
@@ -121,6 +152,17 @@ async def _scrape_price(browser: Browser, url: str, selector: str) -> tuple[floa
         #await page.goto(url, timeout=30000, wait_until="networkidle")
         await page.goto(url, timeout=60000, wait_until="domcontentloaded")
         await page.wait_for_timeout(500)
+
+        # If the page explicitly reports the product as unavailable, return no
+        # price up front — don't let the selector or fallbacks pick up a stale or
+        # unrelated price elsewhere on the page.
+        if await _is_unavailable(page):
+            logger.info("Product page reports unavailable, returning no price: %s", url)
+            try:
+                final_url = await page.evaluate("window.location.href")
+            except Exception:
+                final_url = page.url
+            return None, final_url
 
         price = None
 

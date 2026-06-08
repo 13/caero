@@ -10,6 +10,7 @@ import {
   useCheckProduct,
   useCreateAlert,
   useDeleteAlert,
+  useDeletePrice,
   useDeleteProduct,
   useMe,
   usePrices,
@@ -17,11 +18,12 @@ import {
   useProductStats,
   useSettings,
   useUpdateAlert,
+  useUpdatePrice,
   useUpdateProduct,
 } from '../api/hooks'
 import type { Alert, AlertCreate, User } from '../api/types'
 import apiFetch from '../api/client'
-import PriceChart from '../components/PriceChart'
+import PriceChart, { type PricePoint } from '../components/PriceChart'
 import TimePicker from '../components/TimePicker'
 import {
   DEFAULT_CHECK_TIME_HHMM,
@@ -71,6 +73,8 @@ export default function ProductDetail() {
   const deleteAlertMutation = useDeleteAlert(productId)
   const createAlertMutation = useCreateAlert(productId)
   const updateAlertMutation = useUpdateAlert(productId)
+  const updatePriceMutation = useUpdatePrice(productId)
+  const deletePriceMutation = useDeletePrice(productId)
   const qc = useQueryClient()
 
   // Create a reusable mutation for toggling active status
@@ -105,6 +109,49 @@ export default function ProductDetail() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [alertDeleteTarget, setAlertDeleteTarget] = useState<Alert | null>(null)
   const [editImageError, setEditImageError] = useState<string | null>(null)
+  const [selectedPoint, setSelectedPoint] = useState<PricePoint | null>(null)
+  const [editPriceValue, setEditPriceValue] = useState('')
+  const [confirmDeletePoint, setConfirmDeletePoint] = useState(false)
+
+  const openPricePoint = (point: PricePoint) => {
+    setSelectedPoint(point)
+    setEditPriceValue(point.price.toFixed(2))
+    setConfirmDeletePoint(false)
+  }
+  const closePricePoint = () => {
+    setSelectedPoint(null)
+    setConfirmDeletePoint(false)
+  }
+
+  const handleSavePricePoint = () => {
+    if (!selectedPoint) return
+    const parsed = parseFloat(editPriceValue)
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      toast.error('Enter a valid price greater than 0')
+      return
+    }
+    updatePriceMutation.mutate(
+      { priceId: selectedPoint.id, price: parsed.toFixed(2) },
+      {
+        onSuccess: () => {
+          toast.success('Price updated')
+          closePricePoint()
+        },
+        onError: (err) => toast.error(err.message || 'Update failed'),
+      }
+    )
+  }
+
+  const handleDeletePricePoint = () => {
+    if (!selectedPoint) return
+    deletePriceMutation.mutate(selectedPoint.id, {
+      onSuccess: () => {
+        toast.success('Price entry deleted')
+        closePricePoint()
+      },
+      onError: (err) => toast.error(err.message || 'Delete failed'),
+    })
+  }
 
   useEffect(() => {
     if (me) {
@@ -621,6 +668,84 @@ export default function ProductDetail() {
         onCancel={cancelDeleteAlert}
       />
 
+      {/* ── Price point edit/delete popup ── */}
+      {selectedPoint && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={closePricePoint} />
+          <div className="relative w-full max-w-sm bg-white dark:bg-gray-950 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-800">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-gray-800">
+              <h2 className="font-semibold text-gray-900 dark:text-gray-100">Price entry</h2>
+              <button onClick={closePricePoint} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                {formatDateTime(new Date(selectedPoint.date).toISOString(), settings?.date_format)}
+              </p>
+
+              {confirmDeletePoint ? (
+                <>
+                  <p className="text-sm text-gray-700 dark:text-gray-300">
+                    Delete this price entry? This cannot be undone.
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={handleDeletePricePoint}
+                      disabled={deletePriceMutation.isPending}
+                      className="flex-1 bg-red-600 text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-50 transition-colors"
+                    >
+                      {deletePriceMutation.isPending ? 'Deleting…' : 'Delete'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setConfirmDeletePoint(false)}
+                      className="px-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-700 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div>
+                    <label className={labelCls}>Price</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min={0}
+                      value={editPriceValue}
+                      onChange={(e) => setEditPriceValue(e.target.value)}
+                      className={inputCls}
+                      autoFocus
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={handleSavePricePoint}
+                      disabled={updatePriceMutation.isPending}
+                      className="flex-1 bg-indigo-600 text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+                    >
+                      {updatePriceMutation.isPending ? 'Saving…' : 'Save'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setConfirmDeletePoint(true)}
+                      className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950 text-sm font-medium transition-colors"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                      Delete
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── Stats strip ── */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
         {[
@@ -656,8 +781,13 @@ export default function ProductDetail() {
         <div className="flex items-center gap-2 mb-4">
           <BarChart3 className="h-4 w-4 text-indigo-500" />
           <h2 className="font-semibold text-gray-800 dark:text-gray-100">Price history</h2>
+          {prices.length > 0 && (
+            <span className="text-xs text-gray-400 dark:text-gray-500 ml-auto">
+              Tip: click a point to edit or delete it
+            </span>
+          )}
         </div>
-        <PriceChart data={prices} />
+        <PriceChart data={prices} onPointClick={openPricePoint} />
       </div>
 
       {/* ── Alerts ── */}

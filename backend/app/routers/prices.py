@@ -2,17 +2,37 @@
 from __future__ import annotations
 
 from datetime import datetime
+from decimal import Decimal
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.models import PriceHistory, Product, User
 from app.routers.auth import require_user
-from app.schemas import PriceHistoryOut
+from app.schemas import PriceHistoryOut, PriceHistoryUpdate
 
 router = APIRouter(tags=["prices"])
+
+
+async def _get_owned_price(
+    product_id: int, price_id: int, user: User, db: AsyncSession
+) -> PriceHistory:
+    """Fetch a price row, ensuring it belongs to a product owned by the user."""
+    result = await db.execute(
+        select(PriceHistory)
+        .join(Product, Product.id == PriceHistory.product_id)
+        .where(
+            PriceHistory.id == price_id,
+            PriceHistory.product_id == product_id,
+            Product.user_id == user.id,
+        )
+    )
+    price = result.scalar_one_or_none()
+    if price is None:
+        raise HTTPException(status_code=404, detail="Price entry not found")
+    return price
 
 
 @router.get("/products/{product_id}/prices", response_model=list[PriceHistoryOut])
@@ -59,3 +79,32 @@ async def get_latest_price(
         .limit(1)
     )
     return result.scalar_one_or_none()
+
+
+@router.patch("/products/{product_id}/prices/{price_id}", response_model=PriceHistoryOut)
+async def update_price(
+    product_id: int,
+    price_id: int,
+    body: PriceHistoryUpdate,
+    user: User = Depends(require_user),
+    db: AsyncSession = Depends(get_db),
+) -> PriceHistoryOut:
+    price = await _get_owned_price(product_id, price_id, user, db)
+    price.price = Decimal(body.price).quantize(Decimal("0.01"))
+    await db.commit()
+    await db.refresh(price)
+    return price
+
+
+@router.delete(
+    "/products/{product_id}/prices/{price_id}", status_code=status.HTTP_204_NO_CONTENT
+)
+async def delete_price(
+    product_id: int,
+    price_id: int,
+    user: User = Depends(require_user),
+    db: AsyncSession = Depends(get_db),
+) -> None:
+    price = await _get_owned_price(product_id, price_id, user, db)
+    await db.delete(price)
+    await db.commit()

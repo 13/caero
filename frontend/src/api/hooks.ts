@@ -196,6 +196,34 @@ export function usePrices(productId: number, from?: string, to?: string) {
   })
 }
 
+function invalidatePriceQueries(qc: ReturnType<typeof useQueryClient>, productId: number) {
+  qc.invalidateQueries({ queryKey: ['prices', productId] })
+  qc.invalidateQueries({ queryKey: ['products'] })
+  qc.invalidateQueries({ queryKey: ['products', productId] })
+  qc.invalidateQueries({ queryKey: ['product-stats', productId] })
+}
+
+export function useUpdatePrice(productId: number) {
+  const qc = useQueryClient()
+  return useMutation<PriceHistory, Error, { priceId: number; price: string }>({
+    mutationFn: ({ priceId, price }) =>
+      apiFetch<PriceHistory>(`/api/products/${productId}/prices/${priceId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ price }),
+      }),
+    onSuccess: () => invalidatePriceQueries(qc, productId),
+  })
+}
+
+export function useDeletePrice(productId: number) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, number>({
+    mutationFn: (priceId) =>
+      apiFetch<void>(`/api/products/${productId}/prices/${priceId}`, { method: 'DELETE' }),
+    onSuccess: () => invalidatePriceQueries(qc, productId),
+  })
+}
+
 // ── Alerts ────────────────────────────────────────────────────────────────────
 
 export function useAlerts(productId: number) {

@@ -12,12 +12,19 @@ import { useSettings } from '../api/hooks'
 import type { PriceHistory } from '../api/types'
 import { localeFromDateFormat, formatDateTime } from '../utils/format'
 
+export interface PricePoint {
+  id: number
+  date: number
+  price: number
+}
+
 interface PriceChartProps {
   data: PriceHistory[]
   currency?: string
+  onPointClick?: (point: PricePoint) => void
 }
 
-export default function PriceChart({ data, currency = 'EUR' }: PriceChartProps) {
+export default function PriceChart({ data, currency = 'EUR', onPointClick }: PriceChartProps) {
   const { data: settings } = useSettings()
   const locale = localeFromDateFormat(settings?.date_format)
   const currencyCode = useMemo(
@@ -46,9 +53,10 @@ export default function PriceChart({ data, currency = 'EUR' }: PriceChartProps) 
     return localized.split(' ')[0] // Just return the Day/Month/Year portion for the XAxis
   }
 
-  const chartData = useMemo(
+  const chartData = useMemo<PricePoint[]>(
     () =>
       data.map((dataPoint) => ({
+        id: dataPoint.id,
         date: new Date(dataPoint.scraped_at).getTime(),
         price: parseFloat(dataPoint.price),
       })),
@@ -65,7 +73,17 @@ export default function PriceChart({ data, currency = 'EUR' }: PriceChartProps) 
 
   return (
     <ResponsiveContainer width="100%" height={240}>
-      <LineChart data={chartData} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
+      <LineChart
+        data={chartData}
+        margin={{ top: 8, right: 16, left: 0, bottom: 0 }}
+        onClick={(state) => {
+          if (!onPointClick) return
+          const idx = Number(state?.activeIndex)
+          const point = Number.isInteger(idx) ? chartData[idx] : undefined
+          if (point) onPointClick(point)
+        }}
+        className={onPointClick ? 'cursor-pointer' : undefined}
+      >
         <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
         <XAxis
           dataKey="date"

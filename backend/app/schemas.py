@@ -126,6 +126,10 @@ class ProductOut(BaseModel):
 
 # ── Prices ────────────────────────────────────────────────────────────────────
 
+class PriceHistoryUpdate(BaseModel):
+    price: Decimal = Field(gt=0)
+
+
 class PriceHistoryOut(BaseModel):
     id: int
     product_id: int
