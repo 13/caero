@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useCreateProduct, useSettings } from '../api/hooks'
+import { useCreateProduct, useSelectorDefaults, useSettings } from '../api/hooks'
 import { ArrowLeft, Package, Link as LinkIcon, Code, Clock, Image, Tag, FileText, FolderOpen } from 'lucide-react'
 import {
   DEFAULT_CHECK_TIME_HHMM,
@@ -40,6 +40,24 @@ export default function AddProduct() {
   const navigate = useNavigate()
   const createMutation = useCreateProduct()
   const { data: settings } = useSettings()
+  const { data: selectorDefaults } = useSelectorDefaults()
+
+  // Pick the default selector whose domain matches the URL's hostname. When
+  // several match, the longest (most specific) domain wins. Returns null if the
+  // user has already typed a selector that isn't one of the known defaults.
+  const matchDefaultSelector = (url: string): string | null => {
+    if (!selectorDefaults?.length) return null
+    let hostname = ''
+    try {
+      hostname = new URL(url).hostname.toLowerCase()
+    } catch {
+      return null
+    }
+    const match = selectorDefaults
+      .filter((d) => hostname.includes(d.domain.toLowerCase()))
+      .sort((a, b) => b.domain.length - a.domain.length)[0]
+    return match ? match.selector : null
+  }
 
   const [form, setForm] = useState({
     name: '',
@@ -188,19 +206,12 @@ export default function AddProduct() {
               value={form.url}
               onChange={(e) => {
                 const newUrl = e.target.value
-                let newSelector = form.selector
-                try {
-                  const hostname = new URL(newUrl).hostname.toLowerCase()
-                  if (hostname.includes('amazon.')) {
-                    newSelector = '.a-offscreen, .a-price-whole, .a-price-fraction'
-                  } else if (hostname.includes('reichelt.')) {
-                    newSelector = '.productPrice'
-                  } else if (hostname.includes('zalando.')) {
-                    newSelector = '[data-testid="pdp-price-container"] span'
-                  }
-                } catch {
-                  // ignore invalid URL
-                }
+                // Auto-fill the selector from the matching site default, but never
+                // clobber a selector the user has already typed in by hand.
+                const matched = matchDefaultSelector(newUrl)
+                const previousMatch = matchDefaultSelector(form.url)
+                const selectorIsUntouched = form.selector === '' || form.selector === previousMatch
+                const newSelector = matched && selectorIsUntouched ? matched : form.selector
                 setForm({ ...form, url: newUrl, selector: newSelector })
               }}
               placeholder="https://example.com/product"

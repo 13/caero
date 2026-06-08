@@ -200,6 +200,29 @@ class AppSettingsOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class SelectorDefaultIn(BaseModel):
+    domain: str = Field(min_length=1, max_length=256)
+    selector: str = Field(min_length=1, max_length=512)
+
+    @field_validator("domain")
+    @classmethod
+    def normalize_domain(cls, value: str) -> str:
+        return value.strip().lower()
+
+    @field_validator("selector")
+    @classmethod
+    def strip_selector(cls, value: str) -> str:
+        return value.strip()
+
+
+class SelectorDefaultOut(BaseModel):
+    id: int
+    domain: str
+    selector: str
+
+    model_config = {"from_attributes": True}
+
+
 class TestDbRequest(BaseModel):
     db_type: Literal["sqlite", "postgresql"]
     sqlite_path: str = "/data/caero.db"

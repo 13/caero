@@ -102,6 +102,27 @@ class Alert(Base):
     product: Mapped["Product"] = relationship("Product", back_populates="alerts")
 
 
+class SelectorDefault(Base):
+    """Default CSS price selector applied to products from a given site.
+
+    `domain` is matched as a substring of a product URL's hostname, so e.g.
+    "amazon." matches amazon.it, amazon.de, etc. When several entries match,
+    the longest (most specific) `domain` wins.
+    """
+
+    __tablename__ = "selector_defaults"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    domain: Mapped[str] = mapped_column(String(256), unique=True, nullable=False, index=True)
+    selector: Mapped[str] = mapped_column(String(512), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
 class AppSettings(Base):
     __tablename__ = "app_settings"
 

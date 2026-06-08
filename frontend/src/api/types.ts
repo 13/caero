@@ -108,6 +108,17 @@ export interface AppSettings {
   updated_at: string | null
 }
 
+export interface SelectorDefault {
+  id: number
+  domain: string
+  selector: string
+}
+
+export interface SelectorDefaultIn {
+  domain: string
+  selector: string
+}
+
 export interface TestDbRequest {
   db_type: 'sqlite' | 'postgresql'
   sqlite_path?: string

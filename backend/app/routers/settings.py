@@ -15,13 +15,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings, PROJECT_VERSION
 from app.database import get_db
-from app.models import Alert, AppSettings, PriceHistory, Product, User
+from app.models import Alert, AppSettings, PriceHistory, Product, SelectorDefault, User
 from app.routers.auth import require_admin, require_user
 from app.scheduler import add_product_job, remove_product_job
 from app.schemas import (
     AppSettingsIn,
     AppSettingsOut,
     DataExportPayload,
+    SelectorDefaultIn,
+    SelectorDefaultOut,
     TestDbRequest,
     TestDbResponse,
     TestEmailRequest,
@@ -84,6 +86,75 @@ async def save_settings(
     await db.commit()
     await db.refresh(row)
     return AppSettingsOut.model_validate(row)
+
+
+# ── Default price selectors (per-site) ─────────────────────────────────────────
+
+@router.get("/selectors", response_model=list[SelectorDefaultOut])
+async def list_selector_defaults(
+    db: AsyncSession = Depends(get_db),
+    _user=Depends(require_user),
+) -> list[SelectorDefaultOut]:
+    result = await db.execute(select(SelectorDefault).order_by(SelectorDefault.domain))
+    return [SelectorDefaultOut.model_validate(row) for row in result.scalars().all()]
+
+
+@router.post("/selectors", response_model=SelectorDefaultOut, status_code=status.HTTP_201_CREATED)
+async def create_selector_default(
+    body: SelectorDefaultIn,
+    db: AsyncSession = Depends(get_db),
+    _admin: User = Depends(require_admin),
+) -> SelectorDefaultOut:
+    existing = await db.execute(
+        select(SelectorDefault).where(SelectorDefault.domain == body.domain)
+    )
+    if existing.scalar_one_or_none():
+        raise HTTPException(status_code=409, detail=f"A selector for '{body.domain}' already exists")
+    row = SelectorDefault(domain=body.domain, selector=body.selector)
+    db.add(row)
+    await db.flush()
+    await db.commit()
+    await db.refresh(row)
+    return SelectorDefaultOut.model_validate(row)
+
+
+@router.patch("/selectors/{selector_id}", response_model=SelectorDefaultOut)
+async def update_selector_default(
+    selector_id: int,
+    body: SelectorDefaultIn,
+    db: AsyncSession = Depends(get_db),
+    _admin: User = Depends(require_admin),
+) -> SelectorDefaultOut:
+    row = await db.get(SelectorDefault, selector_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Selector not found")
+    clash = await db.execute(
+        select(SelectorDefault).where(
+            SelectorDefault.domain == body.domain,
+            SelectorDefault.id != selector_id,
+        )
+    )
+    if clash.scalar_one_or_none():
+        raise HTTPException(status_code=409, detail=f"A selector for '{body.domain}' already exists")
+    row.domain = body.domain
+    row.selector = body.selector
+    await db.flush()
+    await db.commit()
+    await db.refresh(row)
+    return SelectorDefaultOut.model_validate(row)
+
+
+@router.delete("/selectors/{selector_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_selector_default(
+    selector_id: int,
+    db: AsyncSession = Depends(get_db),
+    _admin: User = Depends(require_admin),
+) -> None:
+    row = await db.get(SelectorDefault, selector_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Selector not found")
+    await db.delete(row)
+    await db.commit()
 
 
 @router.post("/test-db", response_model=TestDbResponse)

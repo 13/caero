@@ -15,6 +15,8 @@ import type {
   ProductCreate,
   ProductStatistics,
   ProductUpdate,
+  SelectorDefault,
+  SelectorDefaultIn,
   SystemInfoOut,
   TestDbRequest,
   TestDbResponse,
@@ -257,6 +259,47 @@ export function useSaveSettings() {
     mutationFn: (body) =>
       apiFetch<AppSettings>('/api/settings', { method: 'POST', body: JSON.stringify(body) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['settings'] }),
+  })
+}
+
+// ── Default price selectors ─────────────────────────────────────────────────────
+
+export function useSelectorDefaults() {
+  return useQuery<SelectorDefault[]>({
+    queryKey: ['selector-defaults'],
+    queryFn: () => apiFetch<SelectorDefault[]>('/api/settings/selectors'),
+  })
+}
+
+export function useCreateSelectorDefault() {
+  const qc = useQueryClient()
+  return useMutation<SelectorDefault, Error, SelectorDefaultIn>({
+    mutationFn: (body) =>
+      apiFetch<SelectorDefault>('/api/settings/selectors', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['selector-defaults'] }),
+  })
+}
+
+export function useUpdateSelectorDefault() {
+  const qc = useQueryClient()
+  return useMutation<SelectorDefault, Error, { id: number; body: SelectorDefaultIn }>({
+    mutationFn: ({ id, body }) =>
+      apiFetch<SelectorDefault>(`/api/settings/selectors/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(body),
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['selector-defaults'] }),
+  })
+}
+
+export function useDeleteSelectorDefault() {
+  const qc = useQueryClient()
+  return useMutation<void, Error, number>({
+    mutationFn: (id) => apiFetch<void>(`/api/settings/selectors/${id}`, { method: 'DELETE' }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['selector-defaults'] }),
   })
 }
 
