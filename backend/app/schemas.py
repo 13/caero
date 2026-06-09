@@ -186,6 +186,7 @@ class AppSettingsIn(BaseModel):
     allow_registration: bool = True
     date_format: Literal["DD.MM.YYYY", "DD/MM/YYYY", "MM/DD/YYYY", "YYYY-MM-DD"] = "DD.MM.YYYY"
     time_format: Literal["12h", "24h"] = "24h"
+    telegram_bot_token: str = ""
 
 
 class AppSettingsOut(BaseModel):
@@ -199,6 +200,7 @@ class AppSettingsOut(BaseModel):
     allow_registration: bool
     date_format: str
     time_format: str
+    telegram_bot_token: str = ""
     updated_at: datetime | None = None
 
     model_config = {"from_attributes": True}

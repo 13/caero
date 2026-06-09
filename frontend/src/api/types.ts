@@ -105,6 +105,7 @@ export interface AppSettings {
   allow_registration: boolean
   date_format: 'DD.MM.YYYY' | 'DD/MM/YYYY' | 'MM/DD/YYYY' | 'YYYY-MM-DD'
   time_format: '12h' | '24h'
+  telegram_bot_token: string
   updated_at: string | null
 }
 

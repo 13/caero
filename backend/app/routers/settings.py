@@ -85,6 +85,8 @@ async def save_settings(
     await db.flush()
     await db.commit()
     await db.refresh(row)
+    from app.notifier import configure_telegram
+    configure_telegram(row.telegram_bot_token)
     return AppSettingsOut.model_validate(row)
 
 
@@ -221,16 +223,18 @@ async def test_telegram_notification(
     body: TestTelegramRequest,
     _user=Depends(require_admin),
 ) -> TestNotificationResponse:
-    from app.notifier import init_telegram_bot
+    from app.notifier import _bot_token
 
-    bot = init_telegram_bot()
-    if bot is None:
+    if not _bot_token:
         return TestNotificationResponse(status="failed", message="Telegram bot token not configured")
     try:
-        await bot.send_message(
-            chat_id=body.chat_id,
-            text="Testing Telegram notification from Caero...",
-        )
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"https://api.telegram.org/bot{_bot_token}/sendMessage",
+                json={"chat_id": body.chat_id, "text": "Testing Telegram notification from Caero..."},
+                timeout=10.0,
+            )
+            response.raise_for_status()
         return TestNotificationResponse(status="sent", message="Test Telegram message sent")
     except Exception as e:
         return TestNotificationResponse(status="failed", message=str(e))

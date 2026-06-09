@@ -13,6 +13,13 @@ from app.config import settings
 
 logger = logging.getLogger(__name__)
 
+_bot_token: str = settings.telegram_bot_token
+
+
+def configure_telegram(token: str) -> None:
+    global _bot_token
+    _bot_token = token or settings.telegram_bot_token
+
 
 def _build_message(subject: str, body: str, to_email: str) -> MIMEMultipart:
     msg = MIMEMultipart("alternative")
@@ -28,13 +35,14 @@ def _build_notification(subject: str, body: str) -> str:
 
 
 async def _send_telegram_alert(*, chat_id: str, text: str) -> None:
-    if not settings.telegram_bot_token:
+    token = _bot_token
+    if not token:
         logger.info("Telegram bot token not configured — skipping Telegram notification")
         return
     try:
         async with httpx.AsyncClient() as client:
             response = await client.post(
-                f"https://api.telegram.org/bot{settings.telegram_bot_token}/sendMessage",
+                f"https://api.telegram.org/bot{token}/sendMessage",
                 json={"chat_id": chat_id, "text": text},
                 timeout=10.0,
             )

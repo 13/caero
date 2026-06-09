@@ -82,6 +82,18 @@ async def lifespan(application: FastAPI):
         application.state.patchright = None
         application.state.browser = None
 
+    # Load Telegram token from DB (overrides env var if set)
+    try:
+        from app.database import AsyncSessionLocal
+        from app.models import AppSettings as AppSettingsModel
+        from app.notifier import configure_telegram
+        async with AsyncSessionLocal() as _db:
+            _row = await _db.get(AppSettingsModel, 1)
+            if _row and _row.telegram_bot_token:
+                configure_telegram(_row.telegram_bot_token)
+    except Exception as _exc:
+        logger.warning("Could not load Telegram token from DB at startup: %s", _exc)
+
     # Start APScheduler and load product jobs
     scheduler.start()
     await load_all_jobs()

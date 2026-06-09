@@ -137,6 +137,7 @@ class AppSettings(Base):
     allow_registration: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     date_format: Mapped[str] = mapped_column(String(32), default="DD.MM.YYYY", nullable=False)
     time_format: Mapped[str] = mapped_column(String(8), default="24h", nullable=False)
+    telegram_bot_token: Mapped[str] = mapped_column(String(256), default="", nullable=False, server_default="")
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
