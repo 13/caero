@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.models import PriceHistory, Product, User
 from app.routers.auth import require_user
-from app.schemas import PriceHistoryOut, PriceHistoryUpdate
+from app.schemas import PriceHistoryCreate, PriceHistoryOut, PriceHistoryUpdate
 
 router = APIRouter(tags=["prices"])
 
@@ -58,6 +58,46 @@ async def get_prices(
 
     result = await db.execute(query)
     return result.scalars().all()
+
+
+@router.post(
+    "/products/{product_id}/prices",
+    response_model=PriceHistoryOut,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_price(
+    product_id: int,
+    body: PriceHistoryCreate,
+    user: User = Depends(require_user),
+    db: AsyncSession = Depends(get_db),
+) -> PriceHistoryOut:
+    result = await db.execute(
+        select(Product).where(Product.id == product_id, Product.user_id == user.id)
+    )
+    if not result.scalar_one_or_none():
+        raise HTTPException(status_code=404, detail="Product not found")
+
+    currency = body.currency
+    if not currency:
+        # Inherit the currency of the most recent existing entry, defaulting to EUR.
+        latest = await db.execute(
+            select(PriceHistory.currency)
+            .where(PriceHistory.product_id == product_id)
+            .order_by(PriceHistory.scraped_at.desc())
+            .limit(1)
+        )
+        currency = latest.scalar_one_or_none() or "EUR"
+
+    price = PriceHistory(
+        product_id=product_id,
+        price=Decimal(body.price).quantize(Decimal("0.01")),
+        currency=currency,
+        scraped_at=body.scraped_at,
+    )
+    db.add(price)
+    await db.commit()
+    await db.refresh(price)
+    return price
 
 
 @router.get("/products/{product_id}/prices/latest", response_model=PriceHistoryOut | None)

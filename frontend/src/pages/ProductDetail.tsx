@@ -9,6 +9,7 @@ import {
   useAlerts,
   useCheckProduct,
   useCreateAlert,
+  useCreatePrice,
   useDeleteAlert,
   useDeletePrice,
   useDeleteProduct,
@@ -75,6 +76,7 @@ export default function ProductDetail() {
   const updateAlertMutation = useUpdateAlert(productId)
   const updatePriceMutation = useUpdatePrice(productId)
   const deletePriceMutation = useDeletePrice(productId)
+  const createPriceMutation = useCreatePrice(productId)
   const qc = useQueryClient()
 
   // Create a reusable mutation for toggling active status
@@ -112,6 +114,8 @@ export default function ProductDetail() {
   const [selectedPoint, setSelectedPoint] = useState<PricePoint | null>(null)
   const [editPriceValue, setEditPriceValue] = useState('')
   const [confirmDeletePoint, setConfirmDeletePoint] = useState(false)
+  const [showAddPrice, setShowAddPrice] = useState(false)
+  const [addPriceForm, setAddPriceForm] = useState({ date: '', time: '', price: '' })
 
   const openPricePoint = (point: PricePoint) => {
     setSelectedPoint(point)
@@ -138,6 +142,42 @@ export default function ProductDetail() {
           closePricePoint()
         },
         onError: (err) => toast.error(err.message || 'Update failed'),
+      }
+    )
+  }
+
+  const openAddPrice = () => {
+    const now = new Date()
+    const pad = (n: number) => String(n).padStart(2, '0')
+    setAddPriceForm({
+      date: `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`,
+      time: `${pad(now.getHours())}:${pad(now.getMinutes())}`,
+      price: '',
+    })
+    setShowAddPrice(true)
+  }
+
+  const handleAddPrice = () => {
+    const parsed = parseFloat(addPriceForm.price)
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      toast.error('Enter a valid price greater than 0')
+      return
+    }
+    const [y, mo, d] = addPriceForm.date.split('-').map(Number)
+    const [h, mi] = addPriceForm.time.split(':').map(Number)
+    const dt = new Date(y, (mo || 1) - 1, d || 1, h || 0, mi || 0)
+    if (!y || !mo || !d || Number.isNaN(dt.getTime())) {
+      toast.error('Enter a valid date and time')
+      return
+    }
+    createPriceMutation.mutate(
+      { price: parsed.toFixed(2), scraped_at: dt.toISOString() },
+      {
+        onSuccess: () => {
+          toast.success('Price added')
+          setShowAddPrice(false)
+        },
+        onError: (err) => toast.error(err.message || 'Add failed'),
       }
     )
   }
@@ -746,6 +786,74 @@ export default function ProductDetail() {
         </div>
       )}
 
+      {/* ── Add custom price popup ── */}
+      {showAddPrice && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowAddPrice(false)} />
+          <div className="relative w-full max-w-sm bg-white dark:bg-gray-950 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-800">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-gray-800">
+              <h2 className="font-semibold text-gray-900 dark:text-gray-100">Add price</h2>
+              <button onClick={() => setShowAddPrice(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <form
+              onSubmit={(e) => { e.preventDefault(); handleAddPrice() }}
+              className="p-5 space-y-4"
+            >
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={labelCls}>Date</label>
+                  <input
+                    type="date"
+                    value={addPriceForm.date}
+                    onChange={(e) => setAddPriceForm({ ...addPriceForm, date: e.target.value })}
+                    className={inputCls}
+                  />
+                </div>
+                <div>
+                  <label className={labelCls}>Time</label>
+                  <TimePicker
+                    value={addPriceForm.time}
+                    onChange={(value) => setAddPriceForm({ ...addPriceForm, time: value })}
+                    format={settings?.time_format ?? '24h'}
+                    className={inputCls}
+                  />
+                </div>
+              </div>
+              <div>
+                <label className={labelCls}>Price</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min={0}
+                  value={addPriceForm.price}
+                  onChange={(e) => setAddPriceForm({ ...addPriceForm, price: e.target.value })}
+                  className={inputCls}
+                  autoFocus
+                />
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="submit"
+                  disabled={createPriceMutation.isPending}
+                  className="flex-1 bg-indigo-600 text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+                >
+                  {createPriceMutation.isPending ? 'Adding…' : 'Add price'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowAddPrice(false)}
+                  className="px-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-700 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* ── Stats strip ── */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
         {[
@@ -782,10 +890,17 @@ export default function ProductDetail() {
           <BarChart3 className="h-4 w-4 text-indigo-500" />
           <h2 className="font-semibold text-gray-800 dark:text-gray-100">Price history</h2>
           {prices.length > 0 && (
-            <span className="text-xs text-gray-400 dark:text-gray-500 ml-auto">
+            <span className="hidden sm:inline text-xs text-gray-400 dark:text-gray-500">
               Tip: click a point to edit or delete it
             </span>
           )}
+          <button
+            onClick={openAddPrice}
+            className="ml-auto inline-flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 transition-colors font-medium"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Add price
+          </button>
         </div>
         <PriceChart data={prices} onPointClick={openPricePoint} />
       </div>

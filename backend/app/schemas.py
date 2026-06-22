@@ -126,6 +126,12 @@ class ProductOut(BaseModel):
 
 # ── Prices ────────────────────────────────────────────────────────────────────
 
+class PriceHistoryCreate(BaseModel):
+    price: Decimal = Field(gt=0)
+    scraped_at: datetime
+    currency: str | None = Field(default=None, max_length=8)
+
+
 class PriceHistoryUpdate(BaseModel):
     price: Decimal = Field(gt=0)
 

@@ -76,6 +76,12 @@ export interface PriceHistory {
   scraped_at: string
 }
 
+export interface PriceHistoryCreate {
+  price: string
+  scraped_at: string
+  currency?: string | null
+}
+
 export interface Alert {
   id: number
   product_id: number

@@ -11,6 +11,7 @@ import type {
   DataExportPayload,
   NotificationDefaultsUpdate,
   PriceHistory,
+  PriceHistoryCreate,
   Product,
   ProductCreate,
   ProductStatistics,
@@ -201,6 +202,18 @@ function invalidatePriceQueries(qc: ReturnType<typeof useQueryClient>, productId
   qc.invalidateQueries({ queryKey: ['products'] })
   qc.invalidateQueries({ queryKey: ['products', productId] })
   qc.invalidateQueries({ queryKey: ['product-stats', productId] })
+}
+
+export function useCreatePrice(productId: number) {
+  const qc = useQueryClient()
+  return useMutation<PriceHistory, Error, PriceHistoryCreate>({
+    mutationFn: (body) =>
+      apiFetch<PriceHistory>(`/api/products/${productId}/prices`, {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+    onSuccess: () => invalidatePriceQueries(qc, productId),
+  })
 }
 
 export function useUpdatePrice(productId: number) {
