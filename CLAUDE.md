@@ -32,7 +32,7 @@ npm run lint     # eslint (flat config, eslint.config.js)
 npm test         # vitest (src/**/*.test.ts)
 ```
 
-CI (`.github/workflows/ci.yml`) runs ruff + pytest (on SQLite *and* a PostgreSQL service container — conftest reads `DB_TYPE` from the environment), eslint + vitest + build, and a Playwright e2e job (spec in `frontend/e2e/`, config assumes the backend serves the built frontend on :8000). `release.yml` pushes the Docker image to GHCR on `v*` tags. Playwright specs must survive a non-fresh DB (CI retries reuse it). `tests/test_migrations.py` fails when a model change lacks a migration; `tests/test_scrape_flow.py` covers the scrape loop with a faked `scrape_price`.
+CI (`.github/workflows/ci.yml`) runs ruff + pytest (on SQLite *and* a PostgreSQL service container — conftest reads `DB_TYPE` from the environment), eslint + vitest + build, and a Playwright e2e job (spec in `frontend/e2e/`, config assumes the backend serves the built frontend on :8000). `build-docker.yml` pushes the Docker image to GHCR on `v*` tags (and test-builds on PRs). Playwright specs must survive a non-fresh DB (CI retries reuse it). `tests/test_migrations.py` fails when a model change lacks a migration; `tests/test_scrape_flow.py` covers the scrape loop with a faked `scrape_price`.
 
 For full-stack dev, run both: backend on :8000, frontend dev server proxies API calls to it. In production the backend serves the built frontend from `app/static/` with an SPA fallback route.
 
@@ -65,7 +65,7 @@ docker compose up -d --build   # multi-stage build: frontend → static, then Py
 
 **Schema changes:** Alembic (`alembic/versions/`) is the single source of truth; startup runs `upgrade head` (legacy pre-Alembic DBs get stamped). Add a migration for every `models.py` change — there is no `create_all` fallback, so a missing migration means the column never exists on fresh installs. Default CSS selectors are seeded post-migration in `database.py` (only when the table is empty so user edits survive restarts).
 
-**Frontend** (`frontend/src/`) — pages in `pages/` (Dashboard, ProductDetail, AddProduct, Login, Setup), section components in `components/product-detail/` and `components/setup/`, API layer in `api/` (`client.ts` fetch wrapper with Bearer token from localStorage, `hooks.ts` TanStack Query hooks, `types.ts`). Display formats come from `useUiSettings` (all users); `useSettings`/`useSaveSettings` are admin-only. Charts via Recharts, routing via react-router-dom. Note: `npm run lint` is currently broken (no `eslint.config.js` flat config); `tsc -b` via `npm run build` is the working check.
+**Frontend** (`frontend/src/`) — pages in `pages/` (Dashboard, ProductDetail, AddProduct, Login, Setup), section components in `components/product-detail/` and `components/setup/`, API layer in `api/` (`client.ts` fetch wrapper with Bearer token from localStorage, `hooks.ts` TanStack Query hooks, `types.ts`). Display formats come from `useUiSettings` (all users); `useSettings`/`useSaveSettings` are admin-only. Charts via Recharts (route-split so the dashboard chunk stays lean — dashboard sparklines use the tiny SVG `Sparkline` component instead), routing via react-router-dom.
 
 ## Conventions
 
