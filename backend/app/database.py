@@ -62,11 +62,21 @@ async def get_db() -> AsyncSession:
 
 # ── Schema management ──────────────────────────────────────────────────────────
 # Alembic is the single source of truth for the schema. At startup we bring the
-# DB to head. DBs created by pre-0.9 versions (Base.metadata.create_all, no
-# alembic_version table) are stamped to head first: their schema already matches
-# because the old startup code also backfilled columns.
+# DB to head. DBs created by pre-1.6 versions (Base.metadata.create_all, no
+# alembic_version table) match the schema of revision 0013 — the old startup
+# code created tables from the then-current models and backfilled columns — so
+# they are stamped at 0013 and then upgraded from there.
 
 _BACKEND_DIR = Path(__file__).parent.parent
+
+# Last revision whose schema equals what the old create_all-based startup
+# produced (any install that last ran v1.3–v1.5).
+LEGACY_STAMP_REVISION = "0013"
+
+# Column that exists only from revision 0016 onward; used to detect databases
+# that v1.6.0/v1.6.1 wrongly stamped to head without applying 0014+.
+_SENTINEL_TABLE = "products"
+_SENTINEL_COLUMN = "record_all_prices"
 
 
 def _alembic_config():
@@ -77,31 +87,60 @@ def _alembic_config():
     return config
 
 
-def _run_migrations_sync(has_alembic_version: bool, has_tables: bool) -> None:
+def _run_migrations_sync(recorded_version: str | None, has_tables: bool, has_sentinel: bool) -> None:
     # Alembic's async env.py calls asyncio.run(), so this must run in a thread
     # without a running event loop (see run_migrations below).
+    from alembic.script import ScriptDirectory
+
     from alembic import command
 
     config = _alembic_config()
-    if has_tables and not has_alembic_version:
-        logger.info("Existing schema without alembic_version — stamping to head")
-        command.stamp(config, "head")
-    else:
-        command.upgrade(config, "head")
+    head = ScriptDirectory.from_config(config).get_current_head()
+
+    if has_tables and recorded_version is None:
+        logger.info(
+            "Pre-Alembic schema detected — stamping to %s, then upgrading", LEGACY_STAMP_REVISION
+        )
+        command.stamp(config, LEGACY_STAMP_REVISION)
+    elif has_tables and recorded_version == head and not has_sentinel:
+        # v1.6.0/v1.6.1 stamped legacy DBs straight to head without applying
+        # 0014+; the version row lies about the actual schema. Re-stamp to the
+        # legacy revision so the missing migrations run.
+        logger.warning(
+            "alembic_version claims %s but %s.%s is missing — repairing a mis-stamped "
+            "upgrade by re-stamping to %s",
+            head, _SENTINEL_TABLE, _SENTINEL_COLUMN, LEGACY_STAMP_REVISION,
+        )
+        command.stamp(config, LEGACY_STAMP_REVISION, purge=True)
+
+    command.upgrade(config, "head")
 
 
-def _inspect_schema_state(connection) -> tuple[bool, bool]:
+def _inspect_schema_state(connection) -> tuple[str | None, bool, bool]:
     inspector = inspect(connection)
     tables = set(inspector.get_table_names())
-    return "alembic_version" in tables, "users" in tables
+
+    recorded_version = None
+    if "alembic_version" in tables:
+        recorded_version = connection.exec_driver_sql(
+            "SELECT version_num FROM alembic_version"
+        ).scalar()
+
+    has_sentinel = False
+    if _SENTINEL_TABLE in tables:
+        has_sentinel = _SENTINEL_COLUMN in {
+            col["name"] for col in inspector.get_columns(_SENTINEL_TABLE)
+        }
+
+    return recorded_version, "users" in tables, has_sentinel
 
 
 async def run_migrations() -> None:
     """Bring the database schema to the latest Alembic revision and seed defaults."""
     async with engine.connect() as conn:
-        has_alembic_version, has_tables = await conn.run_sync(_inspect_schema_state)
+        recorded_version, has_tables, has_sentinel = await conn.run_sync(_inspect_schema_state)
 
-    await asyncio.to_thread(_run_migrations_sync, has_alembic_version, has_tables)
+    await asyncio.to_thread(_run_migrations_sync, recorded_version, has_tables, has_sentinel)
 
     # Alembic's fileConfig resets the root logger to WARN (alembic.ini); restore
     # the configured level so the app's INFO logs don't vanish after migrations.
