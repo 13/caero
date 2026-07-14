@@ -103,6 +103,10 @@ async def run_migrations() -> None:
 
     await asyncio.to_thread(_run_migrations_sync, has_alembic_version, has_tables)
 
+    # Alembic's fileConfig resets the root logger to WARN (alembic.ini); restore
+    # the configured level so the app's INFO logs don't vanish after migrations.
+    logging.getLogger().setLevel(getattr(logging, settings.log_level.upper(), logging.INFO))
+
     async with engine.begin() as conn:
         await conn.run_sync(_seed_selector_defaults)
         await conn.run_sync(_backfill_amazon_selectors)
