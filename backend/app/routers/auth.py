@@ -1,7 +1,10 @@
 """Auth router — login, register, me."""
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, status
+import time
+from collections import defaultdict, deque
+
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -40,14 +43,17 @@ async def get_current_user(
 
     from app.auth import decode_token
 
-    username = decode_token(token)
-    if not username:
+    decoded = decode_token(token)
+    if not decoded:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+    username, token_version = decoded
 
     result = await db.execute(select(User).where(User.username == username))
     user = result.scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
+    if token_version != user.token_version:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token revoked")
     return user
 
 
@@ -100,17 +106,52 @@ async def register_enabled(db: AsyncSession = Depends(get_db)) -> dict[str, bool
     return {"enabled": app_settings.allow_registration if app_settings else True}
 
 
+# Brute-force protection: per client+username sliding window of failed logins.
+# In-memory is fine here — the app runs as a single process.
+_LOGIN_MAX_FAILURES = 5
+_LOGIN_WINDOW_SECONDS = 300
+_failed_logins: dict[str, deque[float]] = defaultdict(deque)
+
+
+def _login_throttle_key(request: Request, username: str) -> str:
+    client_ip = request.client.host if request.client else "unknown"
+    return f"{client_ip}:{username}"
+
+
+def _is_login_blocked(key: str) -> bool:
+    attempts = _failed_logins[key]
+    cutoff = time.monotonic() - _LOGIN_WINDOW_SECONDS
+    while attempts and attempts[0] < cutoff:
+        attempts.popleft()
+    if not attempts:
+        # Don't let the dict grow one key per (ip, username) forever.
+        del _failed_logins[key]
+        return False
+    return len(attempts) >= _LOGIN_MAX_FAILURES
+
+
 @router.post("/login", response_model=Token)
 async def login(
-    form: OAuth2PasswordRequestForm = Depends(), db: AsyncSession = Depends(get_db)
+    request: Request,
+    form: OAuth2PasswordRequestForm = Depends(),
+    db: AsyncSession = Depends(get_db),
 ) -> Token:
+    throttle_key = _login_throttle_key(request, form.username)
+    if _is_login_blocked(throttle_key):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many failed login attempts. Try again in a few minutes.",
+        )
+
     result = await db.execute(select(User).where(User.username == form.username))
     user = result.scalar_one_or_none()
     if not user or not verify_password(form.password, user.hashed_password):
+        _failed_logins[throttle_key].append(time.monotonic())
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials"
         )
-    return Token(access_token=create_access_token(user.username))
+    _failed_logins.pop(throttle_key, None)
+    return Token(access_token=create_access_token(user.username, user.token_version))
 
 
 @router.get("/me", response_model=UserOut)
@@ -119,7 +160,13 @@ async def me(user: User = Depends(require_user)) -> User:
 
 
 @router.post("/logout")
-async def logout(_user: User = Depends(require_user)) -> dict[str, str]:
+async def logout(
+    user: User = Depends(require_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, str]:
+    # Bump the token version so every outstanding JWT for this user is revoked.
+    user.token_version += 1
+    await db.flush()
     return {"message": "Logged out"}
 
 

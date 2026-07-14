@@ -52,4 +52,14 @@ COPY --from=frontend-builder /backend/app/static ./app/static
 RUN uv run patchright install chromium --with-deps
 
 EXPOSE 8000
-CMD if [ "$SCRAPER_HEADLESS" = "false" ]; then xvfb-run -a -s "-screen 0 1920x1080x24" uv run fastapi run app/main.py --host 0.0.0.0 --port 8000; else uv run fastapi run app/main.py --host 0.0.0.0 --port 8000; fi
+HEALTHCHECK --interval=60s --timeout=10s --start-period=30s --retries=3 \
+    CMD ["python3", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/api/health', timeout=5).status == 200 else 1)"]
+
+# Trust X-Forwarded-For from these proxy IPs so login rate limiting sees real
+# client addresses behind a reverse proxy. Set to your proxy's IP (or "*" if
+# the container port is not reachable directly) via docker-compose/.env.
+ENV FORWARDED_ALLOW_IPS=127.0.0.1
+
+# Must stay a single worker process: APScheduler runs in-process, and multiple
+# workers would each schedule (and run) every scrape job.
+CMD if [ "$SCRAPER_HEADLESS" = "false" ]; then xvfb-run -a -s "-screen 0 1920x1080x24" uv run fastapi run app/main.py --host 0.0.0.0 --port 8000 --proxy-headers; else uv run fastapi run app/main.py --host 0.0.0.0 --port 8000 --proxy-headers; fi

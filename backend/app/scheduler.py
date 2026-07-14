@@ -1,20 +1,60 @@
 """APScheduler integration — one job per active product."""
 from __future__ import annotations
 
+import asyncio
 import logging
+from collections import defaultdict
+from datetime import UTC, datetime
 from decimal import Decimal
 from urllib.parse import urlparse
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from sqlalchemy import select
+from sqlalchemy.sql import func
 
+from app.browser import get_browser
+from app.config import settings
 from app.database import AsyncSessionLocal
 from app.models import Alert, PriceHistory, Product, User
-from app.notifier import send_alert
+from app.notifier import notify, send_alert
 
 logger = logging.getLogger(__name__)
 
 scheduler = AsyncIOScheduler()
+
+# Scheduled jobs, "Check now", and "Check all" can target the same product at
+# the same time; without a lock both would read the same previous price and
+# insert duplicate rows / double-fire alerts.
+_product_locks: dict[int, asyncio.Lock] = defaultdict(asyncio.Lock)
+
+
+def product_scrape_lock(product_id: int) -> asyncio.Lock:
+    return _product_locks[product_id]
+
+
+def evaluate_alert(
+    condition: str,
+    threshold_price: Decimal | None,
+    price: Decimal,
+    prev_price: Decimal | None,
+    threshold_percent: Decimal | None = None,
+) -> bool:
+    """Decide whether an alert fires for the newly observed price."""
+    if condition == "below" and threshold_price is not None:
+        # Fire only when crossing the threshold, not on every check while the
+        # price stays below it (would spam once combined with frequent checks).
+        crossed = prev_price is None or prev_price > threshold_price
+        return price <= threshold_price and crossed
+    if condition == "lowered":
+        return prev_price is not None and price < prev_price
+    if condition == "lowered_percent" and threshold_percent is not None:
+        if prev_price is None or prev_price <= 0:
+            return False
+        drop_percent = (prev_price - price) / prev_price * Decimal(100)
+        return drop_percent >= threshold_percent
+    if condition in ("changed", "any_change"):
+        return prev_price is not None and price != prev_price
+    return False
 
 
 def _urls_same_resource(url1: str, url2: str) -> bool:
@@ -26,8 +66,23 @@ def _urls_same_resource(url1: str, url2: str) -> bool:
             p1.netloc.lower() == p2.netloc.lower()
             and p1.path.rstrip("/").lower() == p2.path.rstrip("/").lower()
         )
-    except Exception:
-        return True
+    except (ValueError, TypeError):
+        # Unparseable URL — fall back to exact comparison rather than silently
+        # suppressing redirect detection.
+        return url1 == url2
+
+
+async def _notify_product_owner(product: Product, db, subject: str, body: str) -> None:
+    """Send a product-level notification to the owner's default channels."""
+    user = await db.get(User, product.user_id)
+    if user is None:
+        return
+    await notify(
+        email=user.default_email,
+        telegram_chat_id=user.default_telegram_chat_id,
+        subject=subject,
+        body=body,
+    )
 
 
 async def check_url_redirect(product: Product, final_url: str | None, db) -> None:
@@ -38,101 +93,101 @@ async def check_url_redirect(product: Product, final_url: str | None, db) -> Non
         logger.debug("product %d URL redirected: %s -> %s", product.id, product.url, final_url)
         if not product.url_redirected:
             product.url_redirected = True
-            user = await db.get(User, product.user_id)
-            if user and (user.default_email or user.default_telegram_chat_id):
-                subject = f"[Caero] URL Redirected: '{product.name}' now points to a different product"
-                body = (
+            await _notify_product_owner(
+                product,
+                db,
+                subject=f"[Caero] URL Redirected: '{product.name}' now points to a different product",
+                body=(
                     f"Caero detected that the URL for '{product.name}' is redirecting to a different page.\n\n"
                     f"Original URL: {product.url}\n"
                     f"Redirected to: {final_url}\n\n"
                     f"The product may no longer be available and has been replaced by a different item. "
                     f"Please update the product URL in Caero."
-                )
-                import asyncio
-                from app.notifier import _build_message, _send_email_alert_sync, _send_telegram_alert, _build_notification
-
-                if user.default_email:
-                    from app.config import settings
-                    if settings.smtp_host:
-                        msg = _build_message(subject, body, user.default_email)
-                        await asyncio.to_thread(_send_email_alert_sync, to_email=user.default_email, msg=msg, product_name=product.name)
-
-                if user.default_telegram_chat_id:
-                    await _send_telegram_alert(
-                        chat_id=user.default_telegram_chat_id,
-                        text=_build_notification(subject, body),
-                    )
+                ),
+            )
     elif product.url_redirected:
         product.url_redirected = False
 
 
 async def scrape_and_record(product_id: int) -> None:
     """Scrape the current price for a product and persist it."""
-    from app.main import app  # late import to avoid circular dep
-
-    browser = getattr(app.state, "browser", None)
+    browser = get_browser()
     if browser is None:
         logger.warning("Browser not available, skipping job for product %d", product_id)
         return
 
+    async with product_scrape_lock(product_id):
+        await _scrape_and_record_locked(product_id, browser)
+
+
+async def _scrape_and_record_locked(product_id: int, browser) -> None:
+    # Short read-only session: the scrape itself can take up to a minute, so
+    # never hold a transaction across it (SQLite locks, PG idle-in-transaction).
     async with AsyncSessionLocal() as db:
         product = await db.get(Product, product_id)
         if product is None or not product.active:
             return
+        url, selector, price_format = product.url, product.selector, product.price_format
 
-        from app.scraper import scrape_price
+    from app.scraper import scrape_price
 
-        price_float, final_url = await scrape_price(browser, product.url, product.selector)
+    result = await scrape_price(browser, url, selector, price_format)
+
+    async with AsyncSessionLocal() as db:
+        # Re-fetch: the product may have been edited or deleted during the scrape.
+        product = await db.get(Product, product_id)
+        if product is None or not product.active:
+            return
 
         # Always update last_checked_at
-        from sqlalchemy.sql import func
-
         product.last_checked_at = func.now()
 
-        await check_url_redirect(product, final_url, db)
+        await check_url_redirect(product, result.final_url, db)
 
         if product.url_redirected:
             logger.debug("Skipping price record for product %d — URL redirected", product_id)
             await db.commit()
             return
 
-        if price_float is None:
+        failure_threshold = settings.scraper_failure_alert_threshold
+
+        if result.price is None:
             logger.warning("Could not scrape price for product %d (%s)", product_id, product.url)
             product.consecutive_scrape_failures += 1
             await db.commit()
 
-            if product.consecutive_scrape_failures == 3:
-                user = await db.get(User, product.user_id)
-                if user and (user.default_email or user.default_telegram_chat_id):
-                    # We will send a generic alert by using "changed" and no current_price
-                    subject = f"[Caero] Action Required: Selector broken for '{product.name}'"
-                    body = (
-                        f"Caero has failed to find a valid price using your CSS selector 3 times in a row for '{product.name}'.\n"
+            # Exactly-once notification when the threshold is first reached.
+            if product.consecutive_scrape_failures == failure_threshold:
+                await _notify_product_owner(
+                    product,
+                    db,
+                    subject=f"[Caero] Action Required: Selector broken for '{product.name}'",
+                    body=(
+                        f"Caero has failed to find a valid price using your CSS selector "
+                        f"{failure_threshold} times in a row for '{product.name}'.\n"
                         f"The webpage layout likely changed, or the item is no longer available.\n\n"
                         f"Product URL: {product.url}\n"
-                    )
-                    import asyncio
-                    from app.notifier import _build_message, _send_email_alert_sync, _send_telegram_alert, _build_notification
-                    
-                    if user.default_email:
-                        from app.config import settings
-                        if settings.smtp_host:
-                            msg = _build_message(subject, body, user.default_email)
-                            await asyncio.to_thread(_send_email_alert_sync, to_email=user.default_email, msg=msg, product_name=product.name)
-                            
-                    if user.default_telegram_chat_id:
-                        await _send_telegram_alert(
-                            chat_id=user.default_telegram_chat_id,
-                            text=_build_notification(subject, body),
-                        )
-            
+                    ),
+                )
             return
 
-        # If success, reset consecutive failures
+        # If success, reset consecutive failures; if the user was told the
+        # selector broke, tell them it recovered.
+        if product.consecutive_scrape_failures >= failure_threshold:
+            await _notify_product_owner(
+                product,
+                db,
+                subject=f"[Caero] Recovered: '{product.name}' is being tracked again",
+                body=(
+                    f"Caero found a valid price for '{product.name}' again after "
+                    f"{product.consecutive_scrape_failures} failed check(s). No action needed.\n\n"
+                    f"Product URL: {product.url}\n"
+                ),
+            )
         if product.consecutive_scrape_failures > 0:
             product.consecutive_scrape_failures = 0
 
-        price = Decimal(str(price_float)).quantize(Decimal("0.01"))
+        price = Decimal(str(result.price)).quantize(Decimal("0.01"))
 
         # Get previous price for change detection BEFORE adding the new one
         prev_result = await db.execute(
@@ -142,33 +197,55 @@ async def scrape_and_record(product_id: int) -> None:
             .limit(1)
         )
         prev = prev_result.scalar_one_or_none()
+        prev_price = prev.price if prev else None
 
-        if prev is not None and prev.price == price:
-            logger.debug("Price for product %d unchanged (%.2f) — skipping record", product_id, price)
-            await db.commit()
-            return
+        now = datetime.now(UTC)
+        changed = prev is None or prev.price != price
 
-        # Persist price record
-        record = PriceHistory(product_id=product_id, price=price)
-        db.add(record)
-        # Flush if necessary, but we don't strictly need to flush here anymore
+        if changed or product.record_all_prices:
+            # Keep the previous currency when detection fails.
+            currency = result.currency or (prev.currency if prev else None) or "EUR"
+            db.add(PriceHistory(product_id=product_id, price=price, currency=currency))
 
-        # Check alerts
+            # A currency flip means the history now mixes units (site redirect,
+            # selector change, …). Fires once: the next check compares against
+            # the row just written.
+            if prev is not None and prev.currency and currency != prev.currency:
+                logger.warning(
+                    "product %d currency changed %s -> %s", product_id, prev.currency, currency
+                )
+                await _notify_product_owner(
+                    product,
+                    db,
+                    subject=f"[Caero] Currency changed for '{product.name}'",
+                    body=(
+                        f"The scraped price for '{product.name}' switched from "
+                        f"{prev.currency} to {currency}.\n"
+                        f"Price history and statistics now mix currencies — check the "
+                        f"product URL and selector.\n\n"
+                        f"Product URL: {product.url}\n"
+                    ),
+                )
+
+        # Evaluate alerts on every successful check; the conditions themselves
+        # (crossing/lowered/changed vs prev_price) keep unchanged prices quiet.
         alerts_result = await db.execute(
             select(Alert).where(Alert.product_id == product_id, Alert.active == True)  # noqa: E712
         )
         alerts = alerts_result.scalars().all()
 
         for alert in alerts:
-            triggered = False
-            if alert.condition == "below" and alert.threshold_price is not None:
-                triggered = price <= alert.threshold_price
-            elif alert.condition == "lowered":
-                triggered = prev is not None and price < prev.price
-            elif alert.condition in ("changed", "any_change"):
-                triggered = prev is not None and price != prev.price
+            alert.last_checked_at = now
+            triggered = evaluate_alert(
+                alert.condition,
+                alert.threshold_price,
+                price,
+                prev_price,
+                alert.threshold_percent,
+            )
 
             if triggered:
+                alert.last_triggered_at = now
                 await send_alert(
                     to_email=alert.email,
                     telegram_chat_id=alert.telegram_chat_id,
@@ -177,14 +254,21 @@ async def scrape_and_record(product_id: int) -> None:
                     condition=alert.condition,
                     current_price=price,
                     threshold_price=alert.threshold_price,
+                    threshold_percent=alert.threshold_percent,
+                    previous_price=prev_price,
                 )
 
         await db.commit()
-        logger.info("Recorded price %.2f for product %d", price, product_id)
+        if changed or product.record_all_prices:
+            logger.info("Recorded price %.2f for product %d", price, product_id)
+        else:
+            logger.debug("Price for product %d unchanged (%.2f) — no record", product_id, price)
 
 
 def add_product_job(product: Product, run_immediately: bool = False) -> None:
-    from datetime import datetime, timezone
+    import random
+    from datetime import timedelta
+
     from app.schedule_utils import get_next_run_time
 
     job_id = f"product_{product.id}"
@@ -195,11 +279,13 @@ def add_product_job(product: Product, run_immediately: bool = False) -> None:
         logger.debug("Skipping job %s (inactive or disabled interval)", job_id)
         return
 
-    next_run = (
-        datetime.now(timezone.utc)
-        if run_immediately
-        else get_next_run_time(product.check_time_hhmm)
-    )
+    if run_immediately:
+        next_run = datetime.now(UTC)
+    else:
+        # Spread products sharing a check time over a jitter window so they
+        # don't hammer shops (and the scrape semaphore) in one burst.
+        jitter = timedelta(seconds=random.uniform(0, settings.schedule_jitter_seconds))
+        next_run = get_next_run_time(product.check_time_hhmm) + jitter
 
     scheduler.add_job(
         scrape_and_record,

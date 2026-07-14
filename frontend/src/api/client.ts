@@ -30,6 +30,16 @@ function stringifyApiErrorDetail(detail: unknown): string | null {
   return String(detail)
 }
 
+export class ApiError extends Error {
+  status: number
+
+  constructor(message: string, status: number) {
+    super(message)
+    this.name = 'ApiError'
+    this.status = status
+  }
+}
+
 async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   const token = localStorage.getItem('token')
   const headers: Record<string, string> = {
@@ -44,7 +54,7 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }))
     const message = stringifyApiErrorDetail(err?.detail ?? err?.message ?? err?.error) ?? res.statusText
-    throw new Error(message)
+    throw new ApiError(message, res.status)
   }
   if (res.status === 204) return undefined as T
   return res.json() as Promise<T>

@@ -4,7 +4,6 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-
 # ── Users ────────────────────────────────────────────────────────────────────
 
 class UserCreate(BaseModel):
@@ -55,6 +54,8 @@ class ProductCreate(BaseModel):
     selector: str = Field(min_length=1, max_length=256)
     check_interval_minutes: int = Field(default=1440, ge=0)
     check_time_hhmm: str | None = None
+    record_all_prices: bool = False
+    price_format: Literal["auto", "eu", "us"] = "auto"
     active: bool = True
 
     @field_validator("tags", mode="before")
@@ -79,6 +80,8 @@ class ProductUpdate(BaseModel):
     selector: str | None = Field(default=None, min_length=1, max_length=256)
     check_interval_minutes: int | None = Field(default=None, ge=0)
     check_time_hhmm: str | None = None
+    record_all_prices: bool | None = None
+    price_format: Literal["auto", "eu", "us"] | None = None
     active: bool | None = None
 
     @field_validator("tags", mode="before")
@@ -106,10 +109,13 @@ class ProductOut(BaseModel):
     selector: str
     check_interval_minutes: int
     check_time_hhmm: str = "10:00"
+    record_all_prices: bool = False
+    price_format: str = "auto"
     consecutive_scrape_failures: int = 0
     url_redirected: bool = False
     active: bool
     created_at: datetime
+    currency: str = "EUR"
     latest_price: Decimal | None = None
     previous_price: Decimal | None = None
     last_price_change_percent: Decimal | None = None
@@ -136,6 +142,11 @@ class PriceHistoryUpdate(BaseModel):
     price: Decimal = Field(gt=0)
 
 
+class SparklinePoint(BaseModel):
+    t: datetime
+    p: Decimal
+
+
 class PriceHistoryOut(BaseModel):
     id: int
     product_id: int
@@ -148,12 +159,13 @@ class PriceHistoryOut(BaseModel):
 
 # ── Alerts ────────────────────────────────────────────────────────────────────
 
-AlertCondition = Literal["below", "changed", "any_change", "lowered"]
+AlertCondition = Literal["below", "changed", "any_change", "lowered", "lowered_percent"]
 
 
 class AlertCreate(BaseModel):
     condition: AlertCondition
     threshold_price: Decimal | None = None
+    threshold_percent: Decimal | None = Field(default=None, gt=0, le=100)
     email: str | None = None
     telegram_chat_id: str | None = None
     active: bool = True
@@ -164,6 +176,8 @@ class AlertCreate(BaseModel):
             self.telegram_chat_id and self.telegram_chat_id.strip()
         ):
             raise ValueError("at least one recipient is required: email or telegram_chat_id")
+        if self.condition == "lowered_percent" and self.threshold_percent is None:
+            raise ValueError("threshold_percent required for 'lowered_percent' condition")
         return self
 
 
@@ -172,44 +186,50 @@ class AlertOut(BaseModel):
     product_id: int
     condition: str
     threshold_price: Decimal | None
+    threshold_percent: Decimal | None = None
     email: str | None
     telegram_chat_id: str | None
     active: bool
+    last_checked_at: datetime | None = None
+    last_triggered_at: datetime | None = None
 
     model_config = {"from_attributes": True}
 
 
 # ── App Settings ──────────────────────────────────────────────────────────────
 
+DateFormat = Literal["DD.MM.YYYY", "DD/MM/YYYY", "MM/DD/YYYY", "YYYY-MM-DD"]
+TimeFormat = Literal["12h", "24h"]
+
+
 class AppSettingsIn(BaseModel):
-    db_type: Literal["sqlite", "postgresql"] = "sqlite"
-    sqlite_path: str = "/data/caero.db"
-    pg_host: str = ""
-    pg_port: int = 5432
-    pg_database: str = ""
-    pg_user: str = ""
-    pg_password: str = ""
     allow_registration: bool = True
-    date_format: Literal["DD.MM.YYYY", "DD/MM/YYYY", "MM/DD/YYYY", "YYYY-MM-DD"] = "DD.MM.YYYY"
-    time_format: Literal["12h", "24h"] = "24h"
-    telegram_bot_token: str = ""
+    date_format: DateFormat = "DD.MM.YYYY"
+    time_format: TimeFormat = "24h"
+    # None = keep the stored token, "" = clear it. The token is never echoed
+    # back by the API, so the client can't round-trip it.
+    telegram_bot_token: str | None = None
 
 
 class AppSettingsOut(BaseModel):
-    db_type: str
-    sqlite_path: str
-    pg_host: str
-    pg_port: int
-    pg_database: str
-    pg_user: str
-    pg_password: str
     allow_registration: bool
     date_format: str
     time_format: str
-    telegram_bot_token: str = ""
+    telegram_bot_token_set: bool = False
     updated_at: datetime | None = None
 
-    model_config = {"from_attributes": True}
+
+class UiSettingsOut(BaseModel):
+    date_format: str
+    time_format: str
+    show_sparklines: bool = True
+
+
+class UiSettingsIn(BaseModel):
+    date_format: DateFormat
+    time_format: TimeFormat
+    # None = keep current value (older clients don't send it)
+    show_sparklines: bool | None = None
 
 
 class SelectorDefaultIn(BaseModel):
@@ -233,21 +253,6 @@ class SelectorDefaultOut(BaseModel):
     selector: str
 
     model_config = {"from_attributes": True}
-
-
-class TestDbRequest(BaseModel):
-    db_type: Literal["sqlite", "postgresql"]
-    sqlite_path: str = "/data/caero.db"
-    pg_host: str = ""
-    pg_port: int = 5432
-    pg_database: str = ""
-    pg_user: str = ""
-    pg_password: str = ""
-
-
-class TestDbResponse(BaseModel):
-    status: Literal["connected", "error"]
-    message: str
 
 
 class TestEmailRequest(BaseModel):

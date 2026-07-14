@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useCreateProduct, useSelectorDefaults, useSettings } from '../api/hooks'
+import { useCreateProduct, useSelectorDefaults, useUiSettings } from '../api/hooks'
+import type { PriceFormat } from '../api/types'
 import { ArrowLeft, Package, Link as LinkIcon, Code, Clock, Image, Tag, FileText, FolderOpen } from 'lucide-react'
 import {
   DEFAULT_CHECK_TIME_HHMM,
@@ -39,7 +40,7 @@ function Field({ icon: Icon, label, required, hint, children }: {
 export default function AddProduct() {
   const navigate = useNavigate()
   const createMutation = useCreateProduct()
-  const { data: settings } = useSettings()
+  const { data: settings } = useUiSettings()
   const { data: selectorDefaults } = useSelectorDefaults()
 
   // Pick the default selector whose domain matches the URL's hostname. When
@@ -69,6 +70,8 @@ export default function AddProduct() {
     url: '',
     selector: '',
     check_interval_minutes: DEFAULT_CHECK_INTERVAL_MINUTES,
+    record_all_prices: false,
+    price_format: 'auto' as PriceFormat,
     active: true,
   })
 
@@ -235,6 +238,23 @@ export default function AddProduct() {
             />
           </Field>
 
+          <Field
+            icon={Code}
+            label="Price number format"
+            hint='Only needed when prices parse wrong — "eu" reads 1.234,56 / "us" reads 1,234.56'
+          >
+            <select
+              value={form.price_format}
+              onChange={(e) => setForm({ ...form, price_format: e.target.value as PriceFormat })}
+              style={{ colorScheme: 'light dark' }}
+              className={inputCls}
+            >
+              <option value="auto">Auto-detect</option>
+              <option value="eu">European (1.234,56)</option>
+              <option value="us">US / UK (1,234.56)</option>
+            </select>
+          </Field>
+
           <Field icon={Clock} label="Check interval (hours)" hint="0 or empty disables scheduling">
             <input
               type="number"
@@ -253,6 +273,20 @@ export default function AddProduct() {
               className={inputCls}
             />
           </Field>
+
+          <label className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-800 cursor-pointer">
+            <div>
+              <p className="text-sm font-medium text-gray-800 dark:text-gray-200">Record every check</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Store a price entry on every check, even when the price didn't change</p>
+            </div>
+            <input
+              type="checkbox"
+              id="record-all-prices"
+              checked={form.record_all_prices}
+              onChange={(e) => setForm({ ...form, record_all_prices: e.target.checked })}
+              className="rounded text-indigo-600 focus:ring-indigo-500 h-4 w-4"
+            />
+          </label>
 
           <label className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-800 cursor-pointer">
             <div>

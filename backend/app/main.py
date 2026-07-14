@@ -9,7 +9,8 @@ from fastapi import FastAPI
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.database import create_tables
+from app.config import settings as _settings
+from app.database import run_migrations
 from app.routers import (
     alerts_router,
     auth_router,
@@ -19,6 +20,10 @@ from app.routers import (
 )
 from app.scheduler import load_all_jobs, scheduler
 
+logging.basicConfig(
+    level=getattr(logging, _settings.log_level.upper(), logging.INFO),
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+)
 logger = logging.getLogger(__name__)
 
 STATIC_DIR = Path(__file__).parent / "static"
@@ -48,14 +53,16 @@ LEGACY_STATIC_ALIASES = {
 @asynccontextmanager
 async def lifespan(application: FastAPI):
     # ── Startup ──────────────────────────────────────────────────────────────
-    # Ensure tables exist
-    await create_tables()
+    # Bring the schema to the latest Alembic revision
+    await run_migrations()
 
     # Check frontend build
     if not (STATIC_DIR / "index.html").exists():
         logger.warning("Frontend not built — run npm run build in /frontend")
 
     # Launch Patchright browser
+    from app.browser import set_browser
+
     try:
         from app.config import settings
 
@@ -63,7 +70,6 @@ async def lifespan(application: FastAPI):
             import patchright.async_api
             pw_module = patchright.async_api.async_playwright
             logger.info("Using Patchright for scraping")
-            application.state.scraper_backend = "patchright"
         except ImportError:
             logger.error("Patchright is not installed")
             raise
@@ -72,15 +78,21 @@ async def lifespan(application: FastAPI):
         application.state.patchright = pw
 
         headless = settings.scraper_headless
-        application.state.browser = await pw.chromium.launch(
+        browser = await pw.chromium.launch(
             headless=headless,
-            args=["--disable-blink-features=AutomationControlled", "--disable-dev-shm-usage", "--no-sandbox", "--disable-setuid-sandbox"]
+            args=[
+                "--disable-blink-features=AutomationControlled",
+                "--disable-dev-shm-usage",
+                "--no-sandbox",
+                "--disable-setuid-sandbox",
+            ],
         )
+        set_browser(browser, backend="patchright")
         logger.info("Patchright browser started in %s mode", "headless" if headless else "headed")
     except Exception as exc:
         logger.error("Could not start Patchright browser: %s", exc)
         application.state.patchright = None
-        application.state.browser = None
+        set_browser(None, backend="unavailable")
 
     # Load Telegram token from DB (overrides env var if set)
     try:
@@ -98,20 +110,35 @@ async def lifespan(application: FastAPI):
     scheduler.start()
     await load_all_jobs()
 
+    # Nightly maintenance: JSON backup + price-history thinning (both no-op
+    # when disabled via settings).
+    from app.backup import run_backup
+    from app.retention import thin_price_history
+
+    scheduler.add_job(run_backup, "cron", hour=3, minute=30, id="maintenance_backup", replace_existing=True)
+    scheduler.add_job(
+        thin_price_history, "cron", hour=4, minute=0, id="maintenance_retention", replace_existing=True
+    )
+
     yield
 
     # ── Shutdown ─────────────────────────────────────────────────────────────
     scheduler.shutdown(wait=False)
 
-    browser = getattr(application.state, "browser", None)
+    from app.browser import get_browser
+
+    browser = get_browser()
     if browser:
         await browser.close()
+    set_browser(None, backend="unavailable")
 
     pw = getattr(application.state, "patchright", None)
     if pw:
         await pw.stop()
 
     logger.info("Caero shutdown complete")
+
+
 from app.config import PROJECT_VERSION
 
 app = FastAPI(
@@ -120,6 +147,12 @@ app = FastAPI(
     version=PROJECT_VERSION,
     lifespan=lifespan,
 )
+
+# ── Health (unauthenticated, for Docker/monitoring probes) ───────────────────
+@app.get("/api/health", include_in_schema=False)
+async def health() -> dict[str, str]:
+    return {"status": "ok"}
+
 
 # ── API routers ───────────────────────────────────────────────────────────────
 app.include_router(auth_router, prefix="/api")
@@ -130,6 +163,7 @@ app.include_router(settings_router, prefix="/api")
 
 # ── Dynamic Product Images ────────────────────────────────────────────────────
 from app.images import get_images_dir
+
 app.mount("/user_images", StaticFiles(directory=get_images_dir()), name="user_images")
 
 # ── Static assets (JS, CSS, images from built frontend) ───────────────────────

@@ -6,9 +6,11 @@ import type {
   Alert,
   AlertCreate,
   AppSettings,
+  AppSettingsIn,
   CheckResult,
   ChangePasswordRequest,
   DataExportPayload,
+  JobOut,
   NotificationDefaultsUpdate,
   PriceHistory,
   PriceHistoryCreate,
@@ -18,13 +20,13 @@ import type {
   ProductUpdate,
   SelectorDefault,
   SelectorDefaultIn,
+  SparklinePoint,
   SystemInfoOut,
-  TestDbRequest,
-  TestDbResponse,
   TestEmailRequest,
   TestNotificationResponse,
   TestTelegramRequest,
   Token,
+  UiSettings,
   User,
   UserDataExportPayload,
 } from './types'
@@ -60,6 +62,16 @@ export function useLogin() {
 }
 
 export function logoutClient() {
+  // Revoke all server-side sessions, then drop the local token. keepalive lets
+  // the request survive the page reload that callers trigger right after.
+  const token = localStorage.getItem('token')
+  if (token) {
+    fetch('/api/auth/logout', {
+      method: 'POST',
+      keepalive: true,
+      headers: { Authorization: `Bearer ${token}` },
+    }).catch(() => {})
+  }
   localStorage.removeItem('token')
 }
 
@@ -287,19 +299,44 @@ export function useUpdateAlert(productId: number) {
 
 // ── Settings ──────────────────────────────────────────────────────────────────
 
-export function useSettings() {
+/** Global display preferences — readable/writable by every authenticated user. */
+export function useUiSettings() {
+  return useQuery<UiSettings>({
+    queryKey: ['ui-settings'],
+    queryFn: () => apiFetch<UiSettings>('/api/settings/ui'),
+  })
+}
+
+export function useSaveUiSettings() {
+  const qc = useQueryClient()
+  return useMutation<UiSettings, Error, UiSettings>({
+    mutationFn: (body) =>
+      apiFetch<UiSettings>('/api/settings/ui', { method: 'PATCH', body: JSON.stringify(body) }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['ui-settings'] })
+      qc.invalidateQueries({ queryKey: ['settings'] })
+    },
+  })
+}
+
+/** Full app settings — admin only; gate with `enabled`. */
+export function useSettings(enabled = true) {
   return useQuery<AppSettings>({
     queryKey: ['settings'],
     queryFn: () => apiFetch<AppSettings>('/api/settings'),
+    enabled,
   })
 }
 
 export function useSaveSettings() {
   const qc = useQueryClient()
-  return useMutation<AppSettings, Error, AppSettings>({
+  return useMutation<AppSettings, Error, AppSettingsIn>({
     mutationFn: (body) =>
       apiFetch<AppSettings>('/api/settings', { method: 'POST', body: JSON.stringify(body) }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['settings'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['settings'] })
+      qc.invalidateQueries({ queryKey: ['ui-settings'] })
+    },
   })
 }
 
@@ -351,13 +388,22 @@ export function useSystemInfo() {
   })
 }
 
-export function useTestDb() {
-  return useMutation<TestDbResponse, Error, TestDbRequest>({
-    mutationFn: (body) =>
-      apiFetch<TestDbResponse>('/api/settings/test-db', {
-        method: 'POST',
-        body: JSON.stringify(body),
-      }),
+/** Scheduler job list — admin only. */
+export function useJobs(enabled = true) {
+  return useQuery<JobOut[]>({
+    queryKey: ['scheduler-jobs'],
+    queryFn: () => apiFetch<JobOut[]>('/api/settings/jobs'),
+    enabled,
+    refetchInterval: 30_000,
+  })
+}
+
+/** Recent price points per product for dashboard sparklines. */
+export function useSparklines(enabled = true) {
+  return useQuery<Record<number, SparklinePoint[]>>({
+    queryKey: ['sparklines'],
+    queryFn: () => apiFetch<Record<number, SparklinePoint[]>>('/api/products/sparklines'),
+    enabled,
   })
 }
 
@@ -378,6 +424,13 @@ export function useTestTelegram() {
         method: 'POST',
         body: JSON.stringify(body),
       }),
+  })
+}
+
+export function useTestWebhooks() {
+  return useMutation<TestNotificationResponse, Error, void>({
+    mutationFn: () =>
+      apiFetch<TestNotificationResponse>('/api/settings/test-webhooks', { method: 'POST' }),
   })
 }
 

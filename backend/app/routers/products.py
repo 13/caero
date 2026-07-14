@@ -1,12 +1,12 @@
 """Products router."""
 from __future__ import annotations
 
+from datetime import UTC
 from decimal import Decimal
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
-from sqlalchemy import select, func
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import aliased
 
 from app.database import get_db
 from app.models import PriceHistory, Product, User
@@ -18,6 +18,7 @@ from app.schemas import (
     ProductOut,
     ProductStatisticsOut,
     ProductUpdate,
+    SparklinePoint,
 )
 
 router = APIRouter(prefix="/products", tags=["products"])
@@ -58,7 +59,7 @@ async def _get_latest_price_changes(db: AsyncSession, product_ids: list[int]) ->
         order_by=PriceHistory.scraped_at.desc()
     ).label("rn")
     latest_subq = (
-        select(PriceHistory.product_id, PriceHistory.price, PriceHistory.scraped_at)
+        select(PriceHistory.product_id, PriceHistory.price, PriceHistory.scraped_at, PriceHistory.currency)
         .where(PriceHistory.product_id.in_(product_ids))
         .add_columns(latest_rn)
     ).subquery()
@@ -67,6 +68,7 @@ async def _get_latest_price_changes(db: AsyncSession, product_ids: list[int]) ->
     latest_rows = (await db.execute(latest_stmt)).all()
 
     latest_prices = {row.product_id: (row.price, row.scraped_at) for row in latest_rows}
+    latest_currencies = {row.product_id: row.currency for row in latest_rows}
 
     diff_rn = func.row_number().over(
         partition_by=PriceHistory.product_id,
@@ -98,7 +100,11 @@ async def _get_latest_price_changes(db: AsyncSession, product_ids: list[int]) ->
 
     first_seen_map = {}
     if or_conditions:
-        first_seen_stmt = select(PriceHistory.product_id, func.min(PriceHistory.scraped_at)).where(or_(*or_conditions)).group_by(PriceHistory.product_id)
+        first_seen_stmt = (
+            select(PriceHistory.product_id, func.min(PriceHistory.scraped_at))
+            .where(or_(*or_conditions))
+            .group_by(PriceHistory.product_id)
+        )
         first_seen_rows = (await db.execute(first_seen_stmt)).all()
         first_seen_map = {row[0]: row[1] for row in first_seen_rows}
 
@@ -106,6 +112,7 @@ async def _get_latest_price_changes(db: AsyncSession, product_ids: list[int]) ->
         latest = latest_prices.get(pid)
         if not latest:
             out[pid] = {
+                "currency": "EUR",
                 "latest_price": None,
                 "previous_price": None,
                 "last_change_at": None,
@@ -115,9 +122,11 @@ async def _get_latest_price_changes(db: AsyncSession, product_ids: list[int]) ->
             continue
 
         latest_price, latest_scraped_at = latest
+        currency = latest_currencies.get(pid) or "EUR"
         prev = prev_different_prices.get(pid)
         if not prev:
             out[pid] = {
+                "currency": currency,
                 "latest_price": latest_price,
                 "previous_price": latest_price,
                 "last_change_at": latest_scraped_at,
@@ -134,6 +143,7 @@ async def _get_latest_price_changes(db: AsyncSession, product_ids: list[int]) ->
             last_change_percent = last_change_percent.quantize(Decimal("0.01"))
 
         out[pid] = {
+            "currency": currency,
             "latest_price": latest_price,
             "previous_price": prev_price,
             "last_change_at": last_change_at,
@@ -152,7 +162,9 @@ async def _get_latest_price_changes(db: AsyncSession, product_ids: list[int]) ->
         order_by=[PriceHistory.price.desc(), PriceHistory.scraped_at.desc()]
     ).label("rn_max")
 
-    base_subq_extreme = select(PriceHistory.product_id, PriceHistory.price, PriceHistory.scraped_at).where(PriceHistory.product_id.in_(product_ids))
+    base_subq_extreme = select(
+        PriceHistory.product_id, PriceHistory.price, PriceHistory.scraped_at
+    ).where(PriceHistory.product_id.in_(product_ids))
 
     min_subq = base_subq_extreme.add_columns(extreme_rn_min).subquery()
     max_subq = base_subq_extreme.add_columns(extreme_rn_max).subquery()
@@ -177,20 +189,8 @@ async def _get_latest_price_changes(db: AsyncSession, product_ids: list[int]) ->
 
     return out
 
-async def _to_product_out(product: Product, db: AsyncSession) -> ProductOut:
+def _build_product_out(product: Product, info: dict) -> ProductOut:
     from app.scheduler import scheduler
-
-    latest_prices = await _get_latest_price_changes(db, [product.id])
-    latest_price_info = latest_prices.get(product.id, {})
-    latest_price = latest_price_info.get("latest_price")
-    previous_price = latest_price_info.get("previous_price")
-    last_change_at = latest_price_info.get("last_change_at")
-    last_change_percent = latest_price_info.get("last_change_percent")
-    last_checked_at = latest_price_info.get("last_checked_at")
-    lowest_price = latest_price_info.get("lowest_price")
-    lowest_price_at = latest_price_info.get("lowest_price_at")
-    highest_price = latest_price_info.get("highest_price")
-    highest_price_at = latest_price_info.get("highest_price_at")
 
     job = scheduler.get_job(f"product_{product.id}")
     next_run_at = job.next_run_time if job else None
@@ -199,68 +199,37 @@ async def _to_product_out(product: Product, db: AsyncSession) -> ProductOut:
         {
             **product.__dict__,
             "tags": _tags_to_list(product.tags),
-            "latest_price": latest_price,
-            "previous_price": previous_price,
-            "last_price_change_percent": last_change_percent,
-            "last_price_change_at": last_change_at,
-            "last_checked_at": last_checked_at,
-            "lowest_price": lowest_price,
-            "lowest_price_at": lowest_price_at,
-            "highest_price": highest_price,
-            "highest_price_at": highest_price_at,
+            "currency": info.get("currency") or "EUR",
+            "latest_price": info.get("latest_price"),
+            "previous_price": info.get("previous_price"),
+            "last_price_change_percent": info.get("last_change_percent"),
+            "last_price_change_at": info.get("last_change_at"),
+            "last_checked_at": info.get("last_checked_at"),
+            "lowest_price": info.get("lowest_price"),
+            "lowest_price_at": info.get("lowest_price_at"),
+            "highest_price": info.get("highest_price"),
+            "highest_price_at": info.get("highest_price_at"),
             "next_run_at": next_run_at,
         }
     )
+
+
+async def _to_product_out(product: Product, db: AsyncSession) -> ProductOut:
+    latest_prices = await _get_latest_price_changes(db, [product.id])
+    return _build_product_out(product, latest_prices.get(product.id, {}))
 
 
 @router.get("", response_model=list[ProductOut])
 async def list_products(
     user: User = Depends(require_user), db: AsyncSession = Depends(get_db)
 ) -> list[ProductOut]:
-    from app.scheduler import scheduler
-
     result = await db.execute(select(Product).where(Product.user_id == user.id))
     products = result.scalars().all()
     if not products:
         return []
 
-    product_ids = [p.id for p in products]
-
-    latest_prices = await _get_latest_price_changes(db, product_ids)
-
-    out = []
-    for product in products:
-        latest_price_info = latest_prices.get(product.id, {})
-        latest_price = latest_price_info.get("latest_price")
-        previous_price = latest_price_info.get("previous_price")
-        last_change_at = latest_price_info.get("last_change_at")
-        last_change_percent = latest_price_info.get("last_change_percent")
-        last_checked_at = latest_price_info.get("last_checked_at")
-        lowest_price = latest_price_info.get("lowest_price")
-        lowest_price_at = latest_price_info.get("lowest_price_at")
-        highest_price = latest_price_info.get("highest_price")
-        highest_price_at = latest_price_info.get("highest_price_at")
-
-        job = scheduler.get_job(f"product_{product.id}")
-        next_run_at = job.next_run_time if job else None
-
-        out.append(ProductOut.model_validate(
-            {
-                **product.__dict__,
-                "tags": _tags_to_list(product.tags),
-                "latest_price": latest_price,
-                "previous_price": previous_price,
-                "last_price_change_percent": last_change_percent,
-                "last_price_change_at": last_change_at,
-                "last_checked_at": last_checked_at,
-                "lowest_price": lowest_price,
-                "lowest_price_at": lowest_price_at,
-                "highest_price": highest_price,
-                "highest_price_at": highest_price_at,
-                "next_run_at": next_run_at,
-            }
-        ))
-    return out
+    latest_prices = await _get_latest_price_changes(db, [p.id for p in products])
+    return [_build_product_out(product, latest_prices.get(product.id, {})) for product in products]
 
 
 @router.post("", response_model=ProductOut, status_code=status.HTTP_201_CREATED)
@@ -278,7 +247,6 @@ async def create_product(
     db.add(product)
     await db.flush()
     await db.refresh(product)
-    await db.commit()
 
     from app.images import schedule_image_download
     if product.image_url:
@@ -287,6 +255,31 @@ async def create_product(
     if product.active and product.check_interval_minutes > 0:
         add_product_job(product)
     return await _to_product_out(product, db)
+
+
+@router.get("/sparklines", response_model=dict[int, list[SparklinePoint]])
+async def get_sparklines(
+    days: int = 30,
+    user: User = Depends(require_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict[int, list[SparklinePoint]]:
+    """Recent price points for all of the user's products, for dashboard sparklines."""
+    from datetime import UTC, datetime, timedelta
+
+    days = max(1, min(days, 365))
+    cutoff = datetime.now(UTC) - timedelta(days=days)
+
+    result = await db.execute(
+        select(PriceHistory.product_id, PriceHistory.price, PriceHistory.scraped_at)
+        .join(Product, Product.id == PriceHistory.product_id)
+        .where(Product.user_id == user.id, PriceHistory.scraped_at >= cutoff)
+        .order_by(PriceHistory.product_id, PriceHistory.scraped_at.asc())
+    )
+
+    out: dict[int, list[SparklinePoint]] = {}
+    for product_id, price, scraped_at in result.all():
+        out.setdefault(product_id, []).append(SparklinePoint(t=scraped_at, p=price))
+    return out
 
 
 @router.get("/{product_id}", response_model=ProductOut)
@@ -311,7 +304,6 @@ async def update_product(
     old_interval = product.check_interval_minutes
     old_active = product.active
     old_image_url = product.image_url
-    old_check_time_hhmm = product.check_time_hhmm
 
     from app.schedule_utils import normalize_check_time_hhmm
     updates = body.model_dump(exclude_unset=True)
@@ -335,7 +327,6 @@ async def update_product(
 
     await db.flush()
     await db.refresh(product)
-    await db.commit()
 
     if image_changed:
         from app.images import schedule_image_download
@@ -374,33 +365,44 @@ async def check_product_now(
     db: AsyncSession = Depends(get_db),
 ) -> CheckResult:
     product = await _get_product(product_id, user, db)
-    from app.main import app
+    from app.browser import get_browser
 
-    browser = getattr(app.state, "browser", None)
+    browser = get_browser()
     if browser is None:
         return CheckResult(product_id=product_id, price=None, error="Browser not available")
 
+    from app.scheduler import check_url_redirect, product_scrape_lock
     from app.scraper import scrape_price
-    from app.scheduler import check_url_redirect
 
-    price_float, final_url = await scrape_price(browser, product.url, product.selector)
+    async with product_scrape_lock(product_id):
+        result = await scrape_price(browser, product.url, product.selector, product.price_format)
 
-    await check_url_redirect(product, final_url, db)
-    await db.commit()
+    await check_url_redirect(product, result.final_url, db)
 
     if product.url_redirected:
         return CheckResult(product_id=product_id, price=None, error="URL redirected")
 
-    if price_float is None:
+    if result.price is None:
         return CheckResult(product_id=product_id, price=None, error="Could not scrape price")
 
     if product.consecutive_scrape_failures > 0:
         product.consecutive_scrape_failures = 0
 
-    price = Decimal(str(price_float)).quantize(Decimal("0.01"))
-    record = PriceHistory(product_id=product_id, price=price)
-    db.add(record)
-    await db.commit()
+    price = Decimal(str(result.price)).quantize(Decimal("0.01"))
+
+    prev = (
+        await db.execute(
+            select(PriceHistory)
+            .where(PriceHistory.product_id == product_id)
+            .order_by(PriceHistory.scraped_at.desc())
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+
+    changed = prev is None or prev.price != price
+    if changed or product.record_all_prices:
+        currency = result.currency or (prev.currency if prev else None) or "EUR"
+        db.add(PriceHistory(product_id=product_id, price=price, currency=currency))
 
     return CheckResult(product_id=product_id, price=price)
 
@@ -412,6 +414,7 @@ async def download_all_missing_images(
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, str]:
     from pathlib import Path
+
     from app.images import download_image_task, get_images_dir
 
     result = await db.execute(select(Product).where(Product.user_id == user.id))
@@ -443,7 +446,6 @@ async def check_all_products_now(
     user: User = Depends(require_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, str]:
-    from app.scheduler import scrape_and_record
 
     result = await db.execute(
         select(Product.id).where(Product.user_id == user.id, Product.active == True)
@@ -472,16 +474,31 @@ async def get_product_statistics(
         func.count(PriceHistory.id),
         func.min(PriceHistory.price),
         func.max(PriceHistory.price),
-        func.avg(PriceHistory.price)
     ).where(PriceHistory.product_id == product_id)
 
     stats_result = await db.execute(stats_stmt)
-    data_points, lowest_val, highest_val, avg_val = stats_result.one()
+    data_points, lowest_val, highest_val = stats_result.one()
 
     if not data_points:
         return ProductStatisticsOut()
 
-    average_price = Decimal(str(avg_val)).quantize(Decimal("0.01")) if avg_val else Decimal(0)
+    # Prices are recorded only when they change, so average by time-in-effect
+    # instead of by row (a row average overweights volatile periods).
+    from datetime import datetime
+
+    from app.stats import time_weighted_average
+
+    history_rows = (
+        await db.execute(
+            select(PriceHistory.price, PriceHistory.scraped_at)
+            .where(PriceHistory.product_id == product_id)
+            .order_by(PriceHistory.scraped_at.asc())
+        )
+    ).all()
+    average_price = time_weighted_average(
+        [(row.price, row.scraped_at) for row in history_rows],
+        now=datetime.now(UTC),
+    ) or Decimal(0)
 
     # Min/Max queries
     # Lowest price at
@@ -501,7 +518,12 @@ async def get_product_statistics(
     highest = highest_res.scalar_one()
 
     # First and Last two points
-    first_stmt = select(PriceHistory).where(PriceHistory.product_id == product_id).order_by(PriceHistory.scraped_at.asc()).limit(1)
+    first_stmt = (
+        select(PriceHistory)
+        .where(PriceHistory.product_id == product_id)
+        .order_by(PriceHistory.scraped_at.asc())
+        .limit(1)
+    )
     first_res = await db.execute(first_stmt)
     first = first_res.scalar_one()
 

@@ -28,6 +28,9 @@ class User(Base):
     default_email: Mapped[str | None] = mapped_column(String(256), nullable=True)
     default_telegram_chat_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     starred_product_ids: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Incremented on logout; JWTs carry the value at issue time, so a bump
+    # invalidates every outstanding token for this user.
+    token_version: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -51,6 +54,11 @@ class Product(Base):
     selector: Mapped[str] = mapped_column(String(256), nullable=False)
     check_interval_minutes: Mapped[int] = mapped_column(Integer, default=30)
     check_time_hhmm: Mapped[str] = mapped_column(String(5), server_default="10:00", default="10:00", nullable=False)
+    # False (default): store a price row only when the price changed.
+    # True: store a row on every successful check.
+    record_all_prices: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0", nullable=False)
+    # Number-format hint for parsing scraped prices: 'auto' | 'eu' | 'us'.
+    price_format: Mapped[str] = mapped_column(String(8), default="auto", server_default="auto", nullable=False)
     consecutive_scrape_failures: Mapped[int] = mapped_column(Integer, default=0)
     url_redirected: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     active: Mapped[bool] = mapped_column(Boolean, default=True)
@@ -91,13 +99,17 @@ class Alert(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     product_id: Mapped[int] = mapped_column(Integer, ForeignKey("products.id"), nullable=False, index=True)
     condition: Mapped[str] = mapped_column(
-        Enum("below", "changed", "any_change", "lowered", name="alert_condition"), nullable=False
+        Enum("below", "changed", "any_change", "lowered", "lowered_percent", name="alert_condition"),
+        nullable=False,
     )
     threshold_price: Mapped[Decimal | None] = mapped_column(Numeric(10, 2), nullable=True)
+    # For "lowered_percent": fire when the price drops by at least this percent.
+    threshold_percent: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
     email: Mapped[str | None] = mapped_column(String(256), nullable=True)
     telegram_chat_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     last_checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_triggered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     product: Mapped["Product"] = relationship("Product", back_populates="alerts")
 
@@ -124,17 +136,13 @@ class SelectorDefault(Base):
 
 
 class AppSettings(Base):
+    """Global app settings row (id=1). DB connection config lives in .env only."""
+
     __tablename__ = "app_settings"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
-    db_type: Mapped[str] = mapped_column(String(16), default="sqlite")
-    sqlite_path: Mapped[str] = mapped_column(String(256), default="/data/caero.db")
-    pg_host: Mapped[str] = mapped_column(String(256), default="")
-    pg_port: Mapped[int] = mapped_column(Integer, default=5432)
-    pg_database: Mapped[str] = mapped_column(String(256), default="")
-    pg_user: Mapped[str] = mapped_column(String(256), default="")
-    pg_password: Mapped[str] = mapped_column(String(256), default="")
     allow_registration: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    show_sparklines: Mapped[bool] = mapped_column(Boolean, default=True, server_default="1", nullable=False)
     date_format: Mapped[str] = mapped_column(String(32), default="DD.MM.YYYY", nullable=False)
     time_format: Mapped[str] = mapped_column(String(8), default="24h", nullable=False)
     telegram_bot_token: Mapped[str] = mapped_column(String(256), default="", nullable=False, server_default="")

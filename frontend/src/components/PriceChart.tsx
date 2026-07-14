@@ -8,7 +8,7 @@ import {
   YAxis,
 } from 'recharts'
 import { useMemo } from 'react'
-import { useSettings } from '../api/hooks'
+import { useUiSettings } from '../api/hooks'
 import type { PriceHistory } from '../api/types'
 import { localeFromDateFormat, formatDateTime } from '../utils/format'
 
@@ -25,7 +25,7 @@ interface PriceChartProps {
 }
 
 export default function PriceChart({ data, currency = 'EUR', onPointClick }: PriceChartProps) {
-  const { data: settings } = useSettings()
+  const { data: settings } = useUiSettings()
   const locale = localeFromDateFormat(settings?.date_format)
   const currencyCode = useMemo(
     () => data.find((item) => item.currency)?.currency || currency,

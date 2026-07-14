@@ -1,14 +1,25 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { Suspense, lazy, useEffect, useState, type ReactNode } from 'react'
 import { LayoutDashboard, Menu, Moon, Plus, Settings, Sun, X, LogOut } from 'lucide-react'
 import { Link, Route, Routes, useLocation } from 'react-router-dom'
 import { logoutClient, useMe } from './api/hooks'
 import { Toaster } from 'react-hot-toast'
 import CaeroBrand from './components/CaeroBrand'
-import AddProduct from './pages/AddProduct'
-import Dashboard from './pages/Dashboard'
 import Login from './pages/Login'
-import ProductDetail from './pages/ProductDetail'
-import Setup from './pages/Setup'
+
+// Route-level code splitting — keeps recharts and the big pages out of the
+// initial bundle.
+const AddProduct = lazy(() => import('./pages/AddProduct'))
+const Dashboard = lazy(() => import('./pages/Dashboard'))
+const ProductDetail = lazy(() => import('./pages/ProductDetail'))
+const Setup = lazy(() => import('./pages/Setup'))
+
+function PageSpinner() {
+  return (
+    <div className="flex items-center justify-center h-64">
+      <div className="animate-spin rounded-full h-10 w-10 border-4 border-indigo-500 border-t-transparent" />
+    </div>
+  )
+}
 
 type Theme = 'light' | 'dark'
 
@@ -45,11 +56,14 @@ function resolveInitialTheme(): Theme {
 
 function NavBar({ theme, onToggleTheme }: { theme: Theme; onToggleTheme: () => void }) {
   const location = useLocation()
-  const [menuOpen, setMenuOpen] = useState(false)
-
-  useEffect(() => {
-    setMenuOpen(false)
-  }, [location.pathname])
+  // The menu is "open for a specific path" — navigating away makes the
+  // comparison false, so it closes without an effect.
+  const [menuOpenPath, setMenuOpenPath] = useState<string | null>(null)
+  const menuOpen = menuOpenPath === location.pathname
+  const setMenuOpen = (open: boolean | ((prev: boolean) => boolean)) => {
+    const next = typeof open === 'function' ? open(menuOpen) : open
+    setMenuOpenPath(next ? location.pathname : null)
+  }
 
   const navLink = (to: string, label: string, ariaLabel?: string, icon?: ReactNode) => (
     <Link
@@ -216,12 +230,14 @@ export default function App() {
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-gray-100">
       <Toaster position="bottom-right" />
       <NavBar theme={theme} onToggleTheme={() => setTheme(theme === 'dark' ? 'light' : 'dark')} />
-      <Routes>
-        <Route path="/" element={<Dashboard />} />
-        <Route path="/add" element={<AddProduct />} />
-        <Route path="/products/:id" element={<ProductDetail />} />
-        <Route path="/setup" element={<Setup />} />
-      </Routes>
+      <Suspense fallback={<PageSpinner />}>
+        <Routes>
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/add" element={<AddProduct />} />
+          <Route path="/products/:id" element={<ProductDetail />} />
+          <Route path="/setup" element={<Setup />} />
+        </Routes>
+      </Suspense>
     </div>
   )
 }

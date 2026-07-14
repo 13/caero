@@ -4,38 +4,23 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import re
+from dataclasses import dataclass
 
 from patchright.async_api import Browser, Page
 
+from app.config import settings
+from app.parsing import detect_currency, parse_price
+
 logger = logging.getLogger(__name__)
 
-_scrape_sem = asyncio.Semaphore(4)
+_scrape_sem = asyncio.Semaphore(settings.scraper_concurrency)
 
-def _parse_price(raw: str) -> float | None:
-    """Normalise European and English price strings to float."""
-    if not raw:
-        return None
-    # Remove currency symbols and whitespace
-    cleaned = re.sub(r"[^\d.,]", "", raw.strip())
-    if not cleaned:
-        return None
 
-    # Detect European format: 1.234,56 or 1234,56
-    if re.search(r"\d\.\d{3},\d{2}$", cleaned):
-        # Thousands dot + comma decimal: 1.234,56 → 1234.56
-        cleaned = cleaned.replace(".", "").replace(",", ".")
-    elif re.search(r",\d{2}$", cleaned):
-        # Comma decimal only: 1234,56 → 1234.56
-        cleaned = cleaned.replace(",", ".")
-    else:
-        # English format or no decimal: remove commas as thousands sep
-        cleaned = cleaned.replace(",", "")
-
-    try:
-        return float(cleaned)
-    except ValueError:
-        return None
+@dataclass
+class ScrapeResult:
+    price: float | None
+    currency: str | None
+    final_url: str | None
 
 
 async def _is_unavailable(page: Page) -> bool:
@@ -69,7 +54,7 @@ async def _is_unavailable(page: Page) -> bool:
         return False
 
 
-async def _try_ld_json(page: Page) -> float | None:
+async def _try_ld_json(page: Page) -> tuple[float | None, str | None]:
     try:
         scripts = await page.query_selector_all("script[type='application/ld+json']")
         for script in scripts:
@@ -85,31 +70,35 @@ async def _try_ld_json(page: Page) -> float | None:
                         break
             if isinstance(data, dict):
                 offers = data.get("offers")
+                if isinstance(offers, list) and offers:
+                    offers = offers[0]
                 if isinstance(offers, dict):
                     price = offers.get("price")
                     if price is not None:
-                        return float(price)
-                elif isinstance(offers, list) and offers:
-                    price = offers[0].get("price")
-                    if price is not None:
-                        return float(price)
+                        currency = offers.get("priceCurrency")
+                        return float(price), currency if isinstance(currency, str) else None
     except Exception:
         pass
-    return None
+    return None, None
 
 
-async def _try_itemprop(page: Page) -> float | None:
+async def _try_itemprop(page: Page) -> tuple[float | None, str | None]:
     try:
         el = await page.query_selector("[itemprop='price']")
         if el:
+            currency = None
+            currency_el = await page.query_selector("[itemprop='priceCurrency']")
+            if currency_el:
+                currency = await currency_el.get_attribute("content")
+
             content = await el.get_attribute("content")
             if content:
-                return _parse_price(content)
+                return parse_price(content), currency
             text = await el.inner_text()
-            return _parse_price(text)
+            return parse_price(text), currency or detect_currency(text)
     except Exception:
         pass
-    return None
+    return None, None
 
 
 async def _try_data_price(page: Page) -> float | None:
@@ -118,38 +107,42 @@ async def _try_data_price(page: Page) -> float | None:
         if el:
             val = await el.get_attribute("data-price")
             if val:
-                return _parse_price(val)
+                return parse_price(val)
     except Exception:
         pass
     return None
 
 
-async def scrape_price(browser: Browser, url: str, selector: str) -> tuple[float | None, str | None]:
+async def scrape_price(
+    browser: Browser, url: str, selector: str, price_format: str = "auto"
+) -> ScrapeResult:
     """
     Scrape a price from the given URL using the given CSS selector.
     Falls back to ld+json, itemprop, and data-price if selector fails.
-    Returns (price, final_url) where final_url is the URL after any redirects.
     """
     async with _scrape_sem:
-        return await _scrape_price(browser, url, selector)
+        return await _scrape_price(browser, url, selector, price_format)
 
 
-async def _scrape_price(browser: Browser, url: str, selector: str) -> tuple[float | None, str | None]:
+async def _scrape_price(
+    browser: Browser, url: str, selector: str, price_format: str = "auto"
+) -> ScrapeResult:
     context = None
     page = None
     try:
-        # Create a full context with realistic defaults instead of just setting headers
+        # Realistic context; deliberately no user_agent override — Patchright's
+        # own UA matches the bundled Chromium, a stale hardcoded one is a
+        # fingerprinting red flag. Locale/timezone must agree with each other,
+        # so both come from config.
         context = await browser.new_context(
-            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
             viewport={"width": 1920, "height": 1080},
-            locale="de-DE",
-            timezone_id="Europe/Rome",
+            locale=settings.scraper_locale,
+            timezone_id=settings.scraper_timezone,
             has_touch=False,
             is_mobile=False,
         )
         page = await context.new_page()
 
-        #await page.goto(url, timeout=30000, wait_until="networkidle")
         await page.goto(url, timeout=60000, wait_until="domcontentloaded")
         await page.wait_for_timeout(500)
 
@@ -158,48 +151,40 @@ async def _scrape_price(browser: Browser, url: str, selector: str) -> tuple[floa
         # unrelated price elsewhere on the page.
         if await _is_unavailable(page):
             logger.info("Product page reports unavailable, returning no price: %s", url)
-            try:
-                final_url = await page.evaluate("window.location.href")
-            except Exception:
-                final_url = page.url
-            return None, final_url
+            return ScrapeResult(None, None, await _current_url(page))
 
         price = None
+        currency = None
 
         # Primary: user-supplied CSS selector
         try:
             await page.wait_for_selector(selector, timeout=10000)
-            #el = await page.query_selector(selector)
             el = page.locator(selector).first
             if await el.count() > 0:
                 text = await el.inner_text()
-                price = _parse_price(text)
+                price = parse_price(text, price_format)
+                currency = detect_currency(text)
         except Exception:
             pass
 
         # Fallback 1: ld+json
         if price is None:
-            price = await _try_ld_json(page)
+            price, currency = await _try_ld_json(page)
 
         # Fallback 2: itemprop="price"
         if price is None:
-            price = await _try_itemprop(page)
+            price, currency = await _try_itemprop(page)
 
         # Fallback 3: data-price attribute
         if price is None:
             price = await _try_data_price(page)
+            currency = None
 
-        # Capture URL after all scraping so JS-based redirects (including pushState) are reflected.
-        # page.url is a cached Python-side property; evaluate forces a browser round-trip.
-        try:
-            final_url = await page.evaluate("window.location.href")
-        except Exception:
-            final_url = page.url
-        return price, final_url
+        return ScrapeResult(price, currency, await _current_url(page))
 
     except Exception as exc:
         logger.warning("scrape_price failed for %s: %s", url, exc)
-        return None, None
+        return ScrapeResult(None, None, None)
     finally:
         if page:
             try:
@@ -211,3 +196,13 @@ async def _scrape_price(browser: Browser, url: str, selector: str) -> tuple[floa
                 await context.close()
             except Exception:
                 pass
+
+
+async def _current_url(page: Page) -> str | None:
+    # Capture URL after all scraping so JS-based redirects (including pushState)
+    # are reflected. page.url is a cached Python-side property; evaluate forces
+    # a browser round-trip.
+    try:
+        return await page.evaluate("window.location.href")
+    except Exception:
+        return page.url

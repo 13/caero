@@ -13,6 +13,9 @@ export interface Token {
   token_type: string
 }
 
+/** Number-format hint for parsing scraped prices. */
+export type PriceFormat = 'auto' | 'eu' | 'us'
+
 export interface Product {
   id: number
   user_id: number
@@ -26,9 +29,12 @@ export interface Product {
   url: string
   selector: string
   check_interval_minutes: number
+  record_all_prices: boolean
+  price_format: PriceFormat
   consecutive_scrape_failures: number
   url_redirected: boolean
   active: boolean
+  currency: string
   latest_price: string | null
   previous_price: string | null
   last_price_change_percent: string | null
@@ -52,6 +58,8 @@ export interface ProductCreate {
   url: string
   selector: string
   check_interval_minutes?: number
+  record_all_prices?: boolean
+  price_format?: PriceFormat
   active?: boolean
 }
 
@@ -65,6 +73,8 @@ export interface ProductUpdate {
   url?: string
   selector?: string
   check_interval_minutes?: number
+  record_all_prices?: boolean
+  price_format?: PriceFormat
   active?: boolean
 }
 
@@ -82,37 +92,58 @@ export interface PriceHistoryCreate {
   currency?: string | null
 }
 
+export type AlertCondition = 'below' | 'changed' | 'any_change' | 'lowered' | 'lowered_percent'
+
 export interface Alert {
   id: number
   product_id: number
-  condition: 'below' | 'changed' | 'any_change' | 'lowered'
+  condition: AlertCondition
   threshold_price: string | null
+  threshold_percent?: string | null
   email: string | null
   telegram_chat_id: string | null
   active: boolean
+  last_checked_at?: string | null
+  last_triggered_at?: string | null
 }
 
 export interface AlertCreate {
-  condition: 'below' | 'changed' | 'any_change' | 'lowered'
+  condition: AlertCondition
   threshold_price?: string | null
+  threshold_percent?: string | null
   email?: string | null
   telegram_chat_id?: string | null
   active?: boolean
 }
 
+export type DateFormat = 'DD.MM.YYYY' | 'DD/MM/YYYY' | 'MM/DD/YYYY' | 'YYYY-MM-DD'
+export type TimeFormat = '12h' | '24h'
+
 export interface AppSettings {
-  db_type: 'sqlite' | 'postgresql'
-  sqlite_path: string
-  pg_host: string
-  pg_port: number
-  pg_database: string
-  pg_user: string
-  pg_password: string
   allow_registration: boolean
-  date_format: 'DD.MM.YYYY' | 'DD/MM/YYYY' | 'MM/DD/YYYY' | 'YYYY-MM-DD'
-  time_format: '12h' | '24h'
-  telegram_bot_token: string
+  date_format: DateFormat
+  time_format: TimeFormat
+  telegram_bot_token_set: boolean
   updated_at: string | null
+}
+
+export interface AppSettingsIn {
+  allow_registration: boolean
+  date_format: DateFormat
+  time_format: TimeFormat
+  /** undefined/null = keep stored token, '' = clear it */
+  telegram_bot_token?: string | null
+}
+
+export interface UiSettings {
+  date_format: DateFormat
+  time_format: TimeFormat
+  show_sparklines: boolean
+}
+
+export interface SparklinePoint {
+  t: string
+  p: string
 }
 
 export interface SelectorDefault {
@@ -124,21 +155,6 @@ export interface SelectorDefault {
 export interface SelectorDefaultIn {
   domain: string
   selector: string
-}
-
-export interface TestDbRequest {
-  db_type: 'sqlite' | 'postgresql'
-  sqlite_path?: string
-  pg_host?: string
-  pg_port?: number
-  pg_database?: string
-  pg_user?: string
-  pg_password?: string
-}
-
-export interface TestDbResponse {
-  status: 'connected' | 'error'
-  message: string
 }
 
 export interface TestEmailRequest {
@@ -215,10 +231,6 @@ export interface SystemInfoOut {
 }
 
 export interface JobOut {
-  id: number
-  product_id: number
-  status: 'pending' | 'in_progress' | 'completed' | 'failed'
-  error_message: string | null
-  created_at: string
-  updated_at: string
+  id: string
+  next_run_time: string | null
 }

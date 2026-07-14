@@ -71,7 +71,6 @@ async def delete_alert(
         raise HTTPException(status_code=404, detail="Alert not found")
 
     await db.delete(alert)
-    await db.commit()
 
 
 @router.patch("/alerts/{alert_id}", response_model=AlertOut)
@@ -99,7 +98,6 @@ async def update_alert(
         setattr(alert, key, value)
 
     await db.flush()
-    await db.commit()
     await db.refresh(alert)
     return alert
 

@@ -2,11 +2,12 @@ import { Link } from 'react-router-dom'
 import { RefreshCw, X, TrendingDown, TrendingUp, ExternalLink, BellRing, Star } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useState } from 'react'
-import type { Product } from '../api/types'
-import { useCheckProduct, useDeleteProduct, useSettings } from '../api/hooks'
-import { formatDate, formatIntervalHours, formatPercent, formatPrice } from '../utils/format'
+import type { Product, SparklinePoint } from '../api/types'
+import { useCheckProduct, useDeleteProduct, useUiSettings } from '../api/hooks'
+import { currencySymbol, formatDate, formatIntervalHours, formatPercent, formatPrice } from '../utils/format'
 import { getTagColorClass } from '../utils/tags'
 import ConfirmDialog from './ConfirmDialog'
+import Sparkline from './Sparkline'
 
 interface ProductCardProps {
   product: Product
@@ -17,12 +18,13 @@ interface ProductCardProps {
   isUpdating?: boolean
   isStarred?: boolean
   onToggleStar?: (productId: number) => void
+  sparkline?: SparklinePoint[]
 }
 
-export default function ProductCard({ product, onKeywordClick, hasActiveAlerts, searchSuffix = '', onToggleActive, isUpdating = false, isStarred = false, onToggleStar }: ProductCardProps) {
+export default function ProductCard({ product, onKeywordClick, hasActiveAlerts, searchSuffix = '', onToggleActive, isUpdating = false, isStarred = false, onToggleStar, sparkline }: ProductCardProps) {
   const deleteMutation = useDeleteProduct()
   const checkMutation = useCheckProduct()
-  const { data: settings } = useSettings()
+  const { data: settings } = useUiSettings()
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const isTrackingActive = product.active && product.check_interval_minutes > 0
   const checkIntervalHours = formatIntervalHours(product.check_interval_minutes)
@@ -30,7 +32,7 @@ export default function ProductCard({ product, onKeywordClick, hasActiveAlerts, 
     ? `Every ${checkIntervalHours}h`
     : checkIntervalHours
   const pct = product.last_price_change_percent !== null ? parseFloat(product.last_price_change_percent) : null
-  const displaySrc = (product as any).cached_image_url ?? product.image_url
+  const displaySrc = product.cached_image_url ?? product.image_url
 
   const handleDelete = () => {
     setShowDeleteConfirm(true)
@@ -41,7 +43,7 @@ export default function ProductCard({ product, onKeywordClick, hasActiveAlerts, 
       onSuccess: () => {
         toast.success(`Deleted ${product.name}`)
       },
-      onError: (err: any) => {
+      onError: (err: Error) => {
         toast.error(err?.message ?? 'Delete failed')
       },
     })
@@ -165,12 +167,19 @@ export default function ProductCard({ product, onKeywordClick, hasActiveAlerts, 
           <span className="truncate">{product.url}</span>
         </a>
 
+        {/* Sparkline — recent price trend */}
+        {sparkline && sparkline.length >= 2 && (
+          <div className="mt-auto pt-2">
+            <Sparkline points={sparkline} />
+          </div>
+        )}
+
         {/* Price + change — pushed to bottom */}
-        <div className="flex items-end justify-between mt-auto pt-3 border-t border-gray-100 dark:border-gray-800">
+        <div className={`flex items-end justify-between pt-3 border-t border-gray-100 dark:border-gray-800 ${sparkline && sparkline.length >= 2 ? '' : 'mt-auto'}`}>
           <div>
             <p className="text-xs text-gray-400 dark:text-gray-500 mb-0.5">Latest price</p>
             <p className="text-2xl font-extrabold text-indigo-600 dark:text-indigo-400 tracking-tight">
-              {formatPrice(product.latest_price, settings?.date_format)}
+              {formatPrice(product.latest_price, settings?.date_format, product.currency)}
             </p>
             <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">{intervalLabel}</p>
           </div>
@@ -206,7 +215,7 @@ export default function ProductCard({ product, onKeywordClick, hasActiveAlerts, 
             onClick={() => checkMutation.mutate(product.id, {
               onSuccess: (data) => {
                 if (data.price !== null) {
-                  toast.success('Successfully checked: €' + data.price)
+                  toast.success(`Successfully checked: ${currencySymbol(product.currency)}${data.price}`)
                 } else if (data.error) {
                   toast.error(data.error)
                 } else {

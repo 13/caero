@@ -95,7 +95,7 @@ async def create_price(
         scraped_at=body.scraped_at,
     )
     db.add(price)
-    await db.commit()
+    await db.flush()
     await db.refresh(price)
     return price
 
@@ -131,7 +131,7 @@ async def update_price(
 ) -> PriceHistoryOut:
     price = await _get_owned_price(product_id, price_id, user, db)
     price.price = Decimal(body.price).quantize(Decimal("0.01"))
-    await db.commit()
+    await db.flush()
     await db.refresh(price)
     return price
 
@@ -147,4 +147,3 @@ async def delete_price(
 ) -> None:
     price = await _get_owned_price(product_id, price_id, user, db)
     await db.delete(price)
-    await db.commit()

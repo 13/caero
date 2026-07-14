@@ -16,10 +16,31 @@ export function localeFromDateFormat(format?: DateFormat) {
   return navigator.language || 'en-US'
 }
 
-export function formatPrice(value: string | null, format?: DateFormat) {
+export function formatPrice(value: string | null, format?: DateFormat, currency = 'EUR') {
   if (!value) return '—'
   const locale = localeFromDateFormat(format)
-  return new Intl.NumberFormat(locale, { style: 'currency', currency: 'EUR' }).format(parseFloat(value))
+  try {
+    return new Intl.NumberFormat(locale, { style: 'currency', currency }).format(parseFloat(value))
+  } catch {
+    // Unknown currency code stored in the DB — fall back to a plain number.
+    return new Intl.NumberFormat(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(parseFloat(value))
+  }
+}
+
+export function currencySymbol(currency = 'EUR', format?: DateFormat) {
+  try {
+    return (0)
+      .toLocaleString(localeFromDateFormat(format), {
+        style: 'currency',
+        currency,
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0,
+      })
+      .replace(/\d/g, '')
+      .trim()
+  } catch {
+    return currency
+  }
 }
 
 export function formatPercent(value: string | null, format?: DateFormat) {

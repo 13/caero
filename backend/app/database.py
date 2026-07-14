@@ -1,10 +1,11 @@
+import asyncio
 import logging
+from pathlib import Path
 
 from sqlalchemy import func, inspect, select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
-from sqlalchemy.schema import CreateColumn
 
 from app.config import settings
 
@@ -37,6 +38,12 @@ class Base(DeclarativeBase):
 
 
 async def get_db() -> AsyncSession:
+    """Request-scoped session.
+
+    Transaction pattern: endpoints mutate and (at most) flush; this dependency
+    commits once on success and rolls back on any exception. Endpoints should
+    not call session.commit() themselves.
+    """
     async with AsyncSessionLocal() as session:
         try:
             yield session
@@ -53,11 +60,50 @@ async def get_db() -> AsyncSession:
             raise
 
 
-async def create_tables() -> None:
-    """Create tables and backfill missing legacy columns when possible."""
+# ── Schema management ──────────────────────────────────────────────────────────
+# Alembic is the single source of truth for the schema. At startup we bring the
+# DB to head. DBs created by pre-0.9 versions (Base.metadata.create_all, no
+# alembic_version table) are stamped to head first: their schema already matches
+# because the old startup code also backfilled columns.
+
+_BACKEND_DIR = Path(__file__).parent.parent
+
+
+def _alembic_config():
+    from alembic.config import Config
+
+    config = Config(str(_BACKEND_DIR / "alembic.ini"))
+    config.set_main_option("script_location", str(_BACKEND_DIR / "alembic"))
+    return config
+
+
+def _run_migrations_sync(has_alembic_version: bool, has_tables: bool) -> None:
+    # Alembic's async env.py calls asyncio.run(), so this must run in a thread
+    # without a running event loop (see run_migrations below).
+    from alembic import command
+
+    config = _alembic_config()
+    if has_tables and not has_alembic_version:
+        logger.info("Existing schema without alembic_version — stamping to head")
+        command.stamp(config, "head")
+    else:
+        command.upgrade(config, "head")
+
+
+def _inspect_schema_state(connection) -> tuple[bool, bool]:
+    inspector = inspect(connection)
+    tables = set(inspector.get_table_names())
+    return "alembic_version" in tables, "users" in tables
+
+
+async def run_migrations() -> None:
+    """Bring the database schema to the latest Alembic revision and seed defaults."""
+    async with engine.connect() as conn:
+        has_alembic_version, has_tables = await conn.run_sync(_inspect_schema_state)
+
+    await asyncio.to_thread(_run_migrations_sync, has_alembic_version, has_tables)
+
     async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-        await conn.run_sync(_add_missing_columns_for_existing_tables)
         await conn.run_sync(_seed_selector_defaults)
         await conn.run_sync(_backfill_amazon_selectors)
 
@@ -116,47 +162,3 @@ def _backfill_amazon_selectors(connection) -> None:
     )
     if result.rowcount:
         logger.info("Migrated %d product(s) to the scoped Amazon selector", result.rowcount)
-
-
-def _add_missing_columns_for_existing_tables(connection) -> None:
-    inspector = inspect(connection)
-    existing_tables = set(inspector.get_table_names())
-    preparer = connection.dialect.identifier_preparer
-
-    for table in Base.metadata.sorted_tables:
-        if table.name not in existing_tables:
-            continue
-
-        existing_columns = {col["name"] for col in inspector.get_columns(table.name)}
-
-        for column in table.columns:
-            if column.name in existing_columns:
-                continue
-            if column.primary_key or column.foreign_keys:
-                logger.warning(
-                    "Skipping automatic schema backfill for %s.%s (unsafe column type)",
-                    table.name,
-                    column.name,
-                )
-                continue
-
-            if not column.nullable and column.server_default is None and column.default is None:
-                logger.warning(
-                    "Skipping automatic schema backfill for %s.%s (NOT NULL without default)",
-                    table.name,
-                    column.name,
-                )
-                continue
-
-            column_sql = str(CreateColumn(column).compile(dialect=connection.dialect))
-            table_sql = preparer.quote(table.name)
-            try:
-                connection.exec_driver_sql(f"ALTER TABLE {table_sql} ADD COLUMN {column_sql}")
-                logger.info("Added missing column %s.%s", table.name, column.name)
-            except SQLAlchemyError as exc:
-                logger.warning(
-                    "Could not backfill missing column %s.%s: %s",
-                    table.name,
-                    column.name,
-                    exc,
-                )

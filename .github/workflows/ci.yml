@@ -1,0 +1,122 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - name: Install dependencies
+        run: uv sync --frozen
+      - name: Lint (ruff)
+        run: uv run ruff check app tests
+      - name: Tests (pytest)
+        run: uv run pytest -q
+
+  backend-postgres:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: caero
+          POSTGRES_PASSWORD: caero
+          POSTGRES_DB: caero
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U caero"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DB_TYPE: postgresql
+      PG_HOST: localhost
+      PG_PORT: "5432"
+      PG_DATABASE: caero
+      PG_USER: caero
+      PG_PASSWORD: caero
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - name: Install dependencies
+        run: uv sync --frozen
+      - name: Tests against PostgreSQL
+        run: uv run pytest -q
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Lint (eslint)
+        run: npm run lint
+      - name: Unit tests (vitest)
+        run: npm test
+      - name: Typecheck + build
+        run: npm run build
+
+  e2e:
+    runs-on: ubuntu-latest
+    needs: [backend, frontend]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Build frontend into backend static dir
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+
+      - name: Install backend
+        working-directory: backend
+        run: uv sync --frozen
+
+      - name: Start backend
+        working-directory: backend
+        env:
+          DB_TYPE: sqlite
+          SQLITE_PATH: /tmp/caero-e2e.db
+          SECRET_KEY: e2e-only-secret-key-not-for-production
+        run: |
+          uv run uvicorn app.main:app --port 8000 &
+          timeout 30 bash -c 'until curl -sf http://localhost:8000/api/health; do sleep 1; done'
+
+      - name: Install Playwright browser
+        working-directory: frontend
+        run: npx playwright install chromium --with-deps
+
+      - name: Run e2e tests
+        working-directory: frontend
+        run: npx playwright test
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-traces
+          path: frontend/test-results/

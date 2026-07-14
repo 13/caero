@@ -4,17 +4,18 @@ from __future__ import annotations
 import asyncio
 import logging
 import smtplib
+from datetime import UTC, datetime
 from decimal import Decimal
-from datetime import datetime, timezone
 from email.message import EmailMessage
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.config import settings, PROJECT_VERSION
+from app.config import PROJECT_VERSION, settings
 from app.database import get_db
+from app.images import schedule_image_download
 from app.models import Alert, AppSettings, PriceHistory, Product, SelectorDefault, User
 from app.routers.auth import require_admin, require_user
 from app.scheduler import add_product_job, remove_product_job
@@ -22,21 +23,24 @@ from app.schemas import (
     AppSettingsIn,
     AppSettingsOut,
     DataExportPayload,
+    JobOut,
     SelectorDefaultIn,
     SelectorDefaultOut,
-    TestDbRequest,
-    TestDbResponse,
+    SystemInfoOut,
     TestEmailRequest,
     TestNotificationResponse,
     TestTelegramRequest,
+    UiSettingsIn,
+    UiSettingsOut,
     UserDataExportPayload,
-    SystemInfoOut,
-    JobOut,
 )
-from app.images import schedule_image_download
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/settings", tags=["settings"])
+
+# app_settings keys accepted on import; legacy exports also contain DB
+# connection fields that no longer exist and are silently dropped.
+_IMPORTABLE_SETTINGS_KEYS = {"allow_registration", "date_format", "time_format", "telegram_bot_token"}
 
 
 def _send_test_email_sync(to_email: str) -> None:
@@ -63,31 +67,77 @@ async def _get_or_create_settings(db: AsyncSession) -> AppSettings:
     return settings_row
 
 
+def _settings_out(row: AppSettings) -> AppSettingsOut:
+    return AppSettingsOut(
+        allow_registration=row.allow_registration,
+        date_format=row.date_format,
+        time_format=row.time_format,
+        telegram_bot_token_set=bool(row.telegram_bot_token),
+        updated_at=row.updated_at,
+    )
+
+
 @router.get("", response_model=AppSettingsOut)
 async def get_settings(
     db: AsyncSession = Depends(get_db),
-    _user=Depends(require_user),
+    _admin: User = Depends(require_admin),
 ) -> AppSettingsOut:
     row = await _get_or_create_settings(db)
-    return AppSettingsOut.model_validate(row)
+    return _settings_out(row)
 
 
 @router.post("", response_model=AppSettingsOut)
 async def save_settings(
     body: AppSettingsIn,
     db: AsyncSession = Depends(get_db),
-    _user=Depends(require_user),
+    _admin: User = Depends(require_admin),
 ) -> AppSettingsOut:
     row = await _get_or_create_settings(db)
-    for key, value in body.model_dump().items():
-        setattr(row, key, value)
-    row.updated_at = datetime.now(timezone.utc)
+    row.allow_registration = body.allow_registration
+    row.date_format = body.date_format
+    row.time_format = body.time_format
+    if body.telegram_bot_token is not None:
+        row.telegram_bot_token = body.telegram_bot_token
+        from app.notifier import configure_telegram
+        configure_telegram(row.telegram_bot_token)
+    row.updated_at = datetime.now(UTC)
     await db.flush()
-    await db.commit()
-    await db.refresh(row)
-    from app.notifier import configure_telegram
-    configure_telegram(row.telegram_bot_token)
-    return AppSettingsOut.model_validate(row)
+    return _settings_out(row)
+
+
+# ── Display preferences (available to every authenticated user) ────────────────
+
+def _ui_settings_out(row: AppSettings) -> UiSettingsOut:
+    return UiSettingsOut(
+        date_format=row.date_format,
+        time_format=row.time_format,
+        show_sparklines=row.show_sparklines,
+    )
+
+
+@router.get("/ui", response_model=UiSettingsOut)
+async def get_ui_settings(
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_user),
+) -> UiSettingsOut:
+    row = await _get_or_create_settings(db)
+    return _ui_settings_out(row)
+
+
+@router.patch("/ui", response_model=UiSettingsOut)
+async def save_ui_settings(
+    body: UiSettingsIn,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_user),
+) -> UiSettingsOut:
+    row = await _get_or_create_settings(db)
+    row.date_format = body.date_format
+    row.time_format = body.time_format
+    if body.show_sparklines is not None:
+        row.show_sparklines = body.show_sparklines
+    row.updated_at = datetime.now(UTC)
+    await db.flush()
+    return _ui_settings_out(row)
 
 
 # ── Default price selectors (per-site) ─────────────────────────────────────────
@@ -115,7 +165,6 @@ async def create_selector_default(
     row = SelectorDefault(domain=body.domain, selector=body.selector)
     db.add(row)
     await db.flush()
-    await db.commit()
     await db.refresh(row)
     return SelectorDefaultOut.model_validate(row)
 
@@ -141,8 +190,6 @@ async def update_selector_default(
     row.domain = body.domain
     row.selector = body.selector
     await db.flush()
-    await db.commit()
-    await db.refresh(row)
     return SelectorDefaultOut.model_validate(row)
 
 
@@ -156,44 +203,9 @@ async def delete_selector_default(
     if row is None:
         raise HTTPException(status_code=404, detail="Selector not found")
     await db.delete(row)
-    await db.commit()
 
 
-@router.post("/test-db", response_model=TestDbResponse)
-async def test_db_connection(
-    body: TestDbRequest,
-    _user=Depends(require_user),
-) -> TestDbResponse:
-    if body.db_type == "sqlite":
-        try:
-            import aiosqlite
-
-            async with aiosqlite.connect(body.sqlite_path) as conn:
-                await conn.execute("SELECT 1")
-            return TestDbResponse(status="connected", message="SQLite connection successful")
-        except Exception as exc:
-            return TestDbResponse(status="error", message=str(exc))
-
-    elif body.db_type == "postgresql":
-        try:
-            import asyncpg
-
-            conn = await asyncpg.connect(
-                host=body.pg_host,
-                port=body.pg_port,
-                database=body.pg_database,
-                user=body.pg_user,
-                password=body.pg_password,
-                timeout=5,
-            )
-            await conn.fetchval("SELECT 1")
-            await conn.close()
-            return TestDbResponse(status="connected", message="PostgreSQL connection successful")
-        except Exception as exc:
-            return TestDbResponse(status="error", message=str(exc))
-
-    raise HTTPException(status_code=422, detail="Unknown db_type")
-
+# ── Notification tests ─────────────────────────────────────────────────────────
 
 @router.post("/test-email", response_model=TestNotificationResponse)
 async def test_email_notification(
@@ -221,30 +233,67 @@ async def test_email_notification(
 @router.post("/test-telegram", response_model=TestNotificationResponse)
 async def test_telegram_notification(
     body: TestTelegramRequest,
-    _user=Depends(require_admin),
+    _admin: User = Depends(require_admin),
 ) -> TestNotificationResponse:
-    from app.notifier import _bot_token
+    from app.notifier import get_telegram_token
 
-    if not _bot_token:
-        return TestNotificationResponse(status="failed", message="Telegram bot token not configured")
+    token = get_telegram_token()
+    if not token:
+        return TestNotificationResponse(status="error", message="Telegram bot token not configured")
     try:
         async with httpx.AsyncClient() as client:
             response = await client.post(
-                f"https://api.telegram.org/bot{_bot_token}/sendMessage",
+                f"https://api.telegram.org/bot{token}/sendMessage",
                 json={"chat_id": body.chat_id, "text": "Testing Telegram notification from Caero..."},
                 timeout=10.0,
             )
             response.raise_for_status()
         return TestNotificationResponse(status="sent", message="Test Telegram message sent")
     except Exception as e:
-        return TestNotificationResponse(status="failed", message=str(e))
+        return TestNotificationResponse(status="error", message=str(e))
 
+
+@router.post("/test-webhooks", response_model=TestNotificationResponse)
+async def test_webhook_notifications(
+    _admin: User = Depends(require_admin),
+) -> TestNotificationResponse:
+    from app.notifier import _send_webhook_notifications, _webhooks_configured
+
+    channels = [
+        name
+        for name, configured in (
+            ("ntfy", bool(settings.ntfy_url)),
+            ("Gotify", bool(settings.gotify_url and settings.gotify_token)),
+            ("Discord", bool(settings.discord_webhook_url)),
+        )
+        if configured
+    ]
+    if not _webhooks_configured():
+        return TestNotificationResponse(
+            status="error",
+            message="No webhook channels configured (NTFY_URL / GOTIFY_URL+TOKEN / DISCORD_WEBHOOK_URL)",
+        )
+
+    await _send_webhook_notifications(
+        "[Caero] Test notification", "Webhook channels are working."
+    )
+    return TestNotificationResponse(
+        status="sent",
+        message=(
+            f"Test sent to: {', '.join(channels)}. "
+            "Check the channel(s) — delivery failures only appear in the logs."
+        ),
+    )
+
+
+# ── System info & jobs ─────────────────────────────────────────────────────────
 
 @router.get("/system-info", response_model=SystemInfoOut)
 async def system_info(
     db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_user),
 ) -> SystemInfoOut:
-    from app.main import app
+    from app.browser import get_backend
 
     db_version = "Unknown"
     try:
@@ -257,15 +306,12 @@ async def system_info(
     except Exception:
         pass
 
-    scraper_backend = getattr(app.state, "scraper_backend", "unknown")
-    scraper_headless = settings.scraper_headless
-
     return SystemInfoOut(
         version=PROJECT_VERSION,
         db_type=settings.db_type,
         db_version=str(db_version),
-        scraper_backend=scraper_backend,
-        scraper_headless=scraper_headless,
+        scraper_backend=get_backend(),
+        scraper_headless=settings.scraper_headless,
     )
 
 
@@ -280,6 +326,8 @@ async def list_jobs(
         jobs.append(JobOut(id=job.id, next_run_time=job.next_run_time))
     return jobs
 
+
+# ── Import / export ────────────────────────────────────────────────────────────
 
 def _serialize_decimal(value: Decimal | None) -> str | None:
     if value is None:
@@ -301,6 +349,21 @@ async def _list_user_products(db: AsyncSession, user_id: int) -> list[Product]:
     return result.scalars().all()
 
 
+async def _reset_pg_sequences(db: AsyncSession) -> None:
+    """Re-sync PG id sequences after inserting rows with explicit ids.
+
+    Explicit-id inserts bypass the sequence, so without this the next regular
+    insert reuses an already-taken id and fails. No-op on SQLite.
+    """
+    if settings.db_type != "postgresql":
+        return
+    for table in ("users", "products", "price_history", "alerts"):
+        await db.execute(text(
+            f"SELECT setval(pg_get_serial_sequence('{table}', 'id'), "
+            f"COALESCE((SELECT MAX(id) FROM {table}), 0) + 1, false)"
+        ))
+
+
 async def _delete_products(products: list[Product], db: AsyncSession) -> int:
     from app.images import delete_local_image
     for product in products:
@@ -320,76 +383,9 @@ async def export_data(
     db: AsyncSession = Depends(get_db),
     _admin: User = Depends(require_admin),
 ) -> DataExportPayload:
-    app_settings = await _get_or_create_settings(db)
-    users = (await db.execute(select(User))).scalars().all()
-    products = (await db.execute(select(Product))).scalars().all()
-    price_history = (await db.execute(select(PriceHistory))).scalars().all()
-    alerts = (await db.execute(select(Alert))).scalars().all()
+    from app.backup import build_export_payload
 
-    return DataExportPayload(
-        app_settings={
-            "id": app_settings.id,
-            "db_type": app_settings.db_type,
-            "sqlite_path": app_settings.sqlite_path,
-            "pg_host": app_settings.pg_host,
-            "pg_port": app_settings.pg_port,
-            "pg_database": app_settings.pg_database,
-            "pg_user": app_settings.pg_user,
-            "pg_password": app_settings.pg_password,
-            "allow_registration": app_settings.allow_registration,
-            "date_format": app_settings.date_format,
-        },
-        users=[
-            {
-                "id": user.id,
-                "username": user.username,
-                "hashed_password": user.hashed_password,
-                "is_admin": user.is_admin,
-                "created_at": user.created_at.isoformat() if user.created_at else None,
-            }
-            for user in users
-        ],
-        products=[
-            {
-                "id": product.id,
-                "user_id": product.user_id,
-                "name": product.name,
-                "category": product.category,
-                "memo": product.memo,
-                "tags": product.tags,
-                "image_url": product.image_url,
-                "check_time_hhmm": product.check_time_hhmm,
-                "url": product.url,
-                "selector": product.selector,
-                "check_interval_minutes": product.check_interval_minutes,
-                "active": product.active,
-                "created_at": product.created_at.isoformat() if product.created_at else None,
-            }
-            for product in products
-        ],
-        price_history=[
-            {
-                "id": row.id,
-                "product_id": row.product_id,
-                "price": _serialize_decimal(row.price),
-                "currency": row.currency,
-                "scraped_at": row.scraped_at.isoformat() if row.scraped_at else None,
-            }
-            for row in price_history
-        ],
-        alerts=[
-            {
-                "id": alert.id,
-                "product_id": alert.product_id,
-                "condition": alert.condition,
-                "threshold_price": _serialize_decimal(alert.threshold_price),
-                "email": alert.email,
-                "telegram_chat_id": alert.telegram_chat_id,
-                "active": alert.active,
-            }
-            for alert in alerts
-        ],
-    )
+    return DataExportPayload(**await build_export_payload(db))
 
 
 @router.get("/export/mine", response_model=UserDataExportPayload)
@@ -422,6 +418,8 @@ async def export_my_data(
                 "url": product.url,
                 "selector": product.selector,
                 "check_interval_minutes": product.check_interval_minutes,
+                "record_all_prices": product.record_all_prices,
+                "price_format": product.price_format,
                 "active": product.active,
                 "created_at": product.created_at.isoformat() if product.created_at else None,
             }
@@ -471,7 +469,12 @@ async def import_data(
     await db.execute(AppSettings.__table__.delete())
     await db.flush()
 
-    app_settings = AppSettings(**payload.app_settings)
+    settings_data = {
+        key: value
+        for key, value in payload.app_settings.items()
+        if key in _IMPORTABLE_SETTINGS_KEYS
+    }
+    app_settings = AppSettings(id=1, **settings_data)
     db.add(app_settings)
 
     for user in payload.users:
@@ -507,6 +510,8 @@ async def import_data(
                 url=product["url"],
                 selector=product["selector"],
                 check_interval_minutes=product.get("check_interval_minutes", 30),
+                record_all_prices=bool(product.get("record_all_prices", False)),
+                price_format=product.get("price_format") or "auto",
                 active=product.get("active", True),
                 created_at=_parse_datetime(product.get("created_at")),
             )
@@ -535,6 +540,9 @@ async def import_data(
                 threshold_price=Decimal(alert["threshold_price"])
                 if alert.get("threshold_price")
                 else None,
+                threshold_percent=Decimal(alert["threshold_percent"])
+                if alert.get("threshold_percent")
+                else None,
                 email=alert.get("email"),
                 telegram_chat_id=alert.get("telegram_chat_id"),
                 active=alert.get("active", True),
@@ -542,7 +550,7 @@ async def import_data(
         )
 
     await db.flush()
-    await db.commit()
+    await _reset_pg_sequences(db)
 
     imported_products = (await db.execute(select(Product))).scalars().all()
     for product in imported_products:
@@ -562,7 +570,6 @@ async def delete_my_products(
 ) -> None:
     products = await _list_user_products(db, user.id)
     await _delete_products(products, db)
-    await db.commit()
 
 
 @router.delete("/users/{user_id}/products")
@@ -576,7 +583,6 @@ async def admin_delete_user_products(
         raise HTTPException(status_code=404, detail="User not found")
     products = await _list_user_products(db, target.id)
     deleted = await _delete_products(products, db)
-    await db.commit()
     return {"message": f"Deleted {deleted} product(s) for user {target.username}"}
 
 
@@ -614,6 +620,8 @@ async def import_my_data(
             url=product["url"],
             selector=product["selector"],
             check_interval_minutes=product.get("check_interval_minutes", 30),
+            record_all_prices=bool(product.get("record_all_prices", False)),
+                price_format=product.get("price_format") or "auto",
             active=product.get("active", True),
             created_at=_parse_datetime(product.get("created_at")),
         )
@@ -657,6 +665,9 @@ async def import_my_data(
                 threshold_price=Decimal(alert["threshold_price"])
                 if alert.get("threshold_price")
                 else None,
+                threshold_percent=Decimal(alert["threshold_percent"])
+                if alert.get("threshold_percent")
+                else None,
                 email=alert.get("email"),
                 telegram_chat_id=alert.get("telegram_chat_id"),
                 active=alert.get("active", True),
@@ -664,7 +675,6 @@ async def import_my_data(
         )
 
     await db.flush()
-    await db.commit()
 
     imported_products = await _list_user_products(db, user.id)
     for product in imported_products:

@@ -1,19 +1,16 @@
-import asyncio
 import logging
 import mimetypes
 import os
 import uuid
-import httpx
-import aiofiles
 from pathlib import Path
 
+import aiofiles
+import httpx
 from fastapi import BackgroundTasks
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
 
-from app.models import Product
-from app.database import AsyncSessionLocal
 from app.config import settings
+from app.database import AsyncSessionLocal
+from app.models import Product
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +24,10 @@ def get_images_dir() -> Path:
     img_dir.mkdir(parents=True, exist_ok=True)
     return img_dir
 
+# Product images are thumbnails; anything bigger is a wrong URL or abuse.
+MAX_IMAGE_BYTES = 5 * 1024 * 1024
+
+
 async def download_image_task(product_id: int, url: str) -> None:
     if not url or url.startswith("/user_images/"):
         return
@@ -36,12 +37,29 @@ async def download_image_task(product_id: int, url: str) -> None:
             resp = await client.get(url)
             resp.raise_for_status()
 
+            content_type = resp.headers.get("content-type", "").split(";")[0].strip().lower()
+            if content_type and not content_type.startswith("image/"):
+                logger.warning(
+                    "Skipping image for product %d: content-type %r is not an image (%s)",
+                    product_id, content_type, url,
+                )
+                return
+            if len(resp.content) > MAX_IMAGE_BYTES:
+                logger.warning(
+                    "Skipping image for product %d: %d bytes exceeds the %d byte limit (%s)",
+                    product_id, len(resp.content), MAX_IMAGE_BYTES, url,
+                )
+                return
+
             ext = mimetypes.guess_extension(resp.headers.get("content-type", ""))
             if not ext:
-                if "jpeg" in url.lower() or "jpg" in url.lower(): ext = ".jpg"
-                elif "png" in url.lower(): ext = ".png"
-                elif "webp" in url.lower(): ext = ".webp"
-                else: ext = ".jpg"
+                lowered = url.lower()
+                if "png" in lowered:
+                    ext = ".png"
+                elif "webp" in lowered:
+                    ext = ".webp"
+                else:
+                    ext = ".jpg"
 
             filename = f"prod_{product_id}_{uuid.uuid4().hex[:8]}{ext}"
             images_dir = get_images_dir()
