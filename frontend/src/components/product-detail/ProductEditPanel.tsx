@@ -178,9 +178,18 @@ export default function ProductEditPanel({ product, onClose }: {
               className="rounded text-indigo-600 h-4 w-4"
             />
           </label>
-          <label className="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
-            <input type="checkbox" id="edit-active" checked={editForm.active} onChange={(e) => setEditForm({ ...editForm, active: e.target.checked })} className="rounded text-indigo-600" />
-            Active
+          <label className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-800 cursor-pointer">
+            <div>
+              <p className="text-sm font-medium text-gray-800 dark:text-gray-200">Active</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Run scheduled price checks for this product</p>
+            </div>
+            <input
+              type="checkbox"
+              id="edit-active"
+              checked={editForm.active}
+              onChange={(e) => setEditForm({ ...editForm, active: e.target.checked })}
+              className="rounded text-indigo-600 h-4 w-4"
+            />
           </label>
           <div className="flex gap-2 pt-1 pb-4">
             <button type="submit" disabled={updateMutation.isPending} className="flex-1 bg-indigo-600 text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 transition-colors">
