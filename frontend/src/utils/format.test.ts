@@ -8,7 +8,26 @@ import {
   formatPrice,
   normalizeCheckTimeHHMM,
   normalizeIntervalHoursToMinutes,
+  priceChangeSentiment,
 } from './format'
+
+describe('priceChangeSentiment', () => {
+  it('default: drop is good, rise is bad', () => {
+    expect(priceChangeSentiment(-5)).toBe('good')
+    expect(priceChangeSentiment(5)).toBe('bad')
+  })
+
+  it('inverse: rise is good, drop is bad', () => {
+    expect(priceChangeSentiment(5, true)).toBe('good')
+    expect(priceChangeSentiment(-5, true)).toBe('bad')
+  })
+
+  it('zero and non-finite are neutral either way', () => {
+    expect(priceChangeSentiment(0)).toBe('neutral')
+    expect(priceChangeSentiment(0, true)).toBe('neutral')
+    expect(priceChangeSentiment(NaN)).toBe('neutral')
+  })
+})
 
 describe('formatPrice', () => {
   it('formats EUR with German locale for DD.MM.YYYY', () => {

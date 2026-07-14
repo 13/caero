@@ -72,6 +72,7 @@ export default function AddProduct() {
     check_interval_minutes: DEFAULT_CHECK_INTERVAL_MINUTES,
     record_all_prices: false,
     price_format: 'auto' as PriceFormat,
+    inverse_price: false,
     active: true,
   })
 
@@ -284,6 +285,20 @@ export default function AddProduct() {
               id="record-all-prices"
               checked={form.record_all_prices}
               onChange={(e) => setForm({ ...form, record_all_prices: e.target.checked })}
+              className="rounded text-indigo-600 focus:ring-indigo-500 h-4 w-4"
+            />
+          </label>
+
+          <label className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-800 cursor-pointer">
+            <div>
+              <p className="text-sm font-medium text-gray-800 dark:text-gray-200">Inverse price colors</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Show rising prices green and falling prices red (e.g. resale value)</p>
+            </div>
+            <input
+              type="checkbox"
+              id="inverse-price"
+              checked={form.inverse_price}
+              onChange={(e) => setForm({ ...form, inverse_price: e.target.checked })}
               className="rounded text-indigo-600 focus:ring-indigo-500 h-4 w-4"
             />
           </label>

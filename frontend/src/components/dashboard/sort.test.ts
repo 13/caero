@@ -15,6 +15,7 @@ const product = (overrides: Partial<Product>): Product => ({
   check_interval_minutes: 60,
   record_all_prices: false,
   price_format: 'auto',
+  inverse_price: false,
   consecutive_scrape_failures: 0,
   url_redirected: false,
   active: true,

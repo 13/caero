@@ -4,7 +4,7 @@ import toast from 'react-hot-toast'
 import { useState } from 'react'
 import type { Product, SparklinePoint } from '../api/types'
 import { useCheckProduct, useDeleteProduct, useUiSettings } from '../api/hooks'
-import { currencySymbol, formatDate, formatIntervalHours, formatPercent, formatPrice } from '../utils/format'
+import { currencySymbol, formatDate, formatIntervalHours, formatPercent, formatPrice, priceChangeSentiment } from '../utils/format'
 import { getTagColorClass } from '../utils/tags'
 import ConfirmDialog from './ConfirmDialog'
 import Sparkline from './Sparkline'
@@ -170,7 +170,7 @@ export default function ProductCard({ product, onKeywordClick, hasActiveAlerts, 
         {/* Sparkline — recent price trend */}
         {sparkline && sparkline.length >= 2 && (
           <div className="mt-auto pt-2">
-            <Sparkline points={sparkline} />
+            <Sparkline points={sparkline} invert={product.inverse_price} />
           </div>
         )}
 
@@ -186,9 +186,9 @@ export default function ProductCard({ product, onKeywordClick, hasActiveAlerts, 
           <div className="text-right">
             {pct !== null ? (
               <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full ${
-                pct < 0
+                priceChangeSentiment(pct, product.inverse_price) === 'good'
                   ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300'
-                  : pct > 0
+                  : priceChangeSentiment(pct, product.inverse_price) === 'bad'
                   ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300'
                   : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'
               }`}>

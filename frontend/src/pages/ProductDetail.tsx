@@ -193,7 +193,7 @@ export default function ProductDetail() {
         <AddPriceDialog productId={productId} onClose={() => setShowAddPrice(false)} />
       )}
 
-      <StatsStrip stats={stats} currency={product.currency} />
+      <StatsStrip stats={stats} currency={product.currency} inversePrice={product.inverse_price} />
 
       {/* ── Price chart ── */}
       <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-5">

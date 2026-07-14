@@ -31,6 +31,7 @@ export interface Product {
   check_interval_minutes: number
   record_all_prices: boolean
   price_format: PriceFormat
+  inverse_price: boolean
   consecutive_scrape_failures: number
   url_redirected: boolean
   active: boolean
@@ -60,6 +61,7 @@ export interface ProductCreate {
   check_interval_minutes?: number
   record_all_prices?: boolean
   price_format?: PriceFormat
+  inverse_price?: boolean
   active?: boolean
 }
 
@@ -75,6 +77,7 @@ export interface ProductUpdate {
   check_interval_minutes?: number
   record_all_prices?: boolean
   price_format?: PriceFormat
+  inverse_price?: boolean
   active?: boolean
 }
 

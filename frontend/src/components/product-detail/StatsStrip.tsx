@@ -2,8 +2,16 @@ import { useUiSettings } from '../../api/hooks'
 import type { ProductStatistics } from '../../api/types'
 import { formatDate, formatPercent, formatPrice } from '../../utils/format'
 
-export default function StatsStrip({ stats, currency }: { stats?: ProductStatistics; currency?: string }) {
+export default function StatsStrip({ stats, currency, inversePrice = false }: {
+  stats?: ProductStatistics
+  currency?: string
+  inversePrice?: boolean
+}) {
   const { data: settings } = useUiSettings()
+
+  // Low prices are the good news by default; inverse products flip that.
+  const goodAccent = 'text-green-600 dark:text-green-400'
+  const badAccent = 'text-red-500 dark:text-red-400'
 
   const cells = [
     { label: 'Average', value: formatPrice(stats?.average_price ?? null, settings?.date_format, currency) },
@@ -11,13 +19,13 @@ export default function StatsStrip({ stats, currency }: { stats?: ProductStatist
       label: 'All-time low',
       value: formatPrice(stats?.lowest_price ?? null, settings?.date_format, currency),
       sub: formatDate(stats?.lowest_price_at ?? null, settings?.date_format),
-      accent: 'text-green-600 dark:text-green-400',
+      accent: inversePrice ? badAccent : goodAccent,
     },
     {
       label: 'All-time high',
       value: formatPrice(stats?.highest_price ?? null, settings?.date_format, currency),
       sub: formatDate(stats?.highest_price_at ?? null, settings?.date_format),
-      accent: 'text-red-500 dark:text-red-400',
+      accent: inversePrice ? goodAccent : badAccent,
     },
     {
       label: 'Total change',

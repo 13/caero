@@ -59,6 +59,9 @@ class Product(Base):
     record_all_prices: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0", nullable=False)
     # Number-format hint for parsing scraped prices: 'auto' | 'eu' | 'us'.
     price_format: Mapped[str] = mapped_column(String(8), default="auto", server_default="auto", nullable=False)
+    # False (default): price drop shows green. True: price rise shows green
+    # (products where increasing value is good news).
+    inverse_price: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0", nullable=False)
     consecutive_scrape_failures: Mapped[int] = mapped_column(Integer, default=0)
     url_redirected: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     active: Mapped[bool] = mapped_column(Boolean, default=True)

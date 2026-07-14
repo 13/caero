@@ -120,14 +120,16 @@ async def test_product_record_all_prices_roundtrip(client):
     assert resp.status_code == 201
     product = resp.json()
     assert product["record_all_prices"] is False
+    assert product["inverse_price"] is False
 
     resp = await client.patch(
         f"/api/products/{product['id']}",
         headers=_auth(token),
-        json={"record_all_prices": True},
+        json={"record_all_prices": True, "inverse_price": True},
     )
     assert resp.status_code == 200
     assert resp.json()["record_all_prices"] is True
+    assert resp.json()["inverse_price"] is True
 
 
 @pytest.mark.asyncio(loop_scope="session")

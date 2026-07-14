@@ -27,6 +27,15 @@ export function formatPrice(value: string | null, format?: DateFormat, currency 
   }
 }
 
+/** Whether a price change is good, bad, or neutral news for this product.
+ *  Default: a drop is good (deal hunting). inverse_price flips it (products
+ *  where rising value is good news). */
+export function priceChangeSentiment(pct: number, inversePrice = false): 'good' | 'bad' | 'neutral' {
+  if (pct === 0 || !Number.isFinite(pct)) return 'neutral'
+  const dropped = pct < 0
+  return dropped !== inversePrice ? 'good' : 'bad'
+}
+
 export function currencySymbol(currency = 'EUR', format?: DateFormat) {
   try {
     return (0)

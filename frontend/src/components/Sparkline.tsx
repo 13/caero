@@ -1,10 +1,12 @@
 import { useMemo } from 'react'
 import type { SparklinePoint } from '../api/types'
 
-/** Tiny inline price trend — pure SVG, no chart library in the dashboard chunk. */
-export default function Sparkline({ points, className = '' }: {
+/** Tiny inline price trend — pure SVG, no chart library in the dashboard chunk.
+ *  invert flips the color semantics for products where rising prices are good. */
+export default function Sparkline({ points, className = '', invert = false }: {
   points: SparklinePoint[]
   className?: string
+  invert?: boolean
 }) {
   const path = useMemo(() => {
     if (points.length < 2) return null
@@ -31,9 +33,10 @@ export default function Sparkline({ points, className = '' }: {
 
   if (!path) return null
 
+  const good = path.falling !== invert
   const stroke = path.flat
     ? 'stroke-gray-400 dark:stroke-gray-500'
-    : path.falling
+    : good
       ? 'stroke-green-500'
       : 'stroke-red-400'
 

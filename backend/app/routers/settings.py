@@ -420,6 +420,7 @@ async def export_my_data(
                 "check_interval_minutes": product.check_interval_minutes,
                 "record_all_prices": product.record_all_prices,
                 "price_format": product.price_format,
+                "inverse_price": product.inverse_price,
                 "active": product.active,
                 "created_at": product.created_at.isoformat() if product.created_at else None,
             }
@@ -512,6 +513,7 @@ async def import_data(
                 check_interval_minutes=product.get("check_interval_minutes", 30),
                 record_all_prices=bool(product.get("record_all_prices", False)),
                 price_format=product.get("price_format") or "auto",
+                inverse_price=bool(product.get("inverse_price", False)),
                 active=product.get("active", True),
                 created_at=_parse_datetime(product.get("created_at")),
             )
@@ -622,6 +624,7 @@ async def import_my_data(
             check_interval_minutes=product.get("check_interval_minutes", 30),
             record_all_prices=bool(product.get("record_all_prices", False)),
                 price_format=product.get("price_format") or "auto",
+                inverse_price=bool(product.get("inverse_price", False)),
             active=product.get("active", True),
             created_at=_parse_datetime(product.get("created_at")),
         )

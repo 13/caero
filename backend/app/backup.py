@@ -66,6 +66,7 @@ async def build_export_payload(db: AsyncSession) -> dict:
                 "check_interval_minutes": product.check_interval_minutes,
                 "record_all_prices": product.record_all_prices,
                 "price_format": product.price_format,
+                "inverse_price": product.inverse_price,
                 "active": product.active,
                 "created_at": _isoformat(product.created_at),
             }

@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { ExternalLink, TrendingDown, TrendingUp, X, ZoomIn } from 'lucide-react'
 import { useUiSettings } from '../../api/hooks'
 import type { Product } from '../../api/types'
-import { formatDateTime, formatPercent, formatPrice } from '../../utils/format'
+import { formatDateTime, formatPercent, formatPrice, priceChangeSentiment } from '../../utils/format'
 import { getTagColorClass } from '../../utils/tags'
 
 export default function ProductHero({ product, onToggleActive, togglePending }: {
@@ -103,12 +103,13 @@ export default function ProductHero({ product, onToggleActive, togglePending }: 
             </span>
             {product.last_price_change_percent !== null && (() => {
               const pct = parseFloat(product.last_price_change_percent ?? '0')
+              const sentiment = priceChangeSentiment(pct, product.inverse_price)
               return (
                 <span
                   className={`inline-flex items-center gap-1 text-sm font-semibold px-2 py-0.5 rounded-full ${
-                    pct < 0
+                    sentiment === 'good'
                       ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300'
-                      : pct > 0
+                      : sentiment === 'bad'
                       ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300'
                       : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'
                   }`}

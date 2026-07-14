@@ -2,7 +2,7 @@ import { ArrowDown, ArrowUp, BellRing, Image as ImageIcon, Star } from 'lucide-r
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useUiSettings } from '../../api/hooks'
 import type { Product, SparklinePoint } from '../../api/types'
-import { formatDateTime, formatPercent, formatPrice } from '../../utils/format'
+import { formatDateTime, formatPercent, formatPrice, priceChangeSentiment } from '../../utils/format'
 import { getTagColorClass } from '../../utils/tags'
 import Sparkline from '../Sparkline'
 import type { SortBy } from './sort'
@@ -177,7 +177,7 @@ export default function ProductTable({
                   <td className="px-4 py-3 w-28">
                     {(sparklines[p.id]?.length ?? 0) >= 2 ? (
                       <div className="w-24">
-                        <Sparkline points={sparklines[p.id]} />
+                        <Sparkline points={sparklines[p.id]} invert={p.inverse_price} />
                       </div>
                     ) : (
                       <span className="text-xs text-gray-300 dark:text-gray-600">—</span>
@@ -187,9 +187,9 @@ export default function ProductTable({
                 <td className="px-4 py-3">
                   {p.last_price_change_percent ? (
                     <span className={`text-xs font-semibold ${
-                      parseFloat(p.last_price_change_percent) < 0
+                      priceChangeSentiment(parseFloat(p.last_price_change_percent), p.inverse_price) === 'good'
                         ? 'text-green-600 dark:text-green-400'
-                        : parseFloat(p.last_price_change_percent) > 0
+                        : priceChangeSentiment(parseFloat(p.last_price_change_percent), p.inverse_price) === 'bad'
                         ? 'text-red-600 dark:text-red-400'
                         : 'text-gray-500'
                     }`}>

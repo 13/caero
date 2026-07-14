@@ -56,6 +56,7 @@ class ProductCreate(BaseModel):
     check_time_hhmm: str | None = None
     record_all_prices: bool = False
     price_format: Literal["auto", "eu", "us"] = "auto"
+    inverse_price: bool = False
     active: bool = True
 
     @field_validator("tags", mode="before")
@@ -82,6 +83,7 @@ class ProductUpdate(BaseModel):
     check_time_hhmm: str | None = None
     record_all_prices: bool | None = None
     price_format: Literal["auto", "eu", "us"] | None = None
+    inverse_price: bool | None = None
     active: bool | None = None
 
     @field_validator("tags", mode="before")
@@ -111,6 +113,7 @@ class ProductOut(BaseModel):
     check_time_hhmm: str = "10:00"
     record_all_prices: bool = False
     price_format: str = "auto"
+    inverse_price: bool = False
     consecutive_scrape_failures: int = 0
     url_redirected: bool = False
     active: bool
