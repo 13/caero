@@ -23,13 +23,7 @@ export default function CaeroBrand({
         src="/caero.svg"
         aria-hidden={logoAriaHidden}
         alt={logoAriaHidden ? '' : logoTitle}
-        className={`${logoSizeClassName} rounded-md dark:hidden`}
-      />
-      <img
-        src="/caero-dark.svg"
-        aria-hidden={logoAriaHidden}
-        alt={logoAriaHidden ? '' : logoTitle}
-        className={`${logoSizeClassName} rounded-md hidden dark:block`}
+        className={`${logoSizeClassName} rounded-md`}
       />
       {showText && (
         <div>

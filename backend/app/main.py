@@ -32,7 +32,6 @@ STATIC_DIR = Path(__file__).parent / "static"
 ROOT_STATIC_FILES = {
     "apple-touch-icon.png",
     "caero-dark.png",
-    "caero-dark.svg",
     "caero.png",
     "caero.svg",
     "favicon-96x96.png",
