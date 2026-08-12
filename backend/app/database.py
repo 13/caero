@@ -26,6 +26,28 @@ engine = create_async_engine(
     },
 )
 
+if settings.db_type == "sqlite":
+    from sqlalchemy import event
+
+    @event.listens_for(engine.sync_engine, "connect")
+    def _sqlite_pragmas(dbapi_connection, _connection_record) -> None:
+        """WAL + a real busy timeout.
+
+        Default journalling makes a writing scrape job block every reader, and
+        the driver's short lock timeout raises "database is locked" instead of
+        waiting — dropping price rows and failing API calls exactly when the
+        scheduler is busiest. WAL lets readers run during writes; the timeout
+        turns the remaining contention into a wait rather than an error.
+        """
+        cursor = dbapi_connection.cursor()
+        try:
+            cursor.execute("PRAGMA journal_mode=WAL")
+            cursor.execute("PRAGMA synchronous=NORMAL")
+            cursor.execute("PRAGMA busy_timeout=10000")
+        finally:
+            cursor.close()
+
+
 AsyncSessionLocal = async_sessionmaker(
     bind=engine,
     class_=AsyncSession,

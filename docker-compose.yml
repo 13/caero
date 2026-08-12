@@ -13,3 +13,8 @@ services:
       - "8000:8000"
     environment:
       - PYTHONUNBUFFERED=1
+    # Chromium under xvfb is the memory hog here, and it grows with
+    # SCRAPER_CONCURRENCY. Without a ceiling a scrape burst can exhaust a small
+    # host's RAM and stall every other container on it; with one, caero is the
+    # only thing the OOM killer touches. Raise alongside SCRAPER_CONCURRENCY.
+    mem_limit: 1500m

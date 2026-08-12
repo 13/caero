@@ -121,7 +121,17 @@ async def scrape_price(
     Falls back to ld+json, itemprop, and data-price if selector fails.
     """
     async with _scrape_sem:
-        return await _scrape_price(browser, url, selector, price_format)
+        # page.goto has its own timeout, but every other await here (context
+        # creation, selector waits, the closes) has none. A wedged browser would
+        # hold this concurrency slot forever and, with enough of them, stop all
+        # scraping without a single error line.
+        timeout = settings.scrape_timeout_seconds or None
+        try:
+            async with asyncio.timeout(timeout):
+                return await _scrape_price(browser, url, selector, price_format)
+        except TimeoutError:
+            logger.warning("scrape_price timed out after %ss for %s", timeout, url)
+            return ScrapeResult(None, None, None)
 
 
 async def _scrape_price(
@@ -186,16 +196,20 @@ async def _scrape_price(
         logger.warning("scrape_price failed for %s: %s", url, exc)
         return ScrapeResult(None, None, None)
     finally:
-        if page:
-            try:
-                await page.close()
-            except Exception:
-                pass
-        if context:
-            try:
-                await context.close()
-            except Exception:
-                pass
+        # Bounded: this cleanup also runs when the outer timeout fires, and a
+        # browser wedged enough to trip that can wedge its own teardown too.
+        await _close_quietly(page)
+        await _close_quietly(context)
+
+
+async def _close_quietly(target: object | None, timeout: float = 10.0) -> None:
+    if target is None:
+        return
+    try:
+        async with asyncio.timeout(timeout):
+            await target.close()
+    except (Exception, asyncio.CancelledError):
+        pass
 
 
 async def _current_url(page: Page) -> str | None:

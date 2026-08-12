@@ -18,7 +18,11 @@ from app.scraper import ScrapeResult
 @pytest.fixture(autouse=True)
 def fake_browser():
     set_browser(object(), backend="fake")  # type: ignore[arg-type]
+    # Scraper health is global (a storm spans products), so it must not leak
+    # between tests — a leftover storm suppresses per-product notifications.
+    scheduler_mod.reset_scrape_health()
     yield
+    scheduler_mod.reset_scrape_health()
     set_browser(None, backend="unavailable")
 
 

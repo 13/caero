@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.models import PriceHistory, Product, User
 from app.routers.auth import require_user
-from app.scheduler import add_product_job, remove_product_job, scrape_and_record
+from app.scheduler import add_product_job, check_all_in_progress, remove_product_job, run_check_all
 from app.schemas import (
     CheckResult,
     ProductCreate,
@@ -365,9 +365,9 @@ async def check_product_now(
     db: AsyncSession = Depends(get_db),
 ) -> CheckResult:
     product = await _get_product(product_id, user, db)
-    from app.browser import get_browser
+    from app.browser import ensure_browser
 
-    browser = get_browser()
+    browser = await ensure_browser()
     if browser is None:
         return CheckResult(product_id=product_id, price=None, error="Browser not available")
 
@@ -447,13 +447,21 @@ async def check_all_products_now(
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, str]:
 
+    if check_all_in_progress():
+        # Clicking the button again used to queue a second full pass behind the
+        # first; the per-product lock made it serialize rather than drop, so the
+        # scraper stayed busy for a multiple of the intended work.
+        return {
+            "status": "busy",
+            "message": "A full check is already running — this request was ignored.",
+        }
+
     result = await db.execute(
         select(Product.id).where(Product.user_id == user.id, Product.active == True)
     )
     product_ids = result.scalars().all()
 
-    for pid in product_ids:
-        background_tasks.add_task(scrape_and_record, pid)
+    background_tasks.add_task(run_check_all, list(product_ids))
 
     return {
         "status": "ok",

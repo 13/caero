@@ -59,39 +59,11 @@ async def lifespan(application: FastAPI):
     if not (STATIC_DIR / "index.html").exists():
         logger.warning("Frontend not built — run npm run build in /frontend")
 
-    # Launch Patchright browser
-    from app.browser import set_browser
+    # Launch Patchright browser. A failure here is not fatal: app.browser
+    # relaunches on demand, so the container is never stuck browserless.
+    from app.browser import start_browser
 
-    try:
-        from app.config import settings
-
-        try:
-            import patchright.async_api
-            pw_module = patchright.async_api.async_playwright
-            logger.info("Using Patchright for scraping")
-        except ImportError:
-            logger.error("Patchright is not installed")
-            raise
-
-        pw = await pw_module().start()
-        application.state.patchright = pw
-
-        headless = settings.scraper_headless
-        browser = await pw.chromium.launch(
-            headless=headless,
-            args=[
-                "--disable-blink-features=AutomationControlled",
-                "--disable-dev-shm-usage",
-                "--no-sandbox",
-                "--disable-setuid-sandbox",
-            ],
-        )
-        set_browser(browser, backend="patchright")
-        logger.info("Patchright browser started in %s mode", "headless" if headless else "headed")
-    except Exception as exc:
-        logger.error("Could not start Patchright browser: %s", exc)
-        application.state.patchright = None
-        set_browser(None, backend="unavailable")
+    await start_browser()
 
     # Load Telegram token from DB (overrides env var if set)
     try:
@@ -124,16 +96,9 @@ async def lifespan(application: FastAPI):
     # ── Shutdown ─────────────────────────────────────────────────────────────
     scheduler.shutdown(wait=False)
 
-    from app.browser import get_browser
+    from app.browser import stop_browser
 
-    browser = get_browser()
-    if browser:
-        await browser.close()
-    set_browser(None, backend="unavailable")
-
-    pw = getattr(application.state, "patchright", None)
-    if pw:
-        await pw.stop()
+    await stop_browser()
 
     logger.info("Caero shutdown complete")
 
@@ -149,8 +114,26 @@ app = FastAPI(
 
 # ── Health (unauthenticated, for Docker/monitoring probes) ───────────────────
 @app.get("/api/health", include_in_schema=False)
-async def health() -> dict[str, str]:
-    return {"status": "ok"}
+async def health() -> dict[str, object]:
+    """Liveness plus scraper visibility.
+
+    Deliberately still 200 when scraping is broken but the app is not: this is
+    the Docker HEALTHCHECK, and failing it would restart-loop the container over
+    a problem a restart may not fix. The fields are for humans and monitoring.
+    """
+    from app.browser import browser_connected, get_backend
+    from app.scheduler import last_successful_scrape_at, scraping_looks_broken
+
+    last_success = last_successful_scrape_at()
+    return {
+        "status": "ok",
+        "browser_connected": browser_connected(),
+        "browser_backend": get_backend(),
+        "scheduler_running": scheduler.running,
+        "scheduled_jobs": len(scheduler.get_jobs()) if scheduler.running else 0,
+        "last_successful_scrape_at": last_success.isoformat() if last_success else None,
+        "scraping_degraded": scraping_looks_broken(),
+    }
 
 
 # ── API routers ───────────────────────────────────────────────────────────────

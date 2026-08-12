@@ -54,12 +54,34 @@ class Settings(BaseSettings):
     scraper_headless: bool = Field(default=False)
     scraper_locale: str = Field(default="de-DE")
     scraper_timezone: str = Field(default="Europe/Berlin")
-    scraper_concurrency: int = Field(default=4, ge=1, le=32)
+    # Parallel scrapes. Each one holds an extra browser context + renderer
+    # process; with SCRAPER_HEADLESS=false (xvfb) that costs real RAM, so this
+    # is a memory knob as much as a politeness knob. See .env.example.
+    scraper_concurrency: int = Field(default=2, ge=1, le=32)
     # Consecutive failures before the "selector broken" notification fires.
     scraper_failure_alert_threshold: int = Field(default=3, ge=1)
     # Random 0..N second offset added to each product's next run so products
     # sharing a check time don't hit shops in one burst. 0 disables jitter.
+    # This is the *floor* of the window — see schedule_jitter_per_product_seconds.
     schedule_jitter_seconds: int = Field(default=300, ge=0)
+    # The jitter window grows with the number of products sharing a check time:
+    # window = max(schedule_jitter_seconds, cohort * this). A fixed window is
+    # swamped once the cohort is large enough that jobs launch faster than a
+    # scrape completes, which puts every scrape back into one burst.
+    schedule_jitter_per_product_seconds: int = Field(default=120, ge=0)
+    # Hard ceiling on a single scrape, covering the whole browser interaction and
+    # not just page.goto. A wedged Chromium otherwise holds its concurrency slot
+    # forever, and enough of them stop scraping entirely. 0 disables.
+    scrape_timeout_seconds: int = Field(default=120, ge=0)
+    # Infrastructure failures (dead browser, no network, host thrashing) make
+    # every product fail at once. Past this many distinct products failing with
+    # no successes in between, per-product "selector broken" mail is replaced by
+    # one "scraping is down" message per affected user. 0 disables.
+    scrape_storm_min_products: int = Field(default=3, ge=0)
+    # How late a missed scrape may still run (APScheduler misfire_grace_time).
+    # Under load, jobs that pass their run time are otherwise dropped outright,
+    # silently leaving gaps in price history. 0 = run no matter how late.
+    scrape_misfire_grace_seconds: int = Field(default=3600, ge=0)
 
     # Price history retention: rows older than this many days are thinned to
     # the daily min and max per product. 0 disables thinning entirely.

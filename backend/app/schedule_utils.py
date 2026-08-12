@@ -34,3 +34,29 @@ def get_next_run_time(check_time_hhmm: object | None, now: datetime | None = Non
         candidate += timedelta(days=1)
     return candidate
 
+
+def jitter_window_seconds(
+    base_seconds: int,
+    cohort_size: int,
+    seconds_per_product: int,
+    max_seconds: int | None = None,
+) -> int:
+    """Width of the random offset window for a product's next run.
+
+    A fixed window stops working once enough products share a check time: N jobs
+    over a constant window fire every window/N seconds, which for a large N is
+    far faster than a scrape completes, so everything queues on the scrape
+    semaphore anyway. Scaling the window with the cohort keeps the spacing
+    roughly constant as products are added.
+
+    max_seconds caps the window (the caller passes the product's own check
+    interval — jittering past the next run makes no sense).
+    """
+    if base_seconds <= 0:
+        return 0
+
+    window = max(base_seconds, max(cohort_size, 1) * max(seconds_per_product, 0))
+    if max_seconds is not None:
+        window = min(window, max(max_seconds, 0))
+    return window
+

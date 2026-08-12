@@ -3,7 +3,7 @@ from decimal import Decimal
 
 import pytest
 
-from app.schedule_utils import get_next_run_time, normalize_check_time_hhmm
+from app.schedule_utils import get_next_run_time, jitter_window_seconds, normalize_check_time_hhmm
 from app.scheduler import _urls_same_resource, evaluate_alert
 
 
@@ -105,3 +105,25 @@ class TestScheduleUtils:
         now = datetime(2026, 7, 1, 10, 0, tzinfo=UTC)
         result = get_next_run_time("09:00", now=now)
         assert result == datetime(2026, 7, 2, 9, 0, tzinfo=UTC)
+
+
+class TestJitterWindow:
+    def test_small_cohort_uses_base_window(self):
+        assert jitter_window_seconds(300, 1, 120) == 300
+
+    def test_window_grows_with_cohort(self):
+        # 30 products at the same check time get 30 x 120s, not a flat 300s.
+        assert jitter_window_seconds(300, 30, 120) == 3600
+
+    def test_zero_base_disables_jitter(self):
+        assert jitter_window_seconds(0, 30, 120) == 0
+
+    def test_zero_per_product_keeps_base(self):
+        assert jitter_window_seconds(300, 30, 0) == 300
+
+    def test_capped_at_max(self):
+        # Never jitter past the product's own check interval.
+        assert jitter_window_seconds(300, 100, 120, max_seconds=3600) == 3600
+
+    def test_cohort_zero_treated_as_one(self):
+        assert jitter_window_seconds(60, 0, 120) == 120
