@@ -49,10 +49,29 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
+      # act_runner runs jobs directly on the host, where `services:` containers
+      # are never started, so on Gitea the same database is brought up by hand.
+      - name: Start PostgreSQL (self-hosted runner)
+        if: github.server_url != 'https://github.com'
+        run: |
+          docker rm -f caero-ci-postgres >/dev/null 2>&1 || true
+          docker run -d --rm --name caero-ci-postgres \
+            -e POSTGRES_USER=caero -e POSTGRES_PASSWORD=caero -e POSTGRES_DB=caero \
+            -p 5432:5432 postgres:17
+          for _ in $(seq 1 30); do
+            docker exec caero-ci-postgres pg_isready -U caero -q && exit 0
+            sleep 2
+          done
+          echo "postgres did not become ready"
+          docker logs caero-ci-postgres
+          exit 1
       - name: Install dependencies
         run: uv sync --frozen
       - name: Tests against PostgreSQL
         run: uv run pytest -q
+      - name: Stop PostgreSQL (self-hosted runner)
+        if: always() && github.server_url != 'https://github.com'
+        run: docker rm -f caero-ci-postgres >/dev/null 2>&1 || true
 
   frontend:
     runs-on: ubuntu-latest
@@ -104,16 +123,31 @@ jobs:
           SQLITE_PATH: /tmp/caero-e2e.db
           SECRET_KEY: e2e-only-secret-key-not-for-production
         run: |
+          # A host-mode self-hosted runner does not reap background processes
+          # when a job ends, so a previous run's server may still hold the port.
+          pkill -f 'uvicorn app.main:app --port 8000' || true
           uv run uvicorn app.main:app --port 8000 &
           timeout 30 bash -c 'until curl -sf http://localhost:8000/api/health; do sleep 1; done'
 
+      # --with-deps escalates with `sudo`, which a self-hosted runner has no
+      # password for; the system libraries are installed on that host once,
+      # out of band, so only the browser itself is fetched here.
       - name: Install Playwright browser
         working-directory: frontend
-        run: npx playwright install chromium --with-deps
+        run: |
+          if [ "${{ github.server_url }}" = "https://github.com" ]; then
+            npx playwright install chromium --with-deps
+          else
+            npx playwright install chromium
+          fi
 
       - name: Run e2e tests
         working-directory: frontend
         run: npx playwright test
+
+      - name: Stop backend
+        if: always()
+        run: pkill -f 'uvicorn app.main:app --port 8000' || true
 
       - uses: actions/upload-artifact@v4
         if: failure()
