@@ -126,8 +126,14 @@ jobs:
           # A host-mode self-hosted runner does not reap background processes
           # when a job ends, so a previous run's server may still hold the port.
           pkill -f 'uvicorn app.main:app --port 8000' || true
-          uv run uvicorn app.main:app --port 8000 &
-          timeout 30 bash -c 'until curl -sf http://localhost:8000/api/health; do sleep 1; done'
+          # setsid + redirection detaches the server from the step's stdout and
+          # stderr. Inheriting them makes act_runner wait for those pipes to
+          # close when the step ends, which it never does while the server runs:
+          # "exec: WaitDelay expired before I/O complete".
+          setsid uv run uvicorn app.main:app --port 8000 \
+            > "$RUNNER_TEMP/backend.log" 2>&1 < /dev/null &
+          timeout 30 bash -c 'until curl -sf http://localhost:8000/api/health; do sleep 1; done' \
+            || { echo "backend did not come up:"; cat "$RUNNER_TEMP/backend.log"; exit 1; }
 
       # --with-deps escalates with `sudo`, which a self-hosted runner has no
       # password for; the system libraries are installed on that host once,
