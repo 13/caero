@@ -90,7 +90,3 @@ npm run lint   # eslint
 ```
 
 CI runs lint, unit tests, a production build, and a Playwright end-to-end suite on every push.
-
-## Status
-
-- caero: docker image pushed to gitea.muh/ben/caero via workflow_dispatch on main (run #2, id 259); release-by-tag not yet exercised
