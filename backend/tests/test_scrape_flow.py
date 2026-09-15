@@ -128,17 +128,17 @@ async def test_failure_threshold_and_recovery_notifications(monkeypatch, sent_no
     assert sent_notifications["notify"] == []  # below threshold
 
     await scheduler_mod.scrape_and_record(pid)
-    broken = [n for n in sent_notifications["notify"] if "Selector broken" in n["subject"]]
+    broken = [n for n in sent_notifications["notify"] if "Selector broken" in n["message"].title]
     assert len(broken) == 1
 
     await scheduler_mod.scrape_and_record(pid)  # stays broken — no repeat
-    broken = [n for n in sent_notifications["notify"] if "Selector broken" in n["subject"]]
+    broken = [n for n in sent_notifications["notify"] if "Selector broken" in n["message"].title]
     assert len(broken) == 1
     assert (await product_by_id(pid)).consecutive_scrape_failures == 3
 
     scrape_returning(monkeypatch, ScrapeResult(9.5, "EUR", "https://shop.example/item"))
     await scheduler_mod.scrape_and_record(pid)
-    recovered = [n for n in sent_notifications["notify"] if "Recovered" in n["subject"]]
+    recovered = [n for n in sent_notifications["notify"] if "Recovered" in n["message"].title]
     assert len(recovered) == 1
     assert (await product_by_id(pid)).consecutive_scrape_failures == 0
 
@@ -157,7 +157,7 @@ async def test_currency_change_notifies_once(monkeypatch, sent_notifications):
     await scheduler_mod.scrape_and_record(pid)
     await scheduler_mod.scrape_and_record(pid)
 
-    changed = [n for n in sent_notifications["notify"] if "Currency changed" in n["subject"]]
+    changed = [n for n in sent_notifications["notify"] if "Currency changed" in n["message"].title]
     assert len(changed) == 1
 
 
@@ -197,5 +197,5 @@ async def test_redirect_blocks_recording_and_notifies(monkeypatch, sent_notifica
 
     assert await prices_for(pid) == []
     assert (await product_by_id(pid)).url_redirected is True
-    redirected = [n for n in sent_notifications["notify"] if "URL Redirected" in n["subject"]]
+    redirected = [n for n in sent_notifications["notify"] if "URL redirected" in n["message"].title]
     assert len(redirected) == 1

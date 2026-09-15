@@ -17,7 +17,7 @@ from app.browser import ensure_browser
 from app.config import settings
 from app.database import AsyncSessionLocal
 from app.models import Alert, PriceHistory, Product, User
-from app.notifier import notify, send_alert
+from app.notifier import Notification, caero_url, format_price, notify, product_links, send_alert
 
 logger = logging.getLogger(__name__)
 
@@ -122,7 +122,7 @@ def _urls_same_resource(url1: str, url2: str) -> bool:
         return url1 == url2
 
 
-async def _notify_product_owner(product: Product, db, subject: str, body: str) -> None:
+async def _notify_product_owner(product: Product, db, message: Notification) -> None:
     """Send a product-level notification to the owner's default channels."""
     user = await db.get(User, product.user_id)
     if user is None:
@@ -130,9 +130,13 @@ async def _notify_product_owner(product: Product, db, subject: str, body: str) -
     await notify(
         email=user.default_email,
         telegram_chat_id=user.default_telegram_chat_id,
-        subject=subject,
-        body=body,
+        message=message,
     )
+
+
+def _dashboard_links() -> list[tuple[str, str]]:
+    url = caero_url("/")
+    return [("Open Caero", url)] if url else []
 
 
 async def _notify_scraping_down(product: Product, db) -> None:
@@ -143,14 +147,20 @@ async def _notify_scraping_down(product: Product, db) -> None:
     await _notify_product_owner(
         product,
         db,
-        subject="[Caero] Scraping is failing for all tracked products",
-        body=(
-            f"Caero could not scrape {len(_failing_products)} products in a row, starting with "
-            f"'{product.name}'.\n"
-            f"Failures this widespread are usually not broken selectors — check that the "
-            f"container has enough memory, that the browser started, and that the host has "
-            f"network access.\n\n"
-            f"Per-product notifications are suppressed until scraping recovers.\n"
+        Notification(
+            emoji="🚨",
+            title="Scraping is failing for all tracked products",
+            facts=[
+                ("Failing products", str(len(_failing_products))),
+                ("First failure", product.name),
+            ],
+            text=[
+                "Failures this widespread are usually not broken selectors. Check that the "
+                "container has enough memory, that the browser started, and that the host "
+                "has network access.",
+                "Per-product notifications are paused until scraping recovers.",
+            ],
+            links=_dashboard_links(),
         ),
     )
 
@@ -160,10 +170,12 @@ async def _notify_scraping_recovered(product: Product, db) -> None:
     await _notify_product_owner(
         product,
         db,
-        subject="[Caero] Scraping recovered",
-        body=(
-            f"Caero is scraping successfully again (first success: '{product.name}').\n"
-            f"Per-product notifications are active again.\n"
+        Notification(
+            emoji="✅",
+            title="Scraping recovered",
+            facts=[("First success", product.name)],
+            text=["Per-product notifications are active again."],
+            links=_dashboard_links(),
         ),
     )
 
@@ -179,13 +191,16 @@ async def check_url_redirect(product: Product, final_url: str | None, db) -> Non
             await _notify_product_owner(
                 product,
                 db,
-                subject=f"[Caero] URL Redirected: '{product.name}' now points to a different product",
-                body=(
-                    f"Caero detected that the URL for '{product.name}' is redirecting to a different page.\n\n"
-                    f"Original URL: {product.url}\n"
-                    f"Redirected to: {final_url}\n\n"
-                    f"The product may no longer be available and has been replaced by a different item. "
-                    f"Please update the product URL in Caero."
+                Notification(
+                    emoji="↪️",
+                    title="URL redirected",
+                    product=product.name,
+                    facts=[("Tracked URL", product.url), ("Now goes to", final_url)],
+                    text=[
+                        "The product may no longer be available. Price tracking is paused "
+                        "until you update the product URL in Caero."
+                    ],
+                    links=product_links(product.id, final_url),
                 ),
             )
     elif product.url_redirected:
@@ -288,12 +303,16 @@ async def _scrape_and_record_locked(product_id: int, browser) -> None:
                     await _notify_product_owner(
                         product,
                         db,
-                        subject=f"[Caero] Action Required: Selector broken for '{product.name}'",
-                        body=(
-                            f"Caero has failed to find a valid price using your CSS selector "
-                            f"{failure_threshold} times in a row for '{product.name}'.\n"
-                            f"The webpage layout likely changed, or the item is no longer available.\n\n"
-                            f"Product URL: {product.url}\n"
+                        Notification(
+                            emoji="⚠️",
+                            title="Selector broken",
+                            product=product.name,
+                            facts=[("Failed checks", f"{failure_threshold} in a row")],
+                            text=[
+                                "No price was found with the CSS selector. The page layout "
+                                "probably changed, or the item is no longer available."
+                            ],
+                            links=product_links(product.id, product.url),
                         ),
                     )
             return
@@ -310,11 +329,15 @@ async def _scrape_and_record_locked(product_id: int, browser) -> None:
             await _notify_product_owner(
                 product,
                 db,
-                subject=f"[Caero] Recovered: '{product.name}' is being tracked again",
-                body=(
-                    f"Caero found a valid price for '{product.name}' again after "
-                    f"{product.consecutive_scrape_failures} failed check(s). No action needed.\n\n"
-                    f"Product URL: {product.url}\n"
+                Notification(
+                    emoji="✅",
+                    title="Recovered",
+                    product=product.name,
+                    facts=[
+                        ("Failed checks before", str(product.consecutive_scrape_failures)),
+                    ],
+                    text=["Tracking works again. No action needed."],
+                    links=product_links(product.id, product.url),
                 ),
             )
         if product.consecutive_scrape_failures > 0:
@@ -335,9 +358,10 @@ async def _scrape_and_record_locked(product_id: int, browser) -> None:
         now = datetime.now(UTC)
         changed = prev is None or prev.price != price
 
+        # Keep the previous currency when detection fails.
+        currency = result.currency or (prev.currency if prev else None) or "EUR"
+
         if changed or product.record_all_prices:
-            # Keep the previous currency when detection fails.
-            currency = result.currency or (prev.currency if prev else None) or "EUR"
             db.add(PriceHistory(product_id=product_id, price=price, currency=currency))
 
             # A currency flip means the history now mixes units (site redirect,
@@ -350,13 +374,19 @@ async def _scrape_and_record_locked(product_id: int, browser) -> None:
                 await _notify_product_owner(
                     product,
                     db,
-                    subject=f"[Caero] Currency changed for '{product.name}'",
-                    body=(
-                        f"The scraped price for '{product.name}' switched from "
-                        f"{prev.currency} to {currency}.\n"
-                        f"Price history and statistics now mix currencies — check the "
-                        f"product URL and selector.\n\n"
-                        f"Product URL: {product.url}\n"
+                    Notification(
+                        emoji="💱",
+                        title="Currency changed",
+                        product=product.name,
+                        facts=[
+                            ("Was", format_price(prev.price, prev.currency)),
+                            ("Now", format_price(price, currency)),
+                        ],
+                        text=[
+                            "Price history and statistics now mix currencies. Check the "
+                            "product URL and selector."
+                        ],
+                        links=product_links(product.id, product.url),
                     ),
                 )
 
@@ -382,10 +412,12 @@ async def _scrape_and_record_locked(product_id: int, browser) -> None:
                 await send_alert(
                     to_email=alert.email,
                     telegram_chat_id=alert.telegram_chat_id,
+                    product_id=product.id,
                     product_name=product.name,
                     product_url=product.url,
                     condition=alert.condition,
                     current_price=price,
+                    currency=currency,
                     threshold_price=alert.threshold_price,
                     threshold_percent=alert.threshold_percent,
                     previous_price=prev_price,

@@ -23,7 +23,7 @@ async def test_all_configured_webhooks_receive_notification(monkeypatch, webhook
     monkeypatch.setattr(settings, "gotify_token", "tok")
     monkeypatch.setattr(settings, "discord_webhook_url", "https://discord.com/api/webhooks/x")
 
-    await notifier.notify(email=None, telegram_chat_id=None, subject="Subj", body="Body")
+    await notifier.notify(email=None, telegram_chat_id=None, message=notifier.Notification(title="Subj", text=["Body"]))
 
     channels = {c["channel"] for c in webhook_calls}
     assert channels == {"ntfy", "Gotify", "Discord"}
@@ -36,10 +36,30 @@ async def test_all_configured_webhooks_receive_notification(monkeypatch, webhook
     discord = next(c for c in webhook_calls if c["channel"] == "Discord")
     assert discord["json"]["content"].startswith("**Subj**")
 
+    ntfy = next(c for c in webhook_calls if c["channel"] == "ntfy")
+    assert ntfy["headers"]["Title"] == "Subj"
+    assert "Click" not in ntfy["headers"]
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_ntfy_title_with_non_ascii_product_is_encoded(monkeypatch, webhook_calls):
+    import httpx
+
+    monkeypatch.setattr(settings, "ntfy_url", "https://ntfy.sh/caero")
+    message = notifier.Notification(
+        title="Price dropped", product="Kaffeemühle", links=[("Open shop", "https://shop.example")]
+    )
+    await notifier.notify(email=None, telegram_chat_id=None, message=message)
+
+    headers = webhook_calls[0]["headers"]
+    assert headers["Title"].startswith("=?utf-8?")
+    assert headers["Click"] == "https://shop.example"
+    httpx.Request("POST", "https://ntfy.sh/caero", headers=headers)  # must not raise
+
 
 @pytest.mark.asyncio(loop_scope="session")
 async def test_no_channels_configured_is_a_noop(webhook_calls):
-    await notifier.notify(email=None, telegram_chat_id=None, subject="S", body="B")
+    await notifier.notify(email=None, telegram_chat_id=None, message=notifier.Notification(title="S"))
     assert webhook_calls == []
 
 
@@ -47,7 +67,7 @@ async def test_no_channels_configured_is_a_noop(webhook_calls):
 async def test_gotify_needs_both_url_and_token(monkeypatch, webhook_calls):
     monkeypatch.setattr(settings, "gotify_url", "https://gotify.example")
 
-    await notifier.notify(email=None, telegram_chat_id=None, subject="S", body="B")
+    await notifier.notify(email=None, telegram_chat_id=None, message=notifier.Notification(title="S"))
     assert webhook_calls == []
 
 

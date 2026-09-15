@@ -8,7 +8,6 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from email.message import EmailMessage
 
-import httpx
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -230,24 +229,35 @@ async def test_email_notification(
         )
 
 
+def _test_notification(channel: str):
+    """Sample message rendered like real alerts, so admins see the actual format."""
+    from app.notifier import Notification, caero_url
+
+    url = caero_url("/")
+    return Notification(
+        emoji="✅",
+        title="Test notification",
+        text=[
+            f"{channel} are working." if channel.endswith("s") else f"{channel} is working.",
+            "Links to Caero are enabled." if url
+            else "Set PUBLIC_URL to add \"Open in Caero\" links to notifications.",
+        ],
+        links=[("Open Caero", url)] if url else [],
+    )
+
+
 @router.post("/test-telegram", response_model=TestNotificationResponse)
 async def test_telegram_notification(
     body: TestTelegramRequest,
     _admin: User = Depends(require_admin),
 ) -> TestNotificationResponse:
-    from app.notifier import get_telegram_token
+    from app.notifier import get_telegram_token, send_telegram_message
 
     token = get_telegram_token()
     if not token:
         return TestNotificationResponse(status="error", message="Telegram bot token not configured")
     try:
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                f"https://api.telegram.org/bot{token}/sendMessage",
-                json={"chat_id": body.chat_id, "text": "Testing Telegram notification from Caero..."},
-                timeout=10.0,
-            )
-            response.raise_for_status()
+        await send_telegram_message(token, body.chat_id, _test_notification("Telegram"))
         return TestNotificationResponse(status="sent", message="Test Telegram message sent")
     except Exception as e:
         return TestNotificationResponse(status="error", message=str(e))
@@ -274,9 +284,7 @@ async def test_webhook_notifications(
             message="No webhook channels configured (NTFY_URL / GOTIFY_URL+TOKEN / DISCORD_WEBHOOK_URL)",
         )
 
-    await _send_webhook_notifications(
-        "[Caero] Test notification", "Webhook channels are working."
-    )
+    await _send_webhook_notifications(_test_notification("Webhook channels"))
     return TestNotificationResponse(
         status="sent",
         message=(

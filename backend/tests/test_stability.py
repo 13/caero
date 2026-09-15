@@ -73,7 +73,7 @@ async def make_product(username: str) -> int:
 
 
 def subjects(captured, needle: str) -> list[dict]:
-    return [n for n in captured["notify"] if needle in n["subject"]]
+    return [n for n in captured["notify"] if needle in n["message"].title]
 
 
 class TestBrowserRecovery:

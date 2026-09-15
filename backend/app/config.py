@@ -41,6 +41,8 @@ class Settings(BaseSettings):
     smtp_from: str = Field(default="caero@localhost")
     smtp_tls: bool = Field(default=True)
     telegram_bot_token: str = Field(default="")
+    # Public base URL of this instance; enables "Open in Caero" links in notifications.
+    public_url: str = Field(default="")
 
     # Webhook notification channels. Each configured channel receives every
     # notification (alerts, selector-broken, redirects, …) in addition to the
