@@ -83,7 +83,12 @@ test('product detail fits a phone screen', async ({ page }) => {
     expect(box.x).toBeGreaterThanOrEqual(0)
     expect(box.x + box.width).toBeLessThanOrEqual(viewport.width)
   }
-  await expect(page.getByRole('button', { name: 'Add price' })).toBeInViewport()
+  // The chart header can sit below the fold (page height depends on the
+  // runner's fonts), so scroll first: the check is that the button isn't
+  // clipped horizontally, not that it shows without scrolling.
+  const addPrice = page.getByRole('button', { name: 'Add price' })
+  await addPrice.scrollIntoViewIfNeeded()
+  await expect(addPrice).toBeInViewport({ ratio: 1 })
   await screenshot(page, 'product-detail')
 })
 
