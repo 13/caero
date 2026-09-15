@@ -41,7 +41,7 @@ async def get_prices(
     from_dt: datetime | None = Query(default=None, alias="from"),
     to_dt: datetime | None = Query(default=None, alias="to"),
     user: User = Depends(require_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ) -> list[PriceHistoryOut]:
     result = await db.execute(
         select(Product).where(Product.id == product_id, Product.user_id == user.id)
@@ -69,7 +69,7 @@ async def create_price(
     product_id: int,
     body: PriceHistoryCreate,
     user: User = Depends(require_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ) -> PriceHistoryOut:
     result = await db.execute(
         select(Product).where(Product.id == product_id, Product.user_id == user.id)
@@ -104,7 +104,7 @@ async def create_price(
 async def get_latest_price(
     product_id: int,
     user: User = Depends(require_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ) -> PriceHistoryOut | None:
     result = await db.execute(
         select(Product).where(Product.id == product_id, Product.user_id == user.id)
@@ -127,7 +127,7 @@ async def update_price(
     price_id: int,
     body: PriceHistoryUpdate,
     user: User = Depends(require_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ) -> PriceHistoryOut:
     price = await _get_owned_price(product_id, price_id, user, db)
     price.price = Decimal(body.price).quantize(Decimal("0.01"))
@@ -143,7 +143,7 @@ async def delete_price(
     product_id: int,
     price_id: int,
     user: User = Depends(require_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ) -> None:
     price = await _get_owned_price(product_id, price_id, user, db)
     await db.delete(price)

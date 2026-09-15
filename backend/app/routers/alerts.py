@@ -17,7 +17,7 @@ router = APIRouter(tags=["alerts"])
 async def list_alerts(
     product_id: int,
     user: User = Depends(require_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ) -> list[AlertOut]:
     result = await db.execute(
         select(Product).where(Product.id == product_id, Product.user_id == user.id)
@@ -38,7 +38,7 @@ async def create_alert(
     product_id: int,
     body: AlertCreate,
     user: User = Depends(require_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ) -> AlertOut:
     result = await db.execute(
         select(Product).where(Product.id == product_id, Product.user_id == user.id)
@@ -61,7 +61,7 @@ async def create_alert(
 @router.delete("/alerts/{alert_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_alert(
     alert_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(require_user),
 ):
     stmt = select(Alert).join(Product).where(Alert.id == alert_id, Product.user_id == current_user.id)
@@ -78,7 +78,7 @@ async def update_alert(
     alert_id: int,
     body: AlertCreate,
     user: User = Depends(require_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ) -> AlertOut:
     result = await db.execute(
         select(Alert)
@@ -104,7 +104,7 @@ async def update_alert(
 
 @router.get("/alerts", response_model=list[AlertOut])
 async def get_all_alerts(
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(require_user),
 ) -> list[AlertOut]:
     stmt = select(Alert).join(Product).where(Product.user_id == current_user.id)

@@ -21,6 +21,20 @@ function PageSpinner() {
   )
 }
 
+const NARROW_QUERY = '(max-width: 639px)'
+
+/** Below Tailwind's `sm` breakpoint. */
+function useIsNarrow() {
+  const [narrow, setNarrow] = useState(() => window.matchMedia(NARROW_QUERY).matches)
+  useEffect(() => {
+    const mq = window.matchMedia(NARROW_QUERY)
+    const onChange = () => setNarrow(mq.matches)
+    mq.addEventListener('change', onChange)
+    return () => mq.removeEventListener('change', onChange)
+  }, [])
+  return narrow
+}
+
 type Theme = 'light' | 'dark'
 
 function applyThemeHeadAssets(theme: Theme) {
@@ -202,6 +216,7 @@ function NavBar({ theme, onToggleTheme }: { theme: Theme; onToggleTheme: () => v
 export default function App() {
   const { data: user, isLoading } = useMe()
   const [theme, setTheme] = useState<Theme>(resolveInitialTheme)
+  const isNarrow = useIsNarrow()
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', theme === 'dark')
@@ -228,7 +243,8 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-gray-100">
-      <Toaster position="bottom-right" />
+      {/* Bottom toasts on phones sit under the browser's bottom toolbar. */}
+      <Toaster position={isNarrow ? 'top-center' : 'bottom-right'} />
       <NavBar theme={theme} onToggleTheme={() => setTheme(theme === 'dark' ? 'light' : 'dark')} />
       <Suspense fallback={<PageSpinner />}>
         <Routes>

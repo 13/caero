@@ -212,6 +212,8 @@ class AppSettingsIn(BaseModel):
     # None = keep the stored token, "" = clear it. The token is never echoed
     # back by the API, so the client can't round-trip it.
     telegram_bot_token: str | None = None
+    # None = keep, "" = clear (fall back to the PUBLIC_URL env var).
+    public_url: str | None = Field(default=None, max_length=512, pattern=r"^(https?://\S+)?$")
 
 
 class AppSettingsOut(BaseModel):
@@ -219,7 +221,20 @@ class AppSettingsOut(BaseModel):
     date_format: str
     time_format: str
     telegram_bot_token_set: bool = False
+    public_url: str = ""
+    # The PUBLIC_URL env fallback, shown so admins know what an empty field means.
+    public_url_env: str = ""
     updated_at: datetime | None = None
+
+
+class NotificationChannelStatusOut(BaseModel):
+    channel: str
+    last_success_at: datetime | None = None
+    last_failure_at: datetime | None = None
+    last_error: str | None = None
+    consecutive_failures: int = 0
+
+    model_config = {"from_attributes": True}
 
 
 class UiSettingsOut(BaseModel):

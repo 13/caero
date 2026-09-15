@@ -19,7 +19,8 @@ export default function ProductHero({ product, onToggleActive, togglePending }: 
 
   return (
     <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-6">
-      <div className="flex gap-6 items-start">
+      {/* Phones stack the image above the details so the title gets full width. */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:gap-6 sm:items-start">
         {(product.cached_image_url ?? product.image_url) && (
           <>
             {/* Lightbox */}
@@ -42,11 +43,11 @@ export default function ProductHero({ product, onToggleActive, togglePending }: 
                 />
               </div>
             )}
-            <div className="shrink-0 relative group cursor-zoom-in" onClick={() => setImageZoomed(true)}>
+            <div className="shrink-0 relative group cursor-zoom-in w-full sm:w-auto" onClick={() => setImageZoomed(true)}>
               <img
                 src={product.cached_image_url ?? product.image_url!}
                 alt={product.name}
-                className="w-28 h-28 object-contain rounded-xl border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800 transition-opacity group-hover:opacity-80"
+                className="w-full h-32 sm:w-28 sm:h-28 object-contain p-2 sm:p-0 rounded-xl border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800 transition-opacity group-hover:opacity-80"
                 loading="lazy"
               />
               <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
@@ -56,8 +57,8 @@ export default function ProductHero({ product, onToggleActive, togglePending }: 
           </>
         )}
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-3">
-            <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100 leading-tight">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+            <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100 leading-tight break-words min-w-0">
               {product.name}
             </h1>
             <span className={`text-xs px-2 py-0.5 rounded-full font-medium cursor-pointer transition-opacity hover:opacity-80 ${
@@ -82,14 +83,14 @@ export default function ProductHero({ product, onToggleActive, togglePending }: 
 
           {/* Warning banners */}
           {product.url_redirected && (
-            <div className="mt-3 text-sm px-3 py-2 rounded-lg bg-yellow-50 text-yellow-800 border border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-300 dark:border-yellow-800/50 flex items-center gap-2 max-w-max">
+            <div className="mt-3 text-sm px-3 py-2 rounded-lg bg-yellow-50 text-yellow-800 border border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-300 dark:border-yellow-800/50 flex flex-wrap items-center gap-x-2 sm:max-w-max">
               <span className="font-semibold">URL redirected</span>
               <span>— This URL points to a different product. Please update it.</span>
             </div>
           )}
           {product.consecutive_scrape_failures > 0 && (
-            <div className="mt-3 text-sm px-3 py-2 rounded-lg bg-orange-50 text-orange-700 border border-orange-200 dark:bg-orange-900/30 dark:text-orange-300 dark:border-orange-800/50 flex items-center gap-2 max-w-max">
-              <span className="font-semibold px-2 py-0.5 rounded bg-orange-100 dark:bg-orange-900 leading-none">
+            <div className="mt-3 text-sm px-3 py-2 rounded-lg bg-orange-50 text-orange-700 border border-orange-200 dark:bg-orange-900/30 dark:text-orange-300 dark:border-orange-800/50 flex items-start gap-2 sm:max-w-max">
+              <span className="shrink-0 font-semibold px-2 py-0.5 rounded bg-orange-100 dark:bg-orange-900 leading-none">
                 {product.consecutive_scrape_failures}
               </span>
               <span>Consecutive failed checks. The CSS selector may be broken or the website layout changed.</span>
@@ -98,7 +99,7 @@ export default function ProductHero({ product, onToggleActive, togglePending }: 
 
           {/* Price row */}
           <div className="mt-3 flex items-baseline gap-3 flex-wrap">
-            <span className="text-4xl font-extrabold text-indigo-600 dark:text-indigo-400 tracking-tight">
+            <span className="text-3xl sm:text-4xl font-extrabold text-indigo-600 dark:text-indigo-400 tracking-tight">
               {formatPrice(product.latest_price, settings?.date_format, product.currency)}
             </span>
             {product.last_price_change_percent !== null && (() => {

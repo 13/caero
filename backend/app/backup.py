@@ -40,6 +40,7 @@ async def build_export_payload(db: AsyncSession) -> dict:
             "allow_registration": app_settings.allow_registration if app_settings else True,
             "date_format": app_settings.date_format if app_settings else "DD.MM.YYYY",
             "time_format": app_settings.time_format if app_settings else "24h",
+            "public_url": app_settings.public_url if app_settings else "",
         },
         "users": [
             {

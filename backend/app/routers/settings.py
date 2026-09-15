@@ -23,6 +23,7 @@ from app.schemas import (
     AppSettingsOut,
     DataExportPayload,
     JobOut,
+    NotificationChannelStatusOut,
     SelectorDefaultIn,
     SelectorDefaultOut,
     SystemInfoOut,
@@ -39,15 +40,20 @@ router = APIRouter(prefix="/settings", tags=["settings"])
 
 # app_settings keys accepted on import; legacy exports also contain DB
 # connection fields that no longer exist and are silently dropped.
-_IMPORTABLE_SETTINGS_KEYS = {"allow_registration", "date_format", "time_format", "telegram_bot_token"}
+_IMPORTABLE_SETTINGS_KEYS = {
+    "allow_registration", "date_format", "time_format", "telegram_bot_token", "public_url",
+}
 
 
 def _send_test_email_sync(to_email: str) -> None:
+    from app.notifier import render_plain
+
+    sample = _test_notification("Email")
     msg = EmailMessage()
-    msg["Subject"] = "[Caero] Test email"
+    msg["Subject"] = f"[Caero] {sample.subject}"
     msg["From"] = settings.smtp_from
     msg["To"] = to_email
-    msg.set_content("This is a test email from Caero settings.")
+    msg.set_content(render_plain(sample))
     with smtplib.SMTP(settings.smtp_host, settings.smtp_port) as server:
         if settings.smtp_tls:
             server.starttls()
@@ -72,13 +78,15 @@ def _settings_out(row: AppSettings) -> AppSettingsOut:
         date_format=row.date_format,
         time_format=row.time_format,
         telegram_bot_token_set=bool(row.telegram_bot_token),
+        public_url=row.public_url,
+        public_url_env=settings.public_url,
         updated_at=row.updated_at,
     )
 
 
 @router.get("", response_model=AppSettingsOut)
 async def get_settings(
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     _admin: User = Depends(require_admin),
 ) -> AppSettingsOut:
     row = await _get_or_create_settings(db)
@@ -88,7 +96,7 @@ async def get_settings(
 @router.post("", response_model=AppSettingsOut)
 async def save_settings(
     body: AppSettingsIn,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     _admin: User = Depends(require_admin),
 ) -> AppSettingsOut:
     row = await _get_or_create_settings(db)
@@ -99,6 +107,10 @@ async def save_settings(
         row.telegram_bot_token = body.telegram_bot_token
         from app.notifier import configure_telegram
         configure_telegram(row.telegram_bot_token)
+    if body.public_url is not None:
+        row.public_url = body.public_url.strip().rstrip("/")
+        from app.notifier import configure_public_url
+        configure_public_url(row.public_url)
     row.updated_at = datetime.now(UTC)
     await db.flush()
     return _settings_out(row)
@@ -116,7 +128,7 @@ def _ui_settings_out(row: AppSettings) -> UiSettingsOut:
 
 @router.get("/ui", response_model=UiSettingsOut)
 async def get_ui_settings(
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     _user: User = Depends(require_user),
 ) -> UiSettingsOut:
     row = await _get_or_create_settings(db)
@@ -126,7 +138,7 @@ async def get_ui_settings(
 @router.patch("/ui", response_model=UiSettingsOut)
 async def save_ui_settings(
     body: UiSettingsIn,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     _user: User = Depends(require_user),
 ) -> UiSettingsOut:
     row = await _get_or_create_settings(db)
@@ -143,7 +155,7 @@ async def save_ui_settings(
 
 @router.get("/selectors", response_model=list[SelectorDefaultOut])
 async def list_selector_defaults(
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     _user=Depends(require_user),
 ) -> list[SelectorDefaultOut]:
     result = await db.execute(select(SelectorDefault).order_by(SelectorDefault.domain))
@@ -153,7 +165,7 @@ async def list_selector_defaults(
 @router.post("/selectors", response_model=SelectorDefaultOut, status_code=status.HTTP_201_CREATED)
 async def create_selector_default(
     body: SelectorDefaultIn,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     _admin: User = Depends(require_admin),
 ) -> SelectorDefaultOut:
     existing = await db.execute(
@@ -172,7 +184,7 @@ async def create_selector_default(
 async def update_selector_default(
     selector_id: int,
     body: SelectorDefaultIn,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     _admin: User = Depends(require_admin),
 ) -> SelectorDefaultOut:
     row = await db.get(SelectorDefault, selector_id)
@@ -195,7 +207,7 @@ async def update_selector_default(
 @router.delete("/selectors/{selector_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_selector_default(
     selector_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     _admin: User = Depends(require_admin),
 ) -> None:
     row = await db.get(SelectorDefault, selector_id)
@@ -230,20 +242,28 @@ async def test_email_notification(
 
 
 def _test_notification(channel: str):
-    """Sample message rendered like real alerts, so admins see the actual format."""
-    from app.notifier import Notification, caero_url
+    """A sample price alert built by the real alert code, so admins see the actual format."""
+    from app.notifier import build_alert_message, caero_url
 
-    url = caero_url("/")
-    return Notification(
-        emoji="✅",
-        title="Test notification",
-        text=[
-            f"{channel} are working." if channel.endswith("s") else f"{channel} is working.",
-            "Links to Caero are enabled." if url
-            else "Set PUBLIC_URL to add \"Open in Caero\" links to notifications.",
-        ],
-        links=[("Open Caero", url)] if url else [],
+    message = build_alert_message(
+        product_id=0,
+        product_name="Example product",
+        product_url="https://example.com/product",
+        condition="lowered_percent",
+        current_price=Decimal("279.00"),
+        currency="EUR",
+        threshold_percent=Decimal("10"),
+        previous_price=Decimal("329.00"),
     )
+    url = caero_url("/")
+    message.title = f"Test: {message.title}"
+    message.text = [
+        f"{channel} {'are' if channel.endswith('s') else 'is'} working — this is a sample alert.",
+        "Links to Caero are enabled." if url
+        else "Set a public URL in Settings to add \"Open in Caero\" links to notifications.",
+    ]
+    message.links = ([("Open Caero", url)] if url else []) + [("Open shop", "https://example.com/product")]
+    return message
 
 
 @router.post("/test-telegram", response_model=TestNotificationResponse)
@@ -289,16 +309,26 @@ async def test_webhook_notifications(
         status="sent",
         message=(
             f"Test sent to: {', '.join(channels)}. "
-            "Check the channel(s) — delivery failures only appear in the logs."
+            "Check the channel(s) — delivery failures show under Delivery status."
         ),
     )
+
+
+@router.get("/notification-status", response_model=list[NotificationChannelStatusOut])
+async def notification_status(
+    _admin: User = Depends(require_admin),
+) -> list[NotificationChannelStatusOut]:
+    """Last delivery outcome per channel since startup."""
+    from app.notifier import channel_statuses
+
+    return [NotificationChannelStatusOut.model_validate(s) for s in channel_statuses()]
 
 
 # ── System info & jobs ─────────────────────────────────────────────────────────
 
 @router.get("/system-info", response_model=SystemInfoOut)
 async def system_info(
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     _user: User = Depends(require_user),
 ) -> SystemInfoOut:
     from app.browser import get_backend
@@ -388,7 +418,7 @@ async def _delete_products(products: list[Product], db: AsyncSession) -> int:
 
 @router.get("/export", response_model=DataExportPayload)
 async def export_data(
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     _admin: User = Depends(require_admin),
 ) -> DataExportPayload:
     from app.backup import build_export_payload
@@ -399,7 +429,7 @@ async def export_data(
 @router.get("/export/mine", response_model=UserDataExportPayload)
 async def export_my_data(
     user: User = Depends(require_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ) -> UserDataExportPayload:
     products = await _list_user_products(db, user.id)
     product_ids = [product.id for product in products]
@@ -463,7 +493,7 @@ async def export_my_data(
 async def import_data(
     payload: DataExportPayload,
     background_tasks: BackgroundTasks,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     _admin: User = Depends(require_admin),
 ) -> dict[str, str]:
     skipped_price_rows = 0
@@ -576,7 +606,7 @@ async def import_data(
 @router.delete("/products/mine", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_my_products(
     user: User = Depends(require_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ) -> None:
     products = await _list_user_products(db, user.id)
     await _delete_products(products, db)
@@ -586,7 +616,7 @@ async def delete_my_products(
 async def admin_delete_user_products(
     user_id: int,
     _admin: User = Depends(require_admin),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ) -> dict[str, str]:
     target = await db.get(User, user_id)
     if target is None:
@@ -601,7 +631,7 @@ async def import_my_data(
     payload: UserDataExportPayload,
     background_tasks: BackgroundTasks,
     user: User = Depends(require_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ) -> dict[str, str]:
     products = await _list_user_products(db, user.id)
     await _delete_products(products, db)

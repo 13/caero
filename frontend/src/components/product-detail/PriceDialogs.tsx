@@ -181,7 +181,8 @@ export function AddPriceDialog({ productId, onClose }: {
           onSubmit={(e) => { e.preventDefault(); handleAdd() }}
           className="p-5 space-y-4"
         >
-          <div className="grid grid-cols-2 gap-3">
+          {/* Stacked on phones: a half-width date input clips its value behind the picker icon. */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className={labelCls}>Date</label>
               <input

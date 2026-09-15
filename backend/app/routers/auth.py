@@ -31,7 +31,7 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login", auto_error=Fals
 
 async def get_current_user(
     token: str | None = Depends(oauth2_scheme),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ) -> User | None:
     """Return the current user or None (in single-user mode, always return first user)."""
     if settings.single_user_mode:
@@ -74,7 +74,7 @@ async def require_admin(user: User = Depends(require_user)) -> User:
 
 
 @router.post("/register", response_model=UserOut, status_code=status.HTTP_201_CREATED)
-async def register(body: UserCreate, db: AsyncSession = Depends(get_db)) -> User:
+async def register(body: UserCreate, db: AsyncSession = Depends(get_db, scope="function")) -> User:
     user_count = (await db.execute(select(func.count()).select_from(User))).scalar_one()
     is_first_user = user_count == 0
     if not is_first_user:
@@ -98,7 +98,7 @@ async def register(body: UserCreate, db: AsyncSession = Depends(get_db)) -> User
 
 
 @router.get("/register-enabled")
-async def register_enabled(db: AsyncSession = Depends(get_db)) -> dict[str, bool]:
+async def register_enabled(db: AsyncSession = Depends(get_db, scope="function")) -> dict[str, bool]:
     user_count = (await db.execute(select(func.count()).select_from(User))).scalar_one()
     if user_count == 0:
         return {"enabled": True}
@@ -134,7 +134,7 @@ def _is_login_blocked(key: str) -> bool:
 async def login(
     request: Request,
     form: OAuth2PasswordRequestForm = Depends(),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ) -> Token:
     throttle_key = _login_throttle_key(request, form.username)
     if _is_login_blocked(throttle_key):
@@ -162,7 +162,7 @@ async def me(user: User = Depends(require_user)) -> User:
 @router.post("/logout")
 async def logout(
     user: User = Depends(require_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ) -> dict[str, str]:
     # Bump the token version so every outstanding JWT for this user is revoked.
     user.token_version += 1
@@ -174,7 +174,7 @@ async def logout(
 async def change_password(
     body: ChangePasswordRequest,
     user: User = Depends(require_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ) -> dict[str, str]:
     if not verify_password(body.current_password, user.hashed_password):
         raise HTTPException(status_code=400, detail="Current password is incorrect")
@@ -187,7 +187,7 @@ async def change_password(
 async def update_starred_products(
     body: StarredProductsUpdate,
     user: User = Depends(require_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ) -> User:
     if len(body.starred_product_ids) > 3:
         raise HTTPException(status_code=400, detail="Maximum 3 starred products allowed")
@@ -201,7 +201,7 @@ async def update_starred_products(
 async def update_notification_defaults(
     body: NotificationDefaultsUpdate,
     user: User = Depends(require_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ) -> dict[str, str]:
     user.default_email = body.default_email
     user.default_telegram_chat_id = body.default_telegram_chat_id
@@ -210,7 +210,10 @@ async def update_notification_defaults(
 
 
 @router.get("/users", response_model=list[UserOut])
-async def list_users(_admin: User = Depends(require_admin), db: AsyncSession = Depends(get_db)) -> list[User]:
+async def list_users(
+    _admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db, scope="function"),
+) -> list[User]:
     result = await db.execute(select(User).order_by(User.username.asc()))
     return result.scalars().all()
 
@@ -219,7 +222,7 @@ async def list_users(_admin: User = Depends(require_admin), db: AsyncSession = D
 async def create_user(
     body: AdminUserCreate,
     _admin: User = Depends(require_admin),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ) -> User:
     result = await db.execute(select(User).where(User.username == body.username))
     if result.scalar_one_or_none():
@@ -240,7 +243,7 @@ async def admin_change_password(
     user_id: int,
     body: AdminUserPasswordUpdate,
     _admin: User = Depends(require_admin),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ) -> dict[str, str]:
     target = await db.get(User, user_id)
     if target is None:
@@ -254,7 +257,7 @@ async def admin_change_password(
 async def delete_user(
     user_id: int,
     admin: User = Depends(require_admin),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ) -> None:
     target = await db.get(User, user_id)
     if target is None:

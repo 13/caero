@@ -128,36 +128,41 @@ export default function ProductDetail() {
     <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
 
       {/* ── Top nav ── */}
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex items-center justify-between gap-2">
         <button
           onClick={() => navigate(`/${dashboardSearch}`)}
-          className="inline-flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-100 transition-colors"
+          className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-100 transition-colors"
         >
           <ArrowLeft className="h-4 w-4" />
           Back
         </button>
+        {/* Labels collapse to icons on phones so the row never wraps. */}
         <div className="flex items-center gap-2">
           <button
             onClick={runCheckNow}
             disabled={checkMutation.isPending}
-            className="flex flex-1 items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-50 text-indigo-700 hover:bg-indigo-100 disabled:opacity-50 dark:bg-indigo-900/40 dark:text-indigo-300 dark:hover:bg-indigo-900/60 font-medium transition-colors"
+            className="inline-flex items-center justify-center gap-1.5 whitespace-nowrap px-3 py-1.5 text-sm rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 disabled:opacity-50 dark:bg-indigo-900/40 dark:text-indigo-300 dark:hover:bg-indigo-900/60 font-medium transition-colors"
           >
             <RefreshCw className={`h-3.5 w-3.5 ${checkMutation.isPending ? 'animate-spin' : ''}`} />
             {checkMutation.isPending ? 'Checking…' : 'Check now'}
           </button>
           <button
             onClick={() => setEditMode(true)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+            aria-label="Edit"
+            title="Edit"
+            className="inline-flex items-center gap-1.5 whitespace-nowrap px-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
           >
             <Pencil className="h-3.5 w-3.5" />
-            Edit
+            <span className="hidden sm:inline">Edit</span>
           </button>
           <button
             onClick={() => setShowDeleteConfirm(true)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950 transition-colors"
+            aria-label="Delete"
+            title="Delete"
+            className="inline-flex items-center gap-1.5 whitespace-nowrap px-3 py-1.5 text-sm rounded-lg border border-transparent text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950 transition-colors"
           >
             <Trash2 className="h-3.5 w-3.5" />
-            Delete
+            <span className="hidden sm:inline">Delete</span>
           </button>
         </div>
       </div>
@@ -197,47 +202,59 @@ export default function ProductDetail() {
 
       {/* ── Price chart ── */}
       <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-5">
-        <div className="flex items-center gap-2 mb-4">
-          <BarChart3 className="h-4 w-4 text-indigo-500" />
-          <h2 className="font-semibold text-gray-800 dark:text-gray-100">Price history</h2>
+        {/* Phones: title + Add on one row, full-width range picker below.
+            sm+: everything on one row. */}
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-3 mb-4">
+          <BarChart3 className="h-4 w-4 shrink-0 text-indigo-500" />
+          <h2 className="font-semibold whitespace-nowrap text-gray-800 dark:text-gray-100">Price history</h2>
           {prices.length > 0 && (
-            <span className="hidden sm:inline text-xs text-gray-400 dark:text-gray-500">
+            <span className="hidden md:inline text-xs text-gray-400 dark:text-gray-500">
               Tip: click a point to edit or delete it
             </span>
           )}
-          <div className="ml-auto flex items-center gap-2">
-            {prices.length > 0 && (
-              <div className="flex rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
-                {CHART_RANGES.map(({ key, label }) => (
-                  <button
-                    key={key}
-                    onClick={() => setChartRange(key)}
-                    className={`px-2 py-1 text-xs font-medium transition-colors ${
-                      chartRange === key
-                        ? 'bg-indigo-600 text-white'
-                        : 'bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
-                    }`}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-            )}
-            <button
-              onClick={() => setShowAddPrice(true)}
-              className="inline-flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 transition-colors font-medium"
+          {prices.length > 0 && (
+            <div
+              role="group"
+              aria-label="Chart range"
+              className="order-last w-full sm:order-none sm:w-auto sm:ml-auto flex rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden"
             >
-              <Plus className="h-3.5 w-3.5" />
-              Add price
-            </button>
-          </div>
+              {CHART_RANGES.map(({ key, label }) => (
+                <button
+                  key={key}
+                  onClick={() => setChartRange(key)}
+                  aria-pressed={chartRange === key}
+                  className={`flex-1 sm:flex-none px-2.5 py-2.5 sm:py-1 text-xs font-medium whitespace-nowrap transition-colors ${
+                    chartRange === key
+                      ? 'bg-indigo-600 text-white'
+                      : 'bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+          <button
+            onClick={() => setShowAddPrice(true)}
+            aria-label="Add price"
+            className={`${prices.length > 0 ? 'ml-auto sm:ml-0' : 'ml-auto'} inline-flex items-center gap-1.5 whitespace-nowrap text-sm px-3 py-1.5 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 transition-colors font-medium`}
+          >
+            <Plus className="h-3.5 w-3.5" />
+            <span className="sm:hidden">Add</span>
+            <span className="hidden sm:inline">Add price</span>
+          </button>
         </div>
         {chartPrices.length === 0 && prices.length > 0 ? (
           <div className="h-64 flex items-center justify-center text-sm text-gray-400 dark:text-gray-500">
             No price entries in this range
           </div>
         ) : (
-          <PriceChart data={chartPrices} onPointClick={setSelectedPoint} />
+          <PriceChart
+            data={chartPrices}
+            currency={product.currency}
+            extendTo={product.last_checked_at}
+            onPointClick={setSelectedPoint}
+          />
         )}
       </div>
 

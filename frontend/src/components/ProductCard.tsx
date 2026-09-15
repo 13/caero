@@ -84,7 +84,7 @@ export default function ProductCard({ product, onKeywordClick, hasActiveAlerts, 
                 onClick={(e) => { e.preventDefault(); onToggleStar(product.id) }}
                 aria-label={isStarred ? 'Unstar product' : 'Star product'}
                 title={isStarred ? 'Remove from favourites' : 'Add to favourites'}
-                className={`p-0.5 rounded transition-colors ${isStarred ? 'text-yellow-400 hover:text-yellow-500' : 'text-gray-300 dark:text-gray-600 hover:text-yellow-400 dark:hover:text-yellow-400'}`}
+                className={`-m-1.5 p-2 sm:m-0 sm:p-0.5 rounded transition-colors ${isStarred ? 'text-yellow-400 hover:text-yellow-500' : 'text-gray-300 dark:text-gray-600 hover:text-yellow-400 dark:hover:text-yellow-400'}`}
               >
                 <Star className={`h-4 w-4 ${isStarred ? 'fill-yellow-400' : ''}`} />
               </button>

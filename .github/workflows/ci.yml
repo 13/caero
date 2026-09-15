@@ -160,3 +160,12 @@ jobs:
         with:
           name: playwright-traces
           path: frontend/test-results/
+
+      # Phone-width screenshots from e2e/mobile.spec.ts, so layout changes in a
+      # PR can be eyeballed without running the app.
+      - uses: actions/upload-artifact@v4
+        if: always() && github.event_name == 'pull_request'
+        with:
+          name: mobile-screenshots
+          path: frontend/test-results/mobile-screens/
+          if-no-files-found: ignore

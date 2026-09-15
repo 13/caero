@@ -12,6 +12,7 @@ import ipaddress
 import logging
 import smtplib
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from decimal import Decimal
 from email.header import Header
 from email.mime.multipart import MIMEMultipart
@@ -25,6 +26,8 @@ from app.config import settings
 logger = logging.getLogger(__name__)
 
 _bot_token: str = settings.telegram_bot_token
+# Admin-set public URL from AppSettings; empty falls back to PUBLIC_URL.
+_public_url: str = ""
 
 
 def configure_telegram(token: str) -> None:
@@ -34,6 +37,62 @@ def configure_telegram(token: str) -> None:
 
 def get_telegram_token() -> str:
     return _bot_token
+
+
+def configure_public_url(url: str) -> None:
+    global _public_url
+    _public_url = (url or "").strip()
+
+
+def get_public_url() -> str:
+    return _public_url or settings.public_url.strip()
+
+
+# ── Delivery health ───────────────────────────────────────────────────────────
+# Failures used to be log-only, so a channel could be broken for weeks without
+# anyone noticing. Kept in memory like scraper health: it resets on restart,
+# which is fine for "is this channel working right now".
+
+
+@dataclass
+class ChannelStatus:
+    channel: str
+    last_success_at: datetime | None = None
+    last_failure_at: datetime | None = None
+    last_error: str | None = None
+    consecutive_failures: int = 0
+
+
+_channel_status: dict[str, ChannelStatus] = {}
+
+
+def _redact(text: str) -> str:
+    # httpx errors include the request URL, which carries the bot token.
+    for secret in (_bot_token, settings.telegram_bot_token, settings.gotify_token, settings.smtp_password):
+        if secret:
+            text = text.replace(secret, "***")
+    return text
+
+
+def _record_delivery(channel: str, error: BaseException | None = None) -> None:
+    status = _channel_status.setdefault(channel, ChannelStatus(channel))
+    now = datetime.now(UTC)
+    if error is None:
+        status.last_success_at = now
+        status.consecutive_failures = 0
+    else:
+        status.last_failure_at = now
+        status.last_error = _redact(f"{type(error).__name__}: {error}")[:300]
+        status.consecutive_failures += 1
+
+
+def channel_statuses() -> list[ChannelStatus]:
+    return sorted(_channel_status.values(), key=lambda s: s.channel)
+
+
+def reset_channel_status() -> None:
+    """Test hook."""
+    _channel_status.clear()
 
 
 # ── Message model & rendering ─────────────────────────────────────────────────
@@ -69,7 +128,7 @@ def format_price(price: Decimal | None, currency: str | None = None) -> str:
 
 def caero_url(path: str = "/") -> str | None:
     """Absolute link into the Caero UI, or None when PUBLIC_URL is not set."""
-    base = settings.public_url.strip().rstrip("/")
+    base = get_public_url().rstrip("/")
     if not base:
         return None
     return f"{base}/{path.lstrip('/')}"
@@ -205,13 +264,15 @@ async def _send_telegram_alert(*, chat_id: str, message: Notification) -> None:
         try:
             await send_telegram_message(token, chat_id, message)
             logger.info("Telegram alert sent to chat %s", chat_id)
+            _record_delivery("Telegram")
             return
         except Exception as exc:
             if delay is None:
                 logger.error(
                     "Failed to send Telegram alert to chat %s after %d attempts: %s",
-                    chat_id, attempt, exc,
+                    chat_id, attempt, _redact(str(exc)),
                 )
+                _record_delivery("Telegram", exc)
                 return
             logger.warning(
                 "Telegram send to chat %s failed (attempt %d), retrying in %ds: %s",
@@ -232,6 +293,7 @@ def _send_email_alert_sync(*, to_email: str, msg: MIMEMultipart, subject: str) -
                     server.login(settings.smtp_user, settings.smtp_password)
                 server.sendmail(settings.smtp_from, [to_email], msg.as_string())
             logger.info("Email alert sent to %s (%s)", to_email, subject)
+            _record_delivery("Email")
             return
         except Exception as exc:
             if delay is None:
@@ -239,6 +301,7 @@ def _send_email_alert_sync(*, to_email: str, msg: MIMEMultipart, subject: str) -
                     "Failed to send email alert to %s after %d attempts: %s",
                     to_email, attempt, exc,
                 )
+                _record_delivery("Email", exc)
                 return
             logger.warning(
                 "Email send to %s failed (attempt %d), retrying in %ds: %s",
@@ -254,10 +317,14 @@ async def _post_with_retry(channel: str, url: str, **request_kwargs) -> None:
                 response = await client.post(url, timeout=10.0, **request_kwargs)
                 response.raise_for_status()
                 logger.info("%s notification sent", channel)
+                _record_delivery(channel)
                 return
         except Exception as exc:
             if delay is None:
-                logger.error("Failed to send %s notification after %d attempts: %s", channel, attempt, exc)
+                logger.error(
+                    "Failed to send %s notification after %d attempts: %s", channel, attempt, _redact(str(exc))
+                )
+                _record_delivery(channel, exc)
                 return
             logger.warning("%s send failed (attempt %d), retrying in %ds: %s", channel, attempt, delay, exc)
             await asyncio.sleep(delay)

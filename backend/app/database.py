@@ -65,6 +65,9 @@ async def get_db() -> AsyncSession:
     Transaction pattern: endpoints mutate and (at most) flush; this dependency
     commits once on success and rolls back on any exception. Endpoints should
     not call session.commit() themselves.
+
+    Inject with Depends(get_db, scope="function") so the commit happens before
+    the response is sent; the default request scope commits afterwards.
     """
     async with AsyncSessionLocal() as session:
         try:

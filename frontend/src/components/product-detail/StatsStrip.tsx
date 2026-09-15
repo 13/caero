@@ -37,7 +37,8 @@ export default function StatsStrip({ stats, currency, inversePrice = false }: {
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
       {cells.map(({ label, value, sub, accent }) => (
-        <div key={label} className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-3">
+        // Odd cell count: the last card spans the 2-column phone grid instead of leaving a hole.
+        <div key={label} className="last:col-span-2 sm:last:col-span-1 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-3 min-w-0">
           <p className="text-xs text-gray-400 dark:text-gray-500 mb-1">{label}</p>
           <p className={`text-base font-bold ${accent ?? 'text-gray-800 dark:text-gray-100'}`}>{value}</p>
           {sub && <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{sub}</p>}

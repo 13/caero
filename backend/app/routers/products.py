@@ -221,7 +221,7 @@ async def _to_product_out(product: Product, db: AsyncSession) -> ProductOut:
 
 @router.get("", response_model=list[ProductOut])
 async def list_products(
-    user: User = Depends(require_user), db: AsyncSession = Depends(get_db)
+    user: User = Depends(require_user), db: AsyncSession = Depends(get_db, scope="function")
 ) -> list[ProductOut]:
     result = await db.execute(select(Product).where(Product.user_id == user.id))
     products = result.scalars().all()
@@ -237,7 +237,7 @@ async def create_product(
     body: ProductCreate,
     background_tasks: BackgroundTasks,
     user: User = Depends(require_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ) -> ProductOut:
     from app.schedule_utils import normalize_check_time_hhmm
     payload = body.model_dump()
@@ -261,7 +261,7 @@ async def create_product(
 async def get_sparklines(
     days: int = 30,
     user: User = Depends(require_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ) -> dict[int, list[SparklinePoint]]:
     """Recent price points for all of the user's products, for dashboard sparklines."""
     from datetime import UTC, datetime, timedelta
@@ -286,7 +286,7 @@ async def get_sparklines(
 async def get_product(
     product_id: int,
     user: User = Depends(require_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ) -> ProductOut:
     product = await _get_product(product_id, user, db)
     return await _to_product_out(product, db)
@@ -298,7 +298,7 @@ async def update_product(
     body: ProductUpdate,
     background_tasks: BackgroundTasks,
     user: User = Depends(require_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ) -> ProductOut:
     product = await _get_product(product_id, user, db)
     old_interval = product.check_interval_minutes
@@ -349,7 +349,7 @@ async def update_product(
 async def delete_product(
     product_id: int,
     user: User = Depends(require_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ) -> None:
     product = await _get_product(product_id, user, db)
     remove_product_job(product_id)
@@ -362,7 +362,7 @@ async def delete_product(
 async def check_product_now(
     product_id: int,
     user: User = Depends(require_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ) -> CheckResult:
     product = await _get_product(product_id, user, db)
     from app.browser import ensure_browser
@@ -411,7 +411,7 @@ async def check_product_now(
 async def download_all_missing_images(
     background_tasks: BackgroundTasks,
     user: User = Depends(require_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ) -> dict[str, str]:
     from pathlib import Path
 
@@ -444,7 +444,7 @@ async def download_all_missing_images(
 async def check_all_products_now(
     background_tasks: BackgroundTasks,
     user: User = Depends(require_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ) -> dict[str, str]:
 
     if check_all_in_progress():
@@ -473,7 +473,7 @@ async def check_all_products_now(
 async def get_product_statistics(
     product_id: int,
     user: User = Depends(require_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ) -> ProductStatisticsOut:
     await _get_product(product_id, user, db)
 

@@ -145,3 +145,57 @@ async def test_telegram_400_resends_as_plain_text(monkeypatch):
     assert sent[0]["parse_mode"] == "HTML"
     assert "parse_mode" not in sent[1]
     assert sent[1]["text"].startswith("📉 Price dropped: Sony <WH-1000XM5> & Case")
+
+
+def test_admin_public_url_overrides_env(monkeypatch):
+    monkeypatch.setattr(settings, "public_url", "https://env.example")
+    notifier.configure_public_url("https://admin.example/")
+    try:
+        assert notifier.caero_url("/products/1") == "https://admin.example/products/1"
+    finally:
+        notifier.configure_public_url("")
+    assert notifier.caero_url("/") == "https://env.example/"
+
+
+def test_channel_status_tracks_outcomes_and_redacts_secrets(monkeypatch):
+    notifier.reset_channel_status()
+    monkeypatch.setattr(notifier, "_bot_token", "123:SECRET")
+
+    notifier._record_delivery(
+        "Telegram", RuntimeError("POST https://api.telegram.org/bot123:SECRET/sendMessage 502")
+    )
+    [status] = notifier.channel_statuses()
+    assert status.consecutive_failures == 1
+    assert "SECRET" not in status.last_error
+    assert "bot***" in status.last_error
+
+    notifier._record_delivery("Telegram", RuntimeError("again"))
+    assert status.consecutive_failures == 2
+
+    notifier._record_delivery("Telegram")
+    assert status.consecutive_failures == 0
+    assert status.last_success_at is not None
+    assert status.last_error == "RuntimeError: again"  # last error kept for context
+    notifier.reset_channel_status()
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_webhook_failure_after_retries_is_recorded(monkeypatch):
+    notifier.reset_channel_status()
+    monkeypatch.setattr(notifier, "_RETRY_DELAYS_SECONDS", (0, 0))
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(500, request=request)
+
+    real_client = httpx.AsyncClient
+    monkeypatch.setattr(
+        notifier.httpx, "AsyncClient", lambda: real_client(transport=httpx.MockTransport(handler))
+    )
+
+    await notifier._post_with_retry("Discord", "https://discord.example/hook", json={"content": "x"})
+
+    [status] = notifier.channel_statuses()
+    assert status.channel == "Discord"
+    assert status.consecutive_failures == 1
+    assert "500" in status.last_error
+    notifier.reset_channel_status()

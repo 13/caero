@@ -189,6 +189,34 @@ async def test_below_alert_fires_on_crossing_only(monkeypatch, sent_notification
 
 
 @pytest.mark.asyncio(loop_scope="session")
+async def test_alert_carries_scraped_currency(monkeypatch, sent_notifications):
+    from app.notifier import build_alert_message
+
+    pid = await make_product("flow-alert-currency")
+    async with AsyncSessionLocal() as db:
+        db.add(Alert(product_id=pid, condition="changed", email="a@example.com"))
+        await db.commit()
+
+    scrape_returning(
+        monkeypatch,
+        ScrapeResult(20.0, "USD", "https://shop.example/item"),
+        ScrapeResult(18.5, "USD", "https://shop.example/item"),
+    )
+    await scheduler_mod.scrape_and_record(pid)
+    await scheduler_mod.scrape_and_record(pid)
+
+    [sent] = sent_notifications["alerts"]
+    assert sent["product_id"] == pid
+    assert sent["currency"] == "USD"
+    assert sent["current_price"] == Decimal("18.50")
+
+    # The kwargs the scheduler passes must build a real message end to end.
+    message = build_alert_message(**{k: v for k, v in sent.items() if k not in ("to_email", "telegram_chat_id")})
+    assert ("Now", "$18.50") in message.facts
+    assert ("Was", "$20.00 (−7.5%)") in message.facts
+
+
+@pytest.mark.asyncio(loop_scope="session")
 async def test_redirect_blocks_recording_and_notifies(monkeypatch, sent_notifications):
     pid = await make_product("flow-redirect")
     scrape_returning(monkeypatch, ScrapeResult(10.0, "EUR", "https://other.example/different"))

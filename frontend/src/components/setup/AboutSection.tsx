@@ -18,7 +18,8 @@ export default function AboutSection() {
         <CaeroBrand showText={false} logoAriaHidden={false} logoSizeClassName="h-16 w-16" className="justify-center mb-1" />
         <p className="text-sm text-gray-600 dark:text-gray-300 text-center mb-2">{APP_DESCRIPTION}</p>
 
-        <div className="grid grid-cols-2 gap-x-8 gap-y-1 text-sm bg-gray-50 dark:bg-gray-800/50 p-4 rounded-xl text-gray-700 dark:text-gray-200">
+        {/* Label column sizes to its text so labels don't wrap on phones. */}
+        <div className="grid grid-cols-[auto_minmax(0,1fr)] sm:grid-cols-2 gap-x-4 sm:gap-x-8 gap-y-1 text-sm [&>div:nth-child(odd)]:whitespace-nowrap [&>div:nth-child(even)]:break-all bg-gray-50 dark:bg-gray-800/50 p-4 rounded-xl text-gray-700 dark:text-gray-200">
           <div className="text-right font-medium text-gray-500 hover:text-gray-700">Frontend Version:</div>
           <div className="font-mono">{APP_VERSION}</div>
 

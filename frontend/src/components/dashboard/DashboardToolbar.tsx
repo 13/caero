@@ -19,7 +19,8 @@ export default function DashboardToolbar({
   return (
     <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-3 flex flex-wrap items-center gap-2">
       {/* Search */}
-      <div className="relative flex-1 min-w-[160px]">
+      {/* Phones: search gets its own full-width row, controls share the next. */}
+      <div className="relative basis-full min-w-0 sm:basis-auto sm:flex-1 sm:min-w-[160px]">
         <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400 pointer-events-none" />
         <input
           value={searchTerm}
@@ -44,7 +45,8 @@ export default function DashboardToolbar({
       <select
         value={sortBy}
         onChange={(e) => onSort(e.target.value as SortBy)}
-        className="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-200 px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        aria-label="Sort by"
+        className="flex-1 min-w-0 sm:flex-none rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-200 px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
       >
         <option value="name">Name</option>
         <option value="category">Category</option>
@@ -63,7 +65,7 @@ export default function DashboardToolbar({
       </button>
 
       {/* Divider */}
-      <div className="w-px h-6 bg-gray-200 dark:bg-gray-700" />
+      <div className="hidden sm:block w-px h-6 bg-gray-200 dark:bg-gray-700" />
 
       {/* View toggle */}
       <div className="flex rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">

@@ -106,10 +106,11 @@ export default function AlertsSection({ productId, currency }: { productId: numb
 
   return (
     <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-5">
-      <div className="flex items-center justify-between mb-4">
+      {/* Wraps the button onto its own line with large text instead of overlapping. */}
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
         <div className="flex items-center gap-2">
-          <Bell className="h-4 w-4 text-indigo-500" />
-          <h2 className="font-semibold text-gray-800 dark:text-gray-100">Price alerts</h2>
+          <Bell className="h-4 w-4 shrink-0 text-indigo-500" />
+          <h2 className="font-semibold whitespace-nowrap text-gray-800 dark:text-gray-100">Price alerts</h2>
           {alerts.length > 0 && (
             <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 font-medium">
               {alerts.length}
@@ -118,7 +119,7 @@ export default function AlertsSection({ productId, currency }: { productId: numb
         </div>
         <button
           onClick={toggleAddAlert}
-          className="inline-flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 transition-colors font-medium"
+          className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap text-sm px-3 py-1.5 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 transition-colors font-medium"
         >
           {showAddAlert ? <X className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
           {showAddAlert ? 'Cancel' : 'Add alert'}
@@ -173,7 +174,7 @@ export default function AlertsSection({ productId, currency }: { productId: numb
                     onClick={() => startEditAlert(alert)}
                     title="Edit alert"
                     aria-label="Edit alert"
-                    className="p-1.5 rounded-lg text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950 transition-colors"
+                    className="p-2.5 sm:p-1.5 rounded-lg text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950 transition-colors"
                   >
                     <Pencil className="h-3.5 w-3.5" />
                   </button>
@@ -181,7 +182,7 @@ export default function AlertsSection({ productId, currency }: { productId: numb
                     onClick={() => setAlertDeleteTarget(alert)}
                     title="Delete alert"
                     aria-label="Delete alert"
-                    className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950 transition-colors"
+                    className="p-2.5 sm:p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950 transition-colors"
                   >
                     <X className="h-3.5 w-3.5" />
                   </button>

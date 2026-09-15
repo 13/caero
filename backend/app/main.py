@@ -65,17 +65,19 @@ async def lifespan(application: FastAPI):
 
     await start_browser()
 
-    # Load Telegram token from DB (overrides env var if set)
+    # Load Telegram token and public URL from DB (both override their env vars if set)
     try:
         from app.database import AsyncSessionLocal
         from app.models import AppSettings as AppSettingsModel
-        from app.notifier import configure_telegram
+        from app.notifier import configure_public_url, configure_telegram
         async with AsyncSessionLocal() as _db:
             _row = await _db.get(AppSettingsModel, 1)
             if _row and _row.telegram_bot_token:
                 configure_telegram(_row.telegram_bot_token)
+            if _row and _row.public_url:
+                configure_public_url(_row.public_url)
     except Exception as _exc:
-        logger.warning("Could not load Telegram token from DB at startup: %s", _exc)
+        logger.warning("Could not load notification settings from DB at startup: %s", _exc)
 
     # Start APScheduler and load product jobs
     scheduler.start()

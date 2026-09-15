@@ -43,10 +43,14 @@ export default function ProductTable({
       : <ArrowDown className="h-3 w-3 inline ml-0.5" />
   }
 
+  // Phones show only name, price and change — the columns that matter at a
+  // glance — instead of a 600px table that hides the price behind a scroll.
+  const desktopOnly = 'hidden sm:table-cell'
+
   return (
     <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden">
       <div className="overflow-x-auto">
-        <table className="w-full text-sm min-w-[600px]">
+        <table className="w-full text-sm sm:min-w-[600px]">
           <thead className="bg-gray-50 dark:bg-gray-800">
             <tr>
               {(
@@ -62,7 +66,9 @@ export default function ProductTable({
               ).map(({ key, label }) => (
                 <th
                   key={key}
-                  className="text-left px-4 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 tracking-wider"
+                  className={`text-left px-3 sm:px-4 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 tracking-wider whitespace-nowrap ${
+                    key === 'category' || key === 'tags' || key === 'trend' || key === 'last_change_date' ? desktopOnly : ''
+                  }`}
                   aria-sort={key !== 'tags' && key !== 'trend' ? ariaSortFor(key as SortBy) : undefined}
                 >
                   {key !== 'tags' && key !== 'trend' ? (
@@ -86,28 +92,28 @@ export default function ProductTable({
                 onClick={() => navigate(`/products/${p.id}${location.search}`)}
                 className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
               >
-                <td className="px-4 py-3">
-                  <div className="flex items-center gap-3">
+                <td className="px-3 sm:px-4 py-3">
+                  <div className="flex items-center gap-2 sm:gap-3">
                     <button
                       onClick={(e) => { e.stopPropagation(); onToggleStar(p.id) }}
                       aria-label={starredIds.includes(p.id) ? 'Unstar product' : 'Star product'}
                       title={starredIds.includes(p.id) ? 'Remove from favourites' : 'Add to favourites'}
-                      className={`shrink-0 p-0.5 rounded transition-colors ${starredIds.includes(p.id) ? 'text-yellow-400 hover:text-yellow-500' : 'text-gray-300 dark:text-gray-600 hover:text-yellow-400 dark:hover:text-yellow-400'}`}
+                      className={`shrink-0 -m-1.5 p-2 sm:m-0 sm:p-0.5 rounded transition-colors ${starredIds.includes(p.id) ? 'text-yellow-400 hover:text-yellow-500' : 'text-gray-300 dark:text-gray-600 hover:text-yellow-400 dark:hover:text-yellow-400'}`}
                     >
                       <Star className={`h-4 w-4 ${starredIds.includes(p.id) ? 'fill-yellow-400' : ''}`} />
                     </button>
                     {(p.cached_image_url ?? p.image_url) ? (
-                      <img src={(p.cached_image_url ?? p.image_url) || undefined} alt="" className="w-10 h-10 object-cover rounded-md border border-gray-200 dark:border-gray-700" />
+                      <img src={(p.cached_image_url ?? p.image_url) || undefined} alt="" className="shrink-0 w-10 h-10 object-cover rounded-md border border-gray-200 dark:border-gray-700" />
                     ) : (
-                      <div className="w-10 h-10 rounded-md bg-gray-100 dark:bg-gray-800 flex items-center justify-center border border-gray-200 dark:border-gray-700">
+                      <div className="shrink-0 w-10 h-10 rounded-md bg-gray-100 dark:bg-gray-800 flex items-center justify-center border border-gray-200 dark:border-gray-700">
                         <ImageIcon className="h-5 w-5 text-gray-400" />
                       </div>
                     )}
-                    <div className="flex flex-col gap-0.5">
+                    <div className="flex flex-col gap-0.5 min-w-0">
                       <Link
                         to={`/products/${p.id}${location.search}`}
                         onClick={(e) => e.stopPropagation()}
-                        className="font-medium text-indigo-600 dark:text-indigo-400 hover:underline line-clamp-1"
+                        className="font-medium text-indigo-600 dark:text-indigo-400 hover:underline line-clamp-2 sm:line-clamp-1 break-words"
                       >
                         {p.name}
                       </Link>
@@ -142,7 +148,7 @@ export default function ProductTable({
                     </div>
                   </div>
                 </td>
-                <td className="px-4 py-3 text-gray-500 dark:text-gray-400">
+                <td className={`px-4 py-3 text-gray-500 dark:text-gray-400 ${desktopOnly}`}>
                   {p.category ? (
                     <button
                       onClick={(e) => { e.stopPropagation(); onSearchTerm(p.category!) }}
@@ -154,7 +160,7 @@ export default function ProductTable({
                     '—'
                   )}
                 </td>
-                <td className="px-4 py-3">
+                <td className={`px-4 py-3 ${desktopOnly}`}>
                   <div className="flex flex-wrap items-center gap-1.5">
                     {p.tags.slice(0, 3).map(tag => (
                       <button
@@ -172,9 +178,9 @@ export default function ProductTable({
                     )}
                   </div>
                 </td>
-                <td className="px-4 py-3 font-semibold text-gray-800 dark:text-gray-200">{formatPrice(p.latest_price, settings?.date_format, p.currency)}</td>
+                <td className="px-3 sm:px-4 py-3 font-semibold whitespace-nowrap text-gray-800 dark:text-gray-200">{formatPrice(p.latest_price, settings?.date_format, p.currency)}</td>
                 {sparklines && (
-                  <td className="px-4 py-3 w-28">
+                  <td className={`px-4 py-3 w-28 ${desktopOnly}`}>
                     {(sparklines[p.id]?.length ?? 0) >= 2 ? (
                       <div className="w-24">
                         <Sparkline points={sparklines[p.id]} invert={p.inverse_price} />
@@ -184,7 +190,7 @@ export default function ProductTable({
                     )}
                   </td>
                 )}
-                <td className="px-4 py-3">
+                <td className="px-3 sm:px-4 py-3 whitespace-nowrap">
                   {p.last_price_change_percent ? (
                     <span className={`text-xs font-semibold ${
                       priceChangeSentiment(parseFloat(p.last_price_change_percent), p.inverse_price) === 'good'
@@ -197,7 +203,7 @@ export default function ProductTable({
                     </span>
                   ) : '—'}
                 </td>
-                <td className="px-4 py-3 text-gray-500 dark:text-gray-400">
+                <td className={`px-4 py-3 whitespace-nowrap text-gray-500 dark:text-gray-400 ${desktopOnly}`}>
                   {formatDateTime(p.last_checked_at, settings?.date_format)}
                 </td>
               </tr>

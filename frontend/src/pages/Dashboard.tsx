@@ -271,8 +271,8 @@ export default function Dashboard() {
           )}
 
           {/* ── Footer Stats ── */}
-          <div className="mt-6 flex flex-wrap items-center justify-center gap-4 text-sm text-gray-500 dark:text-gray-400 border-t border-gray-200 dark:border-gray-800 pt-4">
-            <p>Total Products: <span className="font-medium text-gray-700 dark:text-gray-300">{products?.length || 0}</span></p>
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-sm text-gray-500 dark:text-gray-400 border-t border-gray-200 dark:border-gray-800 pt-4">
+            <p>Total: <span className="font-medium text-gray-700 dark:text-gray-300">{products?.length || 0}</span></p>
             <span className="w-1 h-1 rounded-full bg-gray-300 dark:bg-gray-700"></span>
             <p>Active: <span className="font-medium text-green-600 dark:text-green-400">{activeCount}</span></p>
             <span className="w-1 h-1 rounded-full bg-gray-300 dark:bg-gray-700"></span>

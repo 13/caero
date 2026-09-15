@@ -11,6 +11,7 @@ import type {
   ChangePasswordRequest,
   DataExportPayload,
   JobOut,
+  NotificationChannelStatus,
   NotificationDefaultsUpdate,
   PriceHistory,
   PriceHistoryCreate,
@@ -424,6 +425,16 @@ export function useTestTelegram() {
         method: 'POST',
         body: JSON.stringify(body),
       }),
+  })
+}
+
+/** Last delivery outcome per notification channel — admin only. */
+export function useNotificationStatus(enabled = true) {
+  return useQuery<NotificationChannelStatus[]>({
+    queryKey: ['notification-status'],
+    queryFn: () => apiFetch<NotificationChannelStatus[]>('/api/settings/notification-status'),
+    enabled,
+    refetchInterval: 30_000,
   })
 }
 

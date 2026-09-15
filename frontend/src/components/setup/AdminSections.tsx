@@ -9,6 +9,7 @@ import {
   useImportData,
   useJobs,
   useMe,
+  useNotificationStatus,
   useSaveSettings,
   useSettings,
   useTestEmail,
@@ -23,13 +24,42 @@ import { inputCls, labelCls } from '../../utils/styles'
 import Section from './Section'
 import { downloadJson, exportDateSuffix, formatErrorMessage } from './common'
 
-/** Telegram bot token + notification test tools. Admin only. */
+/** Public URL, Telegram bot token, delivery status and test tools. Admin only. */
 export function NotificationTestsSection({ showToast }: { showToast: (msg: string) => void }) {
   const { data: settings } = useSettings()
+  const { data: uiSettings } = useUiSettings()
+  const { data: statuses } = useNotificationStatus()
   const saveMutation = useSaveSettings()
   const testEmailMutation = useTestEmail()
   const testTelegramMutation = useTestTelegram()
   const testWebhooksMutation = useTestWebhooks()
+
+  // null = untouched, show the stored value.
+  const [publicUrlDraft, setPublicUrlDraft] = useState<string | null>(null)
+  const publicUrl = publicUrlDraft ?? settings?.public_url ?? ''
+
+  const savePublicUrl = () => {
+    if (!settings || publicUrlDraft === null) return
+    const value = publicUrlDraft.trim()
+    if (value && !/^https?:\/\/\S+$/.test(value)) {
+      showToast('Public URL must start with http:// or https://')
+      return
+    }
+    saveMutation.mutate(
+      {
+        allow_registration: settings.allow_registration,
+        date_format: settings.date_format,
+        time_format: settings.time_format,
+        public_url: value,
+      },
+      {
+        onSuccess: () => {
+          setPublicUrlDraft(null)
+          showToast(value ? 'Public URL saved.' : 'Public URL cleared.')
+        },
+      }
+    )
+  }
 
   const [botTokenInput, setBotTokenInput] = useState('')
   const [showBotToken, setShowBotToken] = useState(false)
@@ -57,7 +87,36 @@ export function NotificationTestsSection({ showToast }: { showToast: (msg: strin
   }
 
   return (
-    <Section icon={Bell} title="Notification tests" description="Verify email and Telegram alerts are working">
+    <Section icon={Bell} title="Notifications" description="Links, delivery status and test messages">
+      <div className="space-y-2 pb-2 border-b border-gray-100 dark:border-gray-800">
+        <label className={labelCls} htmlFor="public-url">Public URL</label>
+        <div className="flex gap-2">
+          <input
+            id="public-url"
+            type="url"
+            value={publicUrl}
+            onChange={(e) => setPublicUrlDraft(e.target.value)}
+            placeholder={settings?.public_url_env || 'https://caero.example.com'}
+            className={inputCls}
+          />
+          <button
+            type="button"
+            onClick={savePublicUrl}
+            disabled={saveMutation.isPending || publicUrlDraft === null}
+            className="shrink-0 px-3 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+          >
+            Save
+          </button>
+        </div>
+        <p className="text-xs text-gray-400 dark:text-gray-500">
+          Adds "Open in Caero" links to notifications.{' '}
+          {settings?.public_url_env ? (
+            <>Empty uses <span className="font-mono">PUBLIC_URL</span> from <span className="font-mono">.env</span> ({settings.public_url_env}).</>
+          ) : (
+            <>Leave empty to send notifications without them.</>
+          )}
+        </p>
+      </div>
       <div className="space-y-2 pb-2 border-b border-gray-100 dark:border-gray-800">
         <label className={labelCls}>Telegram bot token</label>
         <div className="flex gap-2">
@@ -161,6 +220,31 @@ export function NotificationTestsSection({ showToast }: { showToast: (msg: strin
         <p className="text-xs text-gray-400 dark:text-gray-500">
           Configured via <span className="font-mono">NTFY_URL</span>, <span className="font-mono">GOTIFY_URL</span>+<span className="font-mono">GOTIFY_TOKEN</span>, <span className="font-mono">DISCORD_WEBHOOK_URL</span> in <span className="font-mono">.env</span>. Every notification from every user is broadcast to these channels.
         </p>
+      </div>
+      <div className="space-y-2 pt-2 border-t border-gray-100 dark:border-gray-800">
+        <label className={labelCls}>Delivery status</label>
+        {!statuses?.length ? (
+          <p className="text-xs text-gray-400 dark:text-gray-500">No notifications sent since the last restart.</p>
+        ) : (
+          <ul className="divide-y divide-gray-100 dark:divide-gray-800">
+            {statuses.map((s) => {
+              const failing = s.consecutive_failures > 0
+              return (
+                <li key={s.channel} className="py-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                  <span className="w-20 text-sm font-medium text-gray-800 dark:text-gray-100">{s.channel}</span>
+                  <span className={`text-xs font-medium ${failing ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
+                    {failing
+                      ? `Failing: ${s.consecutive_failures} in a row, last ${formatDateTime(s.last_failure_at, uiSettings?.date_format)}`
+                      : `OK, last sent ${formatDateTime(s.last_success_at, uiSettings?.date_format)}`}
+                  </span>
+                  {failing && s.last_error && (
+                    <span className="basis-full text-xs font-mono break-all text-gray-500 dark:text-gray-400">{s.last_error}</span>
+                  )}
+                </li>
+              )
+            })}
+          </ul>
+        )}
       </div>
     </Section>
   )

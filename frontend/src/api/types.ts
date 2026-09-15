@@ -127,6 +127,10 @@ export interface AppSettings {
   date_format: DateFormat
   time_format: TimeFormat
   telegram_bot_token_set: boolean
+  /** Admin-set base URL for "Open in Caero" links ('' = use the env var). */
+  public_url: string
+  /** PUBLIC_URL env fallback. */
+  public_url_env: string
   updated_at: string | null
 }
 
@@ -136,6 +140,16 @@ export interface AppSettingsIn {
   time_format: TimeFormat
   /** undefined/null = keep stored token, '' = clear it */
   telegram_bot_token?: string | null
+  /** undefined/null = keep, '' = clear (fall back to PUBLIC_URL) */
+  public_url?: string | null
+}
+
+export interface NotificationChannelStatus {
+  channel: string
+  last_success_at: string | null
+  last_failure_at: string | null
+  last_error: string | null
+  consecutive_failures: number
 }
 
 export interface UiSettings {

@@ -11,5 +11,6 @@ export default defineConfig({
   use: {
     baseURL: process.env.PW_BASE_URL ?? 'http://localhost:8000',
     trace: 'retain-on-failure',
+    screenshot: 'only-on-failure',
   },
 })
