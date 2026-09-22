@@ -33,6 +33,21 @@ class TestParsePrice:
     def test_whitespace_and_symbols(self):
         assert parse_price("  € 49,99 ") == 49.99
 
+    def test_dash_cents_shorthand(self):
+        # reichelt & co. write whole euros as "1.769,- €"
+        assert parse_price("1.769,- €") == 1769.0
+        assert parse_price("1.769,-- €") == 1769.0
+        assert parse_price("769,- €") == 769.0
+
+    def test_dash_cents_shorthand_english_format(self):
+        assert parse_price("$1,769.- ") == 1769.0
+
+    def test_dash_cents_shorthand_with_forced_format(self):
+        assert parse_price("1.769,- €", "eu") == 1769.0
+
+    def test_negative_price_is_not_mistaken_for_dash_cents(self):
+        assert parse_price("-12,50 €") == 12.5
+
     def test_eu_mode_resolves_ambiguity(self):
         # "1,234" is ambiguous: EU comma-decimal vs US thousands
         assert parse_price("1,234", "eu") == 1.234

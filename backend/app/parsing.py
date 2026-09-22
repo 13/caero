@@ -41,8 +41,12 @@ def parse_price(raw: str | None, price_format: str = "auto") -> float | None:
     """
     if not raw:
         return None
+    # "1.769,- €" / "1.769,-- €": dash stands in for zero cents. Spell it out
+    # before the dashes get stripped, otherwise the dangling separator hides
+    # which of the two is the decimal one.
+    raw = re.sub(r"(?<=\d)([.,])[-\u2013\u2014]+(?!\d)", r"\g<1>00", raw.strip())
     # Remove currency symbols and whitespace
-    cleaned = re.sub(r"[^\d.,]", "", raw.strip())
+    cleaned = re.sub(r"[^\d.,]", "", raw)
     if not cleaned:
         return None
 
