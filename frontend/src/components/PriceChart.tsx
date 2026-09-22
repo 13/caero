@@ -11,7 +11,7 @@ import { useMemo } from 'react'
 import { useUiSettings } from '../api/hooks'
 import type { PriceHistory } from '../api/types'
 import { localeFromDateFormat, formatDate, formatDateTime } from '../utils/format'
-import { priceAxisDomain, shortDate } from './priceChartAxis'
+import { lineTypeFor, priceAxisDomain, shortDate } from './priceChartAxis'
 
 export interface PricePoint {
   id: number
@@ -147,10 +147,11 @@ export default function PriceChart({ data, currency = 'EUR', extendTo, onPointCl
             borderColor: 'var(--chart-tooltip-border)',
           }}
         />
-        {/* stepAfter: a price holds until the next change; a curve would
-            invent gradual moves between checks that never happened. */}
+        {/* Only "stepped" is literally true — prices are stored on change
+            only, so the vertices are the real scrapes and any slope between
+            them is drawn, not measured. Reader's choice, in Preferences. */}
         <Line
-          type="stepAfter"
+          type={lineTypeFor(settings?.chart_line_style)}
           dataKey="price"
           stroke="var(--chart-line)"
           strokeWidth={2}

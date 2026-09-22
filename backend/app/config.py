@@ -43,6 +43,9 @@ class Settings(BaseSettings):
     telegram_bot_token: str = Field(default="")
     # Public base URL of this instance; enables "Open in Caero" links in notifications.
     public_url: str = Field(default="")
+    # ISO-8601 image build time, baked in by backend/Dockerfile. Empty when
+    # running outside a built image (dev server) — About then hides the row.
+    build_date: str = Field(default="")
 
     # Webhook notification channels. Each configured channel receives every
     # notification (alerts, selector-broken, redirects, …) in addition to the

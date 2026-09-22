@@ -41,6 +41,8 @@ async def build_export_payload(db: AsyncSession) -> dict:
             "date_format": app_settings.date_format if app_settings else "DD.MM.YYYY",
             "time_format": app_settings.time_format if app_settings else "24h",
             "public_url": app_settings.public_url if app_settings else "",
+            "show_sparklines": app_settings.show_sparklines if app_settings else True,
+            "chart_line_style": app_settings.chart_line_style if app_settings else "curved",
         },
         "users": [
             {

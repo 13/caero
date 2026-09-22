@@ -1,10 +1,12 @@
 import { Info } from 'lucide-react'
-import { useSystemInfo } from '../../api/hooks'
+import { useSystemInfo, useUiSettings } from '../../api/hooks'
 import CaeroBrand from '../CaeroBrand'
+import { formatDateTime } from '../../utils/format'
 import { APP_DESCRIPTION, APP_VERSION } from '../../constants/appInfo'
 
 export default function AboutSection() {
   const { data: systemInfo } = useSystemInfo()
+  const { data: uiSettings } = useUiSettings()
 
   return (
     <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-5 mt-8">
@@ -25,6 +27,15 @@ export default function AboutSection() {
 
           <div className="text-right font-medium text-gray-500 hover:text-gray-700">Backend Version:</div>
           <div className="font-mono">{systemInfo?.version || '...'}</div>
+
+          {/* Only a built image carries a build date; a dev server has none,
+              and an empty row would read as a missing value rather than none. */}
+          {systemInfo?.build_date ? (
+            <>
+              <div className="text-right font-medium text-gray-500 hover:text-gray-700">Built:</div>
+              <div className="font-mono">{formatDateTime(systemInfo.build_date, uiSettings?.date_format)}</div>
+            </>
+          ) : null}
 
           <div className="text-right font-medium text-gray-500 hover:text-gray-700">Active Database:</div>
           <div className="font-mono">{systemInfo?.db_type || '...'}</div>

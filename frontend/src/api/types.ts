@@ -152,10 +152,13 @@ export interface NotificationChannelStatus {
   consecutive_failures: number
 }
 
+export type ChartLineStyle = 'curved' | 'straight' | 'stepped'
+
 export interface UiSettings {
   date_format: DateFormat
   time_format: TimeFormat
   show_sparklines: boolean
+  chart_line_style: ChartLineStyle
 }
 
 export interface SparklinePoint {
@@ -241,6 +244,8 @@ export interface UserDataExportPayload {
 }
 export interface SystemInfoOut {
   version: string
+  /** ISO-8601 image build time; empty when not running a built image. */
+  build_date: string
   db_type: string
   db_version: string
   scraper_backend: string

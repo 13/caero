@@ -65,6 +65,8 @@ jobs:
           file: backend/Dockerfile
           platforms: linux/amd64
           push: ${{ github.event_name != 'pull_request' }}
+          build-args: |
+            BUILD_DATE=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.created'] }}
           provenance: false
           sbom: false
           tags: ${{ steps.meta.outputs.tags }}

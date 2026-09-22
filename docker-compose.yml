@@ -3,6 +3,9 @@ services:
     build:
       context: .
       dockerfile: backend/Dockerfile
+      args:
+        # Stamps Settings → About. Optional: BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ) docker compose up -d --build
+        BUILD_DATE: ${BUILD_DATE:-}
     restart: unless-stopped
     volumes:
       - ./data:/data

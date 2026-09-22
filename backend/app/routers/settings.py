@@ -42,6 +42,7 @@ router = APIRouter(prefix="/settings", tags=["settings"])
 # connection fields that no longer exist and are silently dropped.
 _IMPORTABLE_SETTINGS_KEYS = {
     "allow_registration", "date_format", "time_format", "telegram_bot_token", "public_url",
+    "show_sparklines", "chart_line_style",
 }
 
 
@@ -123,6 +124,7 @@ def _ui_settings_out(row: AppSettings) -> UiSettingsOut:
         date_format=row.date_format,
         time_format=row.time_format,
         show_sparklines=row.show_sparklines,
+        chart_line_style=row.chart_line_style,
     )
 
 
@@ -146,6 +148,8 @@ async def save_ui_settings(
     row.time_format = body.time_format
     if body.show_sparklines is not None:
         row.show_sparklines = body.show_sparklines
+    if body.chart_line_style is not None:
+        row.chart_line_style = body.chart_line_style
     row.updated_at = datetime.now(UTC)
     await db.flush()
     return _ui_settings_out(row)
@@ -346,6 +350,7 @@ async def system_info(
 
     return SystemInfoOut(
         version=PROJECT_VERSION,
+        build_date=settings.build_date,
         db_type=settings.db_type,
         db_version=str(db_version),
         scraper_backend=get_backend(),

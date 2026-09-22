@@ -55,6 +55,12 @@ EXPOSE 8000
 HEALTHCHECK --interval=60s --timeout=10s --start-period=30s --retries=3 \
     CMD ["python3", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/api/health', timeout=5).status == 200 else 1)"]
 
+# ISO-8601 image build time, surfaced in Settings → About. Deliberately last:
+# it changes every build, so an earlier layer would re-run apt, uv sync and the
+# chromium install each time. Empty outside CI — About hides the row then.
+ARG BUILD_DATE=""
+ENV BUILD_DATE=${BUILD_DATE}
+
 # Trust X-Forwarded-For from these proxy IPs so login rate limiting sees real
 # client addresses behind a reverse proxy. Set to your proxy's IP (or "*" if
 # the container port is not reachable directly) via docker-compose/.env.

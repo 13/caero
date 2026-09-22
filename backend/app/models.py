@@ -146,6 +146,10 @@ class AppSettings(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
     allow_registration: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     show_sparklines: Mapped[bool] = mapped_column(Boolean, default=True, server_default="1", nullable=False)
+    # Shape of the price chart line: curved | straight | stepped.
+    chart_line_style: Mapped[str] = mapped_column(
+        String(16), default="curved", server_default="curved", nullable=False
+    )
     date_format: Mapped[str] = mapped_column(String(32), default="DD.MM.YYYY", nullable=False)
     time_format: Mapped[str] = mapped_column(String(8), default="24h", nullable=False)
     telegram_bot_token: Mapped[str] = mapped_column(String(256), default="", nullable=False, server_default="")

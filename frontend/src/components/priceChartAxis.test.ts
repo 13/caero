@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { priceAxisDomain, shortDate } from './priceChartAxis'
+import { lineTypeFor, priceAxisDomain, shortDate } from './priceChartAxis'
 
 describe('priceAxisDomain', () => {
   it('hugs the data instead of starting at zero', () => {
@@ -33,5 +33,18 @@ describe('shortDate', () => {
     ['2026-07-14', 'YYYY-MM-DD', '07-14'],
   ])('%s (%s) → %s', (input, format, expected) => {
     expect(shortDate(input, format)).toBe(expected)
+  })
+})
+
+describe('lineTypeFor', () => {
+  it('maps the stored styles to recharts curve types', () => {
+    expect(lineTypeFor('curved')).toBe('monotone')
+    expect(lineTypeFor('straight')).toBe('linear')
+    expect(lineTypeFor('stepped')).toBe('stepAfter')
+  })
+
+  it('falls back to the curved default for missing or unknown values', () => {
+    expect(lineTypeFor(undefined)).toBe('monotone')
+    expect(lineTypeFor('squiggly')).toBe('monotone')
   })
 })

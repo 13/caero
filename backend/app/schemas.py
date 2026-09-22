@@ -203,6 +203,7 @@ class AlertOut(BaseModel):
 
 DateFormat = Literal["DD.MM.YYYY", "DD/MM/YYYY", "MM/DD/YYYY", "YYYY-MM-DD"]
 TimeFormat = Literal["12h", "24h"]
+ChartLineStyle = Literal["curved", "straight", "stepped"]
 
 
 class AppSettingsIn(BaseModel):
@@ -241,6 +242,7 @@ class UiSettingsOut(BaseModel):
     date_format: str
     time_format: str
     show_sparklines: bool = True
+    chart_line_style: str = "curved"
 
 
 class UiSettingsIn(BaseModel):
@@ -248,6 +250,7 @@ class UiSettingsIn(BaseModel):
     time_format: TimeFormat
     # None = keep current value (older clients don't send it)
     show_sparklines: bool | None = None
+    chart_line_style: ChartLineStyle | None = None
 
 
 class SelectorDefaultIn(BaseModel):
@@ -344,6 +347,7 @@ class UserDataExportPayload(BaseModel):
 
 class SystemInfoOut(BaseModel):
     version: str
+    build_date: str = ""
     db_type: str
     db_version: str
     scraper_backend: str = "unknown"

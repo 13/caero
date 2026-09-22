@@ -1,5 +1,18 @@
-// Pure axis helpers for PriceChart, kept out of the component so they are
+// Pure helpers for PriceChart, kept out of the component so they are
 // unit-testable without rendering recharts.
+
+/** Stored chart_line_style → recharts curve type. Unknown or missing values
+ *  fall back to the curved default rather than dropping the line. */
+export function lineTypeFor(style: string | undefined): 'monotone' | 'linear' | 'stepAfter' {
+  switch (style) {
+    case 'straight':
+      return 'linear'
+    case 'stepped':
+      return 'stepAfter'
+    default:
+      return 'monotone'
+  }
+}
 
 /** Y-axis bounds hugging the data (with ~10% headroom), rounded to a tidy
  *  step. Starting at 0 flattens a 1,650–2,100 range into a straight line. */

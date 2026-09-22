@@ -51,8 +51,11 @@ async def test_auth_and_settings_guards(client):
     # UI settings are available to every authenticated user
     resp = await client.get("/api/settings/ui", headers=_auth(user_token))
     assert resp.status_code == 200
-    assert set(resp.json()) == {"date_format", "time_format", "show_sparklines"}
+    assert set(resp.json()) == {
+        "date_format", "time_format", "show_sparklines", "chart_line_style",
+    }
     assert resp.json()["show_sparklines"] is True
+    assert resp.json()["chart_line_style"] == "curved"
 
     resp = await client.patch(
         "/api/settings/ui",
@@ -70,6 +73,41 @@ async def test_auth_and_settings_guards(client):
         json={"date_format": "YYYY-MM-DD", "time_format": "12h"},
     )
     assert resp.json()["show_sparklines"] is False
+    assert resp.json()["chart_line_style"] == "curved"
+
+    # Chart line style round-trips and survives an omitting client
+    resp = await client.patch(
+        "/api/settings/ui",
+        headers=_auth(user_token),
+        json={"date_format": "YYYY-MM-DD", "time_format": "12h", "chart_line_style": "stepped"},
+    )
+    assert resp.json()["chart_line_style"] == "stepped"
+    resp = await client.patch(
+        "/api/settings/ui",
+        headers=_auth(user_token),
+        json={"date_format": "YYYY-MM-DD", "time_format": "12h"},
+    )
+    assert resp.json()["chart_line_style"] == "stepped"
+
+    # An unknown shape is rejected rather than stored
+    resp = await client.patch(
+        "/api/settings/ui",
+        headers=_auth(user_token),
+        json={"date_format": "YYYY-MM-DD", "time_format": "12h", "chart_line_style": "squiggly"},
+    )
+    assert resp.status_code == 422
+
+    # Back to the default so later assertions in this session are unaffected
+    await client.patch(
+        "/api/settings/ui",
+        headers=_auth(user_token),
+        json={"date_format": "YYYY-MM-DD", "time_format": "12h", "chart_line_style": "curved"},
+    )
+
+    # System info carries the build stamp; empty outside a Docker build
+    resp = await client.get("/api/settings/system-info", headers=_auth(user_token))
+    assert resp.status_code == 200
+    assert resp.json()["build_date"] == ""
 
     # Saving a bot token flips the flag without echoing the token
     resp = await client.post(

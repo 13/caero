@@ -1,6 +1,6 @@
 import { User } from 'lucide-react'
 import { useSaveUiSettings, useUiSettings } from '../../api/hooks'
-import type { DateFormat, TimeFormat } from '../../api/types'
+import type { ChartLineStyle, DateFormat, TimeFormat } from '../../api/types'
 import { inputCls } from '../../utils/styles'
 import Section from './Section'
 
@@ -11,10 +11,17 @@ export default function PreferencesSection({ showToast }: { showToast: (msg: str
   const dateFormat = settings?.date_format ?? 'DD.MM.YYYY'
   const timeFormat = settings?.time_format ?? '24h'
   const showSparklines = settings?.show_sparklines ?? true
+  const chartLineStyle = settings?.chart_line_style ?? 'curved'
 
-  const save = (next: Partial<{ date_format: DateFormat; time_format: TimeFormat; show_sparklines: boolean }>) => {
+  const save = (next: Partial<{ date_format: DateFormat; time_format: TimeFormat; show_sparklines: boolean; chart_line_style: ChartLineStyle }>) => {
     saveMutation.mutate(
-      { date_format: dateFormat, time_format: timeFormat, show_sparklines: showSparklines, ...next },
+      {
+        date_format: dateFormat,
+        time_format: timeFormat,
+        show_sparklines: showSparklines,
+        chart_line_style: chartLineStyle,
+        ...next,
+      },
       { onSuccess: () => showToast('Preferences saved.') }
     )
   }
@@ -47,6 +54,20 @@ export default function PreferencesSection({ showToast }: { showToast: (msg: str
           >
             <option value="24h">24-hour (HH:MM)</option>
             <option value="12h">12-hour (HH:MM AM/PM)</option>
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Chart line</label>
+          <select
+            value={chartLineStyle}
+            onChange={(e) => save({ chart_line_style: e.target.value as ChartLineStyle })}
+            style={{ colorScheme: 'light dark' }}
+            className={inputCls}
+          >
+            <option value="curved">Curved</option>
+            <option value="straight">Straight</option>
+            <option value="stepped">Stepped (matches how prices are stored)</option>
           </select>
         </div>
 
