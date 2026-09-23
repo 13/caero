@@ -3,7 +3,9 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useUiSettings } from '../../api/hooks'
 import type { Product, SparklinePoint } from '../../api/types'
 import { formatDateTime, formatPercent, formatPrice, priceChangeSentiment } from '../../utils/format'
+import { hasHealthIssue } from '../../utils/scrapeFailure'
 import { getTagColorClass } from '../../utils/tags'
+import { ProductHealthBadge } from '../ProductHealth'
 import Sparkline from '../Sparkline'
 import type { SortBy } from './sort'
 
@@ -139,6 +141,13 @@ export default function ProductTable({
                         >
                           {p.active ? 'Active' : 'Paused'}
                         </span>
+                        {/* Health badge here where there's no Trend column to hold it:
+                            always without sparklines, phones only with them. */}
+                        {hasHealthIssue(p) && (
+                          <span className={sparklines ? 'sm:hidden' : ''}>
+                            <ProductHealthBadge product={p} />
+                          </span>
+                        )}
                         {hasActiveAlerts(p.id) && (
                           <span title="Alerts active" className="flex items-center justify-center bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300 px-1 py-0.5 rounded-full">
                             <BellRing className="h-3 w-3" />
@@ -181,7 +190,9 @@ export default function ProductTable({
                 <td className="px-3 sm:px-4 py-3 font-semibold whitespace-nowrap text-gray-800 dark:text-gray-200">{formatPrice(p.latest_price, settings?.date_format, p.currency)}</td>
                 {sparklines && (
                   <td className={`px-4 py-3 w-28 ${desktopOnly}`}>
-                    {(sparklines[p.id]?.length ?? 0) >= 2 ? (
+                    {hasHealthIssue(p) ? (
+                      <ProductHealthBadge product={p} />
+                    ) : (sparklines[p.id]?.length ?? 0) >= 2 ? (
                       <div className="w-24">
                         <Sparkline points={sparklines[p.id]} invert={p.inverse_price} />
                       </div>

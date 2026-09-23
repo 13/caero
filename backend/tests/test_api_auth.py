@@ -198,7 +198,25 @@ async def test_sparklines_endpoint(client):
     assert resp.status_code == 200
     data = resp.json()
     assert str(product_id) in data
-    assert [point["p"] for point in data[str(product_id)]] == ["10.00", "12.00"]
+    # The current price is carried forward to "now"
+    assert [point["p"] for point in data[str(product_id)]] == ["10.00", "12.00", "12.00"]
+
+    # A price that hasn't moved within the window still draws a line: the
+    # price in effect at the window start, then carried forward to now.
+    resp = await client.post(
+        "/api/products",
+        headers=_auth(token),
+        json={"name": "Steady", "url": "https://example.com/steady", "selector": ".p"},
+    )
+    steady_id = resp.json()["id"]
+    for price, when in (("5.00", now - timedelta(days=90)), ("7.00", now - timedelta(days=60))):
+        await client.post(
+            f"/api/products/{steady_id}/prices",
+            headers=_auth(token),
+            json={"price": price, "scraped_at": when.isoformat()},
+        )
+    resp = await client.get("/api/products/sparklines", headers=_auth(token))
+    assert [point["p"] for point in resp.json()[str(steady_id)]] == ["7.00", "7.00"]
 
     # Only own products appear
     other_token = await _login(client, "user1")

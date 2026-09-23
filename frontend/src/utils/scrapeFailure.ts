@@ -1,4 +1,4 @@
-import type { CheckResult, ScrapeFailureReason } from '../api/types'
+import type { CheckResult, Product, ScrapeFailureReason } from '../api/types'
 import { pluralize } from './format'
 
 /** Backend default for SCRAPER_FAILURE_ALERT_THRESHOLD (older servers don't send it). */
@@ -90,4 +90,9 @@ export function formatTimeAgo(value: string | null, now = Date.now()): string {
   if (hours < 24) return `${hours} h ago`
   const days = Math.floor(hours / 24)
   return `${days} ${pluralize(days, 'day')} ago`
+}
+
+/** Whether a product needs a health notice (redirect or failing checks). */
+export function hasHealthIssue(product: Pick<Product, 'url_redirected' | 'consecutive_scrape_failures'>) {
+  return product.url_redirected || product.consecutive_scrape_failures > 0
 }

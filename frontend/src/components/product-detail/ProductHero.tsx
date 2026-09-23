@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import { ArrowRightLeft, ExternalLink, Pencil, RefreshCw, TrendingDown, TrendingUp, TriangleAlert, X, ZoomIn } from 'lucide-react'
-import { useScraperHealth, useUiSettings } from '../../api/hooks'
+import { useUiSettings } from '../../api/hooks'
 import type { Product } from '../../api/types'
 import { formatDateTime, formatPercent, formatPrice, priceChangeSentiment } from '../../utils/format'
-import { describeFailure, failureSeverity, formatTimeAgo } from '../../utils/scrapeFailure'
+import { formatTimeAgo } from '../../utils/scrapeFailure'
 import { getTagColorClass } from '../../utils/tags'
+import { useProductHealth } from '../../hooks/useProductHealth'
 import WarningBanner from '../WarningBanner'
 import type { EditFocusField } from './ProductEditPanel'
 
@@ -18,10 +19,7 @@ export default function ProductHero({ product, onToggleActive, togglePending, on
 }) {
   const { data: settings } = useUiSettings()
   const [imageZoomed, setImageZoomed] = useState(false)
-  const failures = product.consecutive_scrape_failures
-  const severity = failureSeverity(failures, settings?.scrape_failure_threshold)
-  const { data: health } = useScraperHealth(severity === 'broken')
-  const failure = describeFailure(product.last_scrape_error, health?.scraping_degraded)
+  const { failures, severity, failure } = useProductHealth(product)
 
   const productUrlChars = Array.from(product.url)
   const productUrlPreview =
@@ -90,32 +88,6 @@ export default function ProductHero({ product, onToggleActive, togglePending, on
               {togglePending ? '…' : (product.active ? 'Active' : 'Paused')}
             </span>
           </div>
-
-          {/* Warning banners */}
-          {product.url_redirected && (
-            <WarningBanner
-              tone="warning"
-              icon={ArrowRightLeft}
-              title="URL redirected"
-              description="This link now points to a different product."
-              actions={[{ label: 'Edit URL', icon: Pencil, onClick: () => onEdit('url') }]}
-            />
-          )}
-          {severity !== 'none' && (
-            <WarningBanner
-              tone={severity === 'broken' ? 'error' : 'muted'}
-              icon={TriangleAlert}
-              title={failures === 1 ? 'Last price check failed' : `Last ${failures} price checks failed`}
-              description={failure.detail}
-              meta={severity === 'broken'
-                ? product.scrape_failing_since && `Failing since ${formatTimeAgo(product.scrape_failing_since)}`
-                : 'Caero retries on the next scheduled check.'}
-              actions={[
-                ...(failure.selectorFix ? [{ label: 'Edit selector', icon: Pencil, onClick: () => onEdit('selector') }] : []),
-                { label: checkPending ? 'Checking…' : 'Check now', icon: RefreshCw, onClick: onCheckNow, disabled: checkPending, busy: checkPending },
-              ]}
-            />
-          )}
 
           {/* Price row */}
           <div className="mt-3 flex items-baseline gap-3 flex-wrap">
@@ -193,6 +165,34 @@ export default function ProductHero({ product, onToggleActive, togglePending, on
               <span className="truncate">{productUrlPreview}</span>
             </a>
           </div>
+
+          {/* Health notices — below the link they're about */}
+          {product.url_redirected && (
+            <WarningBanner
+              className="mt-3"
+              tone="warning"
+              icon={ArrowRightLeft}
+              title="URL redirected"
+              description="This link now points to a different product."
+              actions={[{ label: 'Edit URL', icon: Pencil, onClick: () => onEdit('url') }]}
+            />
+          )}
+          {severity !== 'none' && (
+            <WarningBanner
+              className="mt-3"
+              tone={severity === 'broken' ? 'error' : 'muted'}
+              icon={TriangleAlert}
+              title={failures === 1 ? 'Last price check failed' : `Last ${failures} price checks failed`}
+              description={failure.detail}
+              meta={severity === 'broken'
+                ? product.scrape_failing_since && `Failing since ${formatTimeAgo(product.scrape_failing_since)}`
+                : 'Caero retries on the next scheduled check.'}
+              actions={[
+                ...(failure.selectorFix ? [{ label: 'Edit selector', icon: Pencil, onClick: () => onEdit('selector') }] : []),
+                { label: checkPending ? 'Checking…' : 'Check now', icon: RefreshCw, onClick: onCheckNow, disabled: checkPending, busy: checkPending },
+              ]}
+            />
+          )}
         </div>
       </div>
     </div>

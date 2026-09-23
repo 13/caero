@@ -37,9 +37,10 @@ export interface BannerAction {
   busy?: boolean
 }
 
-/** Product health notice (failed checks, URL redirect). Compact = title and
- *  description only, optionally a link (dashboard card); full adds meta and actions. */
-export default function WarningBanner({ tone, icon: Icon, title, description, meta, to, actions = [], compact = false, tooltip }: {
+/** Product health notice (failed checks, URL redirect).
+ *  badge: one-word pill (table row). compact: title + description, optionally a
+ *  link (dashboard card). full: adds meta and actions (product page). */
+export default function WarningBanner({ tone, icon: Icon, title, description, meta, to, actions = [], variant = 'full', tooltip, className = '' }: {
   tone: Tone
   icon: LucideIcon
   title: string
@@ -47,12 +48,23 @@ export default function WarningBanner({ tone, icon: Icon, title, description, me
   meta?: ReactNode
   to?: string
   actions?: BannerAction[]
-  compact?: boolean
+  variant?: 'badge' | 'compact' | 'full'
   tooltip?: string
+  /** Full variant only, e.g. margins. */
+  className?: string
 }) {
   const cls = toneCls[tone]
 
-  if (compact) {
+  if (variant === 'badge') {
+    return (
+      <span title={tooltip} className={`inline-flex items-center gap-1 whitespace-nowrap text-[10px] leading-none px-1.5 py-1 rounded-full border font-medium ${cls.box}`}>
+        <Icon className={`h-3 w-3 shrink-0 ${cls.icon}`} aria-hidden />
+        {title}
+      </span>
+    )
+  }
+
+  if (variant === 'compact') {
     // Description on its own line: cards are too narrow to share one with the
     // title, and truncating it ("— sel…") says nothing.
     const content = (
@@ -73,7 +85,7 @@ export default function WarningBanner({ tone, icon: Icon, title, description, me
   }
 
   return (
-    <div className={`mt-3 text-sm px-3 py-2.5 rounded-lg border flex flex-wrap items-center gap-x-4 gap-y-2 sm:max-w-max ${cls.box}`}>
+    <div className={`text-sm px-3 py-2.5 rounded-lg border flex flex-wrap items-center gap-x-4 gap-y-2 sm:max-w-max ${cls.box} ${className}`}>
       <div className="flex items-start gap-2.5 min-w-0">
         <Icon className={`h-4 w-4 mt-0.5 shrink-0 ${cls.icon}`} aria-hidden />
         <div className="min-w-0">

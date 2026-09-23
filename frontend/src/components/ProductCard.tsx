@@ -1,15 +1,15 @@
 import { Link } from 'react-router-dom'
-import { RefreshCw, X, TrendingDown, TrendingUp, ExternalLink, BellRing, Star, TriangleAlert, ArrowRightLeft } from 'lucide-react'
+import { RefreshCw, X, TrendingDown, TrendingUp, ExternalLink, BellRing, Star } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useState } from 'react'
 import type { Product, SparklinePoint } from '../api/types'
-import { useCheckProduct, useDeleteProduct, useScraperHealth, useUiSettings } from '../api/hooks'
-import { currencySymbol, formatDate, formatIntervalHours, formatPercent, formatPrice, pluralize, priceChangeSentiment } from '../utils/format'
-import { checkFailureMessage, describeFailure, failureSeverity, formatTimeAgo } from '../utils/scrapeFailure'
+import { useCheckProduct, useDeleteProduct, useUiSettings } from '../api/hooks'
+import { currencySymbol, formatDate, formatIntervalHours, formatPercent, formatPrice, priceChangeSentiment } from '../utils/format'
+import { checkFailureMessage, hasHealthIssue } from '../utils/scrapeFailure'
 import { getTagColorClass } from '../utils/tags'
 import ConfirmDialog from './ConfirmDialog'
 import Sparkline from './Sparkline'
-import WarningBanner from './WarningBanner'
+import { ProductHealthNotice } from './ProductHealth'
 
 interface ProductCardProps {
   product: Product
@@ -35,10 +35,10 @@ export default function ProductCard({ product, onKeywordClick, hasActiveAlerts, 
     : checkIntervalHours
   const pct = product.last_price_change_percent !== null ? parseFloat(product.last_price_change_percent) : null
   const displaySrc = product.cached_image_url ?? product.image_url
-  const failures = product.consecutive_scrape_failures
-  const severity = failureSeverity(failures, settings?.scrape_failure_threshold)
-  const { data: health } = useScraperHealth(severity === 'broken')
-  const failure = describeFailure(product.last_scrape_error, health?.scraping_degraded)
+  const productLink = `/products/${product.id}${searchSuffix}`
+  const hasTrend = (sparkline?.length ?? 0) >= 2
+  // The trend slot holds a health notice instead of the chart when there is one.
+  const showSlot = sparkline !== undefined || hasHealthIssue(product)
 
   const handleDelete = () => {
     setShowDeleteConfirm(true)
@@ -117,32 +117,6 @@ export default function ProductCard({ product, onKeywordClick, hasActiveAlerts, 
           </div>
         </div>
 
-        {/* Warning banners — link straight to the product to fix the issue */}
-        {product.url_redirected && (
-          <WarningBanner
-            compact
-            tone="warning"
-            icon={ArrowRightLeft}
-            title="URL redirected"
-            description="Update the product URL"
-            to={`/products/${product.id}${searchSuffix}`}
-          />
-        )}
-        {severity !== 'none' && (
-          <WarningBanner
-            compact
-            tone={severity === 'broken' ? 'error' : 'muted'}
-            icon={TriangleAlert}
-            title={failures === 1 ? 'Last check failed' : `${failures} failed ${pluralize(failures, 'check')}`}
-            description={failure.short}
-            tooltip={[
-              failure.detail,
-              product.scrape_failing_since && `Failing since ${formatTimeAgo(product.scrape_failing_since)}.`,
-            ].filter(Boolean).join(' ')}
-            to={`/products/${product.id}${searchSuffix}`}
-          />
-        )}
-
         {/* Tags + category */}
         {(product.category || product.tags.length > 0) && (
           <div className="flex flex-wrap items-center gap-1.5">
@@ -183,17 +157,29 @@ export default function ProductCard({ product, onKeywordClick, hasActiveAlerts, 
           <span className="truncate">{product.url}</span>
         </a>
 
-        {/* Sparkline — recent price trend, opens the detail page */}
-        {sparkline && sparkline.length >= 2 && (
-          <Link to={`/products/${product.id}${searchSuffix}`} className="block mt-auto pt-2">
-            <Sparkline points={sparkline} invert={product.inverse_price} />
-          </Link>
+        {/* Trend slot: health notice if tracking is off, else the recent price
+            trend — both open the detail page. Always present while sparklines
+            are on, so cards line up whatever state they're in. */}
+        {showSlot && (
+          <div className="mt-auto pt-2">
+            {hasHealthIssue(product) ? (
+              <ProductHealthNotice product={product} to={productLink} />
+            ) : hasTrend ? (
+              <Link to={productLink} className="block">
+                <Sparkline points={sparkline!} invert={product.inverse_price} />
+              </Link>
+            ) : (
+              <p className="h-7 flex items-center text-xs text-gray-400 dark:text-gray-500">
+                {product.latest_price === null ? 'No price history yet' : ''}
+              </p>
+            )}
+          </div>
         )}
 
         {/* Price + change — pushed to bottom, opens the detail page */}
         <Link
           to={`/products/${product.id}${searchSuffix}`}
-          className={`flex items-end justify-between pt-3 border-t border-gray-100 dark:border-gray-800 ${sparkline && sparkline.length >= 2 ? '' : 'mt-auto'}`}
+          className={`flex items-end justify-between pt-3 border-t border-gray-100 dark:border-gray-800 ${showSlot ? '' : 'mt-auto'}`}
         >
           <div>
             <p className="text-xs text-gray-400 dark:text-gray-500 mb-0.5">Latest price</p>
