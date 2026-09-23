@@ -17,6 +17,8 @@ const product = (overrides: Partial<Product>): Product => ({
   price_format: 'auto',
   inverse_price: false,
   consecutive_scrape_failures: 0,
+  last_scrape_error: null,
+  scrape_failing_since: null,
   url_redirected: false,
   active: true,
   currency: 'EUR',

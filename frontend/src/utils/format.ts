@@ -104,3 +104,7 @@ export function normalizeCheckTimeHHMM(value?: string | null) {
   return CHECK_TIME_HHMM_RE.test(trimmed) ? trimmed : DEFAULT_CHECK_TIME_HHMM
 }
 
+
+export function pluralize(count: number, singular: string, plural = `${singular}s`) {
+  return count === 1 ? singular : plural
+}

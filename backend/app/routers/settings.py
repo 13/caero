@@ -125,6 +125,7 @@ def _ui_settings_out(row: AppSettings) -> UiSettingsOut:
         time_format=row.time_format,
         show_sparklines=row.show_sparklines,
         chart_line_style=row.chart_line_style,
+        scrape_failure_threshold=settings.scraper_failure_alert_threshold,
     )
 
 

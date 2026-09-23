@@ -115,6 +115,8 @@ class ProductOut(BaseModel):
     price_format: str = "auto"
     inverse_price: bool = False
     consecutive_scrape_failures: int = 0
+    last_scrape_error: str | None = None
+    scrape_failing_since: datetime | None = None
     url_redirected: bool = False
     active: bool
     created_at: datetime
@@ -243,6 +245,9 @@ class UiSettingsOut(BaseModel):
     time_format: str
     show_sparklines: bool = True
     chart_line_style: str = "curved"
+    # Failed checks in a row before a product counts as broken (and the owner
+    # is notified); the UI stays quiet about fewer. Read-only, from env.
+    scrape_failure_threshold: int = 3
 
 
 class UiSettingsIn(BaseModel):
@@ -293,6 +298,8 @@ class CheckResult(BaseModel):
     product_id: int
     price: Decimal | None
     error: str | None = None
+    # scraper.FAILURE_* code when no price was found
+    reason: str | None = None
 
 
 class ChangePasswordRequest(BaseModel):

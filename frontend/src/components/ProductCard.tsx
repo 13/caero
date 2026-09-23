@@ -1,13 +1,15 @@
 import { Link } from 'react-router-dom'
-import { RefreshCw, X, TrendingDown, TrendingUp, ExternalLink, BellRing, Star } from 'lucide-react'
+import { RefreshCw, X, TrendingDown, TrendingUp, ExternalLink, BellRing, Star, TriangleAlert, ArrowRightLeft } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useState } from 'react'
 import type { Product, SparklinePoint } from '../api/types'
-import { useCheckProduct, useDeleteProduct, useUiSettings } from '../api/hooks'
-import { currencySymbol, formatDate, formatIntervalHours, formatPercent, formatPrice, priceChangeSentiment } from '../utils/format'
+import { useCheckProduct, useDeleteProduct, useScraperHealth, useUiSettings } from '../api/hooks'
+import { currencySymbol, formatDate, formatIntervalHours, formatPercent, formatPrice, pluralize, priceChangeSentiment } from '../utils/format'
+import { checkFailureMessage, describeFailure, failureSeverity, formatTimeAgo } from '../utils/scrapeFailure'
 import { getTagColorClass } from '../utils/tags'
 import ConfirmDialog from './ConfirmDialog'
 import Sparkline from './Sparkline'
+import WarningBanner from './WarningBanner'
 
 interface ProductCardProps {
   product: Product
@@ -33,6 +35,10 @@ export default function ProductCard({ product, onKeywordClick, hasActiveAlerts, 
     : checkIntervalHours
   const pct = product.last_price_change_percent !== null ? parseFloat(product.last_price_change_percent) : null
   const displaySrc = product.cached_image_url ?? product.image_url
+  const failures = product.consecutive_scrape_failures
+  const severity = failureSeverity(failures, settings?.scrape_failure_threshold)
+  const { data: health } = useScraperHealth(severity === 'broken')
+  const failure = describeFailure(product.last_scrape_error, health?.scraping_degraded)
 
   const handleDelete = () => {
     setShowDeleteConfirm(true)
@@ -113,24 +119,28 @@ export default function ProductCard({ product, onKeywordClick, hasActiveAlerts, 
 
         {/* Warning banners — link straight to the product to fix the issue */}
         {product.url_redirected && (
-          <Link
+          <WarningBanner
+            compact
+            tone="warning"
+            icon={ArrowRightLeft}
+            title="URL redirected"
+            description="Update the product URL"
             to={`/products/${product.id}${searchSuffix}`}
-            className="text-xs px-3 py-2 rounded-lg bg-yellow-50 text-yellow-800 border border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-300 dark:border-yellow-800/50 flex items-center gap-2 hover:bg-yellow-100 dark:hover:bg-yellow-900/50 transition-colors"
-          >
-            <span className="font-semibold">URL redirected</span>
-            <span>— update the product URL</span>
-          </Link>
+          />
         )}
-        {product.consecutive_scrape_failures > 0 && (
-          <Link
+        {severity !== 'none' && (
+          <WarningBanner
+            compact
+            tone={severity === 'broken' ? 'error' : 'muted'}
+            icon={TriangleAlert}
+            title={failures === 1 ? 'Last check failed' : `${failures} failed ${pluralize(failures, 'check')}`}
+            description={failure.short}
+            tooltip={[
+              failure.detail,
+              product.scrape_failing_since && `Failing since ${formatTimeAgo(product.scrape_failing_since)}.`,
+            ].filter(Boolean).join(' ')}
             to={`/products/${product.id}${searchSuffix}`}
-            className="text-xs px-3 py-2 rounded-lg bg-orange-50 text-orange-700 border border-orange-200 dark:bg-orange-900/30 dark:text-orange-300 dark:border-orange-800/50 flex items-center gap-2 hover:bg-orange-100 dark:hover:bg-orange-900/50 transition-colors"
-          >
-            <span className="font-semibold px-1.5 py-0.5 rounded bg-orange-100 dark:bg-orange-900 leading-none">
-              {product.consecutive_scrape_failures}
-            </span>
-            <span>Failed checks (selector may be broken)</span>
-          </Link>
+          />
         )}
 
         {/* Tags + category */}
@@ -225,10 +235,8 @@ export default function ProductCard({ product, onKeywordClick, hasActiveAlerts, 
               onSuccess: (data) => {
                 if (data.price !== null) {
                   toast.success(`Successfully checked: ${currencySymbol(product.currency)}${data.price}`)
-                } else if (data.error) {
-                  toast.error(data.error)
                 } else {
-                  toast.error('No price found (check selector)')
+                  toast.error(checkFailureMessage(data))
                 }
               },
               onError: (err) => toast.error(err.message || 'Check failed')

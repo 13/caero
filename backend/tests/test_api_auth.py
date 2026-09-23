@@ -53,6 +53,7 @@ async def test_auth_and_settings_guards(client):
     assert resp.status_code == 200
     assert set(resp.json()) == {
         "date_format", "time_format", "show_sparklines", "chart_line_style",
+        "scrape_failure_threshold",
     }
     assert resp.json()["show_sparklines"] is True
     assert resp.json()["chart_line_style"] == "curved"

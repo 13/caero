@@ -10,6 +10,7 @@ import type {
   CheckResult,
   ChangePasswordRequest,
   DataExportPayload,
+  HealthOut,
   JobOut,
   NotificationChannelStatus,
   NotificationDefaultsUpdate,
@@ -301,6 +302,17 @@ export function useUpdateAlert(productId: number) {
 // ── Settings ──────────────────────────────────────────────────────────────────
 
 /** Global display preferences — readable/writable by every authenticated user. */
+/** Scraper health, to tell a broken selector from a scraping-wide outage.
+ *  Only enable where a failure is on screen; shared across cards by key. */
+export function useScraperHealth(enabled = true) {
+  return useQuery<HealthOut>({
+    queryKey: ['health'],
+    queryFn: () => apiFetch<HealthOut>('/api/health'),
+    enabled,
+    staleTime: 60_000,
+  })
+}
+
 export function useUiSettings() {
   return useQuery<UiSettings>({
     queryKey: ['ui-settings'],

@@ -33,6 +33,10 @@ export interface Product {
   price_format: PriceFormat
   inverse_price: boolean
   consecutive_scrape_failures: number
+  /** Why the latest failed check found no price; null while checks succeed */
+  last_scrape_error: ScrapeFailureReason | null
+  /** When the current failure streak began */
+  scrape_failing_since: string | null
   url_redirected: boolean
   active: boolean
   currency: string
@@ -159,6 +163,8 @@ export interface UiSettings {
   time_format: TimeFormat
   show_sparklines: boolean
   chart_line_style: ChartLineStyle
+  /** Failed checks in a row before a product counts as broken; read-only */
+  scrape_failure_threshold?: number
 }
 
 export interface SparklinePoint {
@@ -194,6 +200,15 @@ export interface CheckResult {
   product_id: number
   price: string | null
   error: string | null
+  reason?: ScrapeFailureReason | null
+}
+
+export type ScrapeFailureReason = 'no_match' | 'unparseable' | 'unavailable' | 'timeout' | 'page_error'
+
+/** /api/health — the parts the UI reads */
+export interface HealthOut {
+  scraping_degraded: boolean
+  last_successful_scrape_at: string | null
 }
 
 export interface ProductStatistics {

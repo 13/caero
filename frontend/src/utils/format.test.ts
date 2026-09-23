@@ -8,6 +8,7 @@ import {
   formatPrice,
   normalizeCheckTimeHHMM,
   normalizeIntervalHoursToMinutes,
+  pluralize,
   priceChangeSentiment,
 } from './format'
 
@@ -115,5 +116,14 @@ describe('normalizeCheckTimeHHMM', () => {
     expect(normalizeCheckTimeHHMM('9:30')).toBe('10:00')
     expect(normalizeCheckTimeHHMM('')).toBe('10:00')
     expect(normalizeCheckTimeHHMM(null)).toBe('10:00')
+  })
+})
+
+describe('pluralize', () => {
+  it('picks singular only for exactly one', () => {
+    expect(pluralize(1, 'check')).toBe('check')
+    expect(pluralize(0, 'check')).toBe('checks')
+    expect(pluralize(3, 'check')).toBe('checks')
+    expect(pluralize(2, 'entry', 'entries')).toBe('entries')
   })
 })

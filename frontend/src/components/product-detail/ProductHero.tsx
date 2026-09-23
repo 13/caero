@@ -1,17 +1,27 @@
 import { useState } from 'react'
-import { ExternalLink, TrendingDown, TrendingUp, X, ZoomIn } from 'lucide-react'
-import { useUiSettings } from '../../api/hooks'
+import { ArrowRightLeft, ExternalLink, Pencil, RefreshCw, TrendingDown, TrendingUp, TriangleAlert, X, ZoomIn } from 'lucide-react'
+import { useScraperHealth, useUiSettings } from '../../api/hooks'
 import type { Product } from '../../api/types'
 import { formatDateTime, formatPercent, formatPrice, priceChangeSentiment } from '../../utils/format'
+import { describeFailure, failureSeverity, formatTimeAgo } from '../../utils/scrapeFailure'
 import { getTagColorClass } from '../../utils/tags'
+import WarningBanner from '../WarningBanner'
+import type { EditFocusField } from './ProductEditPanel'
 
-export default function ProductHero({ product, onToggleActive, togglePending }: {
+export default function ProductHero({ product, onToggleActive, togglePending, onEdit, onCheckNow, checkPending }: {
   product: Product
   onToggleActive: () => void
   togglePending: boolean
+  onEdit: (field: EditFocusField) => void
+  onCheckNow: () => void
+  checkPending: boolean
 }) {
   const { data: settings } = useUiSettings()
   const [imageZoomed, setImageZoomed] = useState(false)
+  const failures = product.consecutive_scrape_failures
+  const severity = failureSeverity(failures, settings?.scrape_failure_threshold)
+  const { data: health } = useScraperHealth(severity === 'broken')
+  const failure = describeFailure(product.last_scrape_error, health?.scraping_degraded)
 
   const productUrlChars = Array.from(product.url)
   const productUrlPreview =
@@ -83,18 +93,28 @@ export default function ProductHero({ product, onToggleActive, togglePending }: 
 
           {/* Warning banners */}
           {product.url_redirected && (
-            <div className="mt-3 text-sm px-3 py-2 rounded-lg bg-yellow-50 text-yellow-800 border border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-300 dark:border-yellow-800/50 flex flex-wrap items-center gap-x-2 sm:max-w-max">
-              <span className="font-semibold">URL redirected</span>
-              <span>— This URL points to a different product. Please update it.</span>
-            </div>
+            <WarningBanner
+              tone="warning"
+              icon={ArrowRightLeft}
+              title="URL redirected"
+              description="This link now points to a different product."
+              actions={[{ label: 'Edit URL', icon: Pencil, onClick: () => onEdit('url') }]}
+            />
           )}
-          {product.consecutive_scrape_failures > 0 && (
-            <div className="mt-3 text-sm px-3 py-2 rounded-lg bg-orange-50 text-orange-700 border border-orange-200 dark:bg-orange-900/30 dark:text-orange-300 dark:border-orange-800/50 flex items-start gap-2 sm:max-w-max">
-              <span className="shrink-0 font-semibold px-2 py-0.5 rounded bg-orange-100 dark:bg-orange-900 leading-none">
-                {product.consecutive_scrape_failures}
-              </span>
-              <span>Consecutive failed checks. The CSS selector may be broken or the website layout changed.</span>
-            </div>
+          {severity !== 'none' && (
+            <WarningBanner
+              tone={severity === 'broken' ? 'error' : 'muted'}
+              icon={TriangleAlert}
+              title={failures === 1 ? 'Last price check failed' : `Last ${failures} price checks failed`}
+              description={failure.detail}
+              meta={severity === 'broken'
+                ? product.scrape_failing_since && `Failing since ${formatTimeAgo(product.scrape_failing_since)}`
+                : 'Caero retries on the next scheduled check.'}
+              actions={[
+                ...(failure.selectorFix ? [{ label: 'Edit selector', icon: Pencil, onClick: () => onEdit('selector') }] : []),
+                { label: checkPending ? 'Checking…' : 'Check now', icon: RefreshCw, onClick: onCheckNow, disabled: checkPending, busy: checkPending },
+              ]}
+            />
           )}
 
           {/* Price row */}

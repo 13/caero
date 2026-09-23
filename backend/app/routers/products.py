@@ -371,7 +371,7 @@ async def check_product_now(
     if browser is None:
         return CheckResult(product_id=product_id, price=None, error="Browser not available")
 
-    from app.scheduler import check_url_redirect, product_scrape_lock
+    from app.scheduler import check_url_redirect, clear_scrape_failures, product_scrape_lock
     from app.scraper import scrape_price
 
     async with product_scrape_lock(product_id):
@@ -383,10 +383,17 @@ async def check_product_now(
         return CheckResult(product_id=product_id, price=None, error="URL redirected")
 
     if result.price is None:
-        return CheckResult(product_id=product_id, price=None, error="Could not scrape price")
+        # A manual check doesn't extend the streak, but its reason is the freshest.
+        if product.consecutive_scrape_failures > 0 and result.error:
+            product.last_scrape_error = result.error
+        return CheckResult(
+            product_id=product_id,
+            price=None,
+            error="Could not scrape price",
+            reason=result.error,
+        )
 
-    if product.consecutive_scrape_failures > 0:
-        product.consecutive_scrape_failures = 0
+    clear_scrape_failures(product)
 
     price = Decimal(str(result.price)).quantize(Decimal("0.01"))
 
