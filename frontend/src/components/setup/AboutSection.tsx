@@ -9,7 +9,7 @@ export default function AboutSection() {
   const { data: uiSettings } = useUiSettings()
 
   return (
-    <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-5 mt-8">
+    <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-5">
       <div className="flex items-center gap-3 mb-3">
         <div className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
           <Info className="h-4 w-4 text-gray-500 dark:text-gray-400" />
