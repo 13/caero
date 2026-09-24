@@ -12,7 +12,7 @@ import app.scheduler as scheduler_mod
 from app.config import settings
 from app.database import AsyncSessionLocal, engine, run_migrations
 from app.models import Product, User
-from app.scraper import ScrapeResult, scrape_price
+from app.scraper import ERROR_TIMEOUT, ScrapeResult, scrape_price
 
 
 class DeadBrowser:
@@ -154,14 +154,14 @@ class TestScrapeTimeout:
             scrape_price(HangingBrowser(), "https://shop.example/x", ".price"),
             timeout=5,
         )
-        assert result == ScrapeResult(None, None, None)
+        assert result == ScrapeResult(None, None, None, error=ERROR_TIMEOUT)
 
         # The semaphore slot came back: a second scrape still runs.
         again = await asyncio.wait_for(
             scrape_price(HangingBrowser(), "https://shop.example/x", ".price"),
             timeout=5,
         )
-        assert again == ScrapeResult(None, None, None)
+        assert again == ScrapeResult(None, None, None, error=ERROR_TIMEOUT)
 
 
 class TestFailureStorm:
