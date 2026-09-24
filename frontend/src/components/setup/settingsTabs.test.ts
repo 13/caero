@@ -4,12 +4,13 @@ import { resolveTab, visibleTabs } from './settingsTabs'
 describe('settings tabs', () => {
   it('shows admin-only tabs to admins only', () => {
     expect(visibleTabs(false)).toEqual(['account', 'about'])
-    expect(visibleTabs(true)).toEqual(['account', 'schedulers', 'admin', 'about'])
+    expect(visibleTabs(true)).toEqual(['account', 'schedulers', 'logs', 'admin', 'about'])
   })
 
   it('resolves known tabs', () => {
     expect(resolveTab('about', false)).toBe('about')
     expect(resolveTab('schedulers', true)).toBe('schedulers')
+    expect(resolveTab('logs', true)).toBe('logs')
   })
 
   it('falls back to account for missing, unknown or forbidden tabs', () => {
@@ -17,5 +18,6 @@ describe('settings tabs', () => {
     expect(resolveTab('garbage', true)).toBe('account')
     expect(resolveTab('schedulers', false)).toBe('account')
     expect(resolveTab('admin', false)).toBe('account')
+    expect(resolveTab('logs', false)).toBe('account')
   })
 })

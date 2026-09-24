@@ -274,3 +274,24 @@ export interface JobsResponse {
   jobs: JobOut[]
   check_all_running: boolean
 }
+
+export type EventLevel = 'info' | 'warning' | 'error'
+export type EventCategory = 'scrape' | 'alert' | 'notification' | 'system' | 'maintenance'
+
+export interface EventLogEntry {
+  id: number
+  created_at: string
+  level: EventLevel
+  category: EventCategory
+  event: string
+  product_id: number | null
+  product_name: string | null
+  message: string
+  duration_ms: number | null
+  details: Record<string, unknown> | null
+}
+
+export interface EventLogPage {
+  items: EventLogEntry[]
+  next_before_id: number | null
+}

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Check, Clock, Info, Shield, User } from 'lucide-react'
+import { Check, Clock, Info, ScrollText, Shield, User } from 'lucide-react'
 import { useMe } from '../api/hooks'
 import PreferencesSection from '../components/setup/PreferencesSection'
 import SelectorDefaultsSection from '../components/setup/SelectorDefaultsSection'
@@ -16,12 +16,14 @@ import {
   UserManagementSection,
 } from '../components/setup/AdminSections'
 import SchedulersTab from '../components/setup/SchedulersTab'
+import LogsTab from '../components/setup/LogsTab'
 import AboutSection from '../components/setup/AboutSection'
 import { resolveTab, visibleTabs, type SettingsTab } from '../components/setup/settingsTabs'
 
 const TAB_META: Record<SettingsTab, { label: string; icon: React.ElementType }> = {
   account: { label: 'Account', icon: User },
   schedulers: { label: 'Schedulers', icon: Clock },
+  logs: { label: 'Logs', icon: ScrollText },
   admin: { label: 'Admin', icon: Shield },
   about: { label: 'About', icon: Info },
 }
@@ -100,6 +102,8 @@ export default function Setup() {
       )}
 
       {activeTab === 'schedulers' && <SchedulersTab showToast={showToast} />}
+
+      {activeTab === 'logs' && <LogsTab />}
 
       {activeTab === 'admin' && (
         <div className="space-y-4">

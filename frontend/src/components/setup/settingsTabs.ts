@@ -1,7 +1,7 @@
-export type SettingsTab = 'account' | 'schedulers' | 'admin' | 'about'
+export type SettingsTab = 'account' | 'schedulers' | 'logs' | 'admin' | 'about'
 
-const ALL_TABS: readonly SettingsTab[] = ['account', 'schedulers', 'admin', 'about']
-const ADMIN_TABS: ReadonlySet<SettingsTab> = new Set<SettingsTab>(['schedulers', 'admin'])
+const ALL_TABS: readonly SettingsTab[] = ['account', 'schedulers', 'logs', 'admin', 'about']
+const ADMIN_TABS: ReadonlySet<SettingsTab> = new Set<SettingsTab>(['schedulers', 'logs', 'admin'])
 
 export function visibleTabs(isAdmin: boolean): SettingsTab[] {
   return ALL_TABS.filter((tab) => isAdmin || !ADMIN_TABS.has(tab))

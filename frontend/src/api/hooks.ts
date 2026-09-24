@@ -1,5 +1,6 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import apiFetch from './client'
+import { logQueryString, type LogFilters } from '../utils/logFilters'
 import type {
   AdminUserCreate,
   AdminUserPasswordUpdate,
@@ -10,6 +11,7 @@ import type {
   CheckResult,
   ChangePasswordRequest,
   DataExportPayload,
+  EventLogPage,
   JobsResponse,
   NotificationChannelStatus,
   NotificationDefaultsUpdate,
@@ -569,6 +571,19 @@ export function useDeleteMyProducts() {
   return useMutation<void, Error, void>({
     mutationFn: () => apiFetch<void>('/api/settings/products/mine', { method: 'DELETE' }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['products'] }),
+  })
+}
+
+/** Admin event log, newest first, keyset-paged. */
+export function useEventLog(filters: LogFilters, autoRefresh: boolean) {
+  return useInfiniteQuery({
+    // Keyed on the API query (without cursor) — productName is display-only.
+    queryKey: ['event-log', logQueryString(filters)],
+    queryFn: ({ pageParam }) =>
+      apiFetch<EventLogPage>(`/api/settings/logs?${logQueryString(filters, pageParam)}`),
+    initialPageParam: undefined as number | undefined,
+    getNextPageParam: (last) => last.next_before_id ?? undefined,
+    refetchInterval: autoRefresh ? 15_000 : false,
   })
 }
 
