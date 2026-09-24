@@ -66,6 +66,18 @@ New model `EventLog` in `models.py`, migration
 Indexes: `ix_event_log_created_at (created_at)`,
 `ix_event_log_product_created (product_id, created_at)`.
 
+SQLite runs without `PRAGMA foreign_keys`, so `ON DELETE SET NULL` alone
+only works on PostgreSQL. A SQLAlchemy `before_delete` listener on `Product`
+nulls `event_log.product_id` for every ORM product delete on both backends —
+otherwise a reused product id would attach old events to a new product.
+
+SQLite returns naive datetimes; `EventLogOut` marks naive `created_at` as UTC
+so the browser renders local time correctly.
+
+`details` is passed through a JSON-safe converter (`Decimal` → string,
+datetimes → ISO) before insert — a raw `Decimal` would fail the commit and
+take the scrape's own writes down with it.
+
 Levels/categories/event codes are validated in Python (string constants in
 `app/events.py`), not DB enums — adding a code must not need a migration.
 
@@ -97,12 +109,13 @@ notification errors passes through `notifier._redact` first.
 | `scrape_ok` | info | scrape | `_scrape_and_record_locked`, price recorded & changed | `price`, `prev_price`, `currency`, `source` |
 | `scrape_unchanged` | info | scrape | same, price unchanged | `price`, `currency`, `source` |
 | `scrape_failed` | warning | scrape | same, `result.price is None` | `error`, `consecutive_failures`, `url` |
-| `scrape_skipped` | warning | scrape | `scrape_and_record` when browser unavailable | — |
+| `scrape_skipped` | warning | scrape | `scrape_and_record` when browser unavailable; also every check while the product's URL redirects | `reason` |
 | `url_redirected` | warning | scrape | `check_url_redirect` when newly redirected | `from`, `to` |
 | `currency_changed` | warning | scrape | currency flip branch | `was`, `now` |
 | `selector_broken` | error | alert | failure threshold reached (per-product notice) | `failures` |
 | `scraping_down` | error | system | storm notice sent | — |
-| `scrape_recovered` | info | alert | recovered notice sent | `failures_before` |
+| `scrape_recovered` | info | alert | per-product recovered notice sent | `failures_before` |
+| `scraping_recovered` | info | system | storm-recovered notice sent | — |
 | `alert_triggered` | info | alert | each triggered alert | `condition`, `price`, `threshold` |
 | `notify_failed` | error | notification | notifier channel delivery fails after retries | `channel` (redacted error) |
 | `browser_relaunched` | warning | system | `browser.ensure_browser` relaunch path | `reason` |
@@ -128,8 +141,10 @@ set until done.
 `ScrapeResult` gains two fields (defaults keep existing constructors valid):
 
 - `error: str | None` — one of `timeout`, `navigation` (exception during
-  goto/context; message kept in logs, not the code), `unavailable`,
-  `no_match` (page loaded, no price from selector or fallbacks).
+  goto/context), `unavailable`, `no_match` (page loaded, no price from
+  selector or fallbacks).
+- `error_detail: str | None` — for `navigation`, the exception text
+  (truncated to 300 chars), stored in the event's `details`.
 - `source: str | None` — `selector`, `ld_json`, `itemprop`, `data_price` —
   which strategy produced the price. Surfaces products that only work thanks
   to a fallback (selector silently broken).
@@ -190,11 +205,20 @@ the only consumer is the component being replaced.)
 
 ### `POST /api/settings/jobs/{job_id}/run`
 
-`scheduler.modify_job(job_id, next_run_time=now)` — the run still goes through
-`max_instances=1`, the per-product lock and the scrape semaphore, so it cannot
-double-run. `404` for unknown job ids. Returns `202 {"queued": true}`.
-The interval schedule is preserved: after the run, APScheduler computes the
-next fire time from the interval as usual.
+Adds a one-off APScheduler `date` job `"<job_id>__run_now"` that runs the
+job's function with its args immediately (`replace_existing=True`, so repeated
+clicks before it starts collapse into one). It deliberately does **not**
+`modify_job(next_run_time=now)`: an interval trigger computes the next fire
+time from the previous one, so that would permanently shift the product's
+schedule away from its configured check time. The run still goes through the
+per-product lock and the scrape semaphore. `404` for unknown job ids. Returns
+`202 {"queued": true}`. `__run_now` jobs are hidden from the listing, and
+`remove_product_job` also removes a pending one.
+
+`JobOut` also carries a human-readable `schedule` string ("Every 1 h from
+08:00", "Daily at 03:30"), built server-side by `describe_schedule()` in
+`schedule_utils.py`. Maintenance job names/times live in one
+`MAINTENANCE_JOBS` table in `scheduler.py` that `main.py` registers from.
 
 ## 7. Frontend
 
@@ -219,11 +243,15 @@ next fire time from the interval as usual.
 
 ### Logs tab
 - Filter bar: level chips (info/warning/error, multi-select), category
-  select, product select (from existing products query), search input
-  (debounced 300 ms). Filters live in the URL query alongside `tab`.
+  select, search input (debounced 300 ms). Product filter is set by clicking
+  a row's product name and shown as a removable chip — `useProducts()` only
+  returns the admin's own products, so a product dropdown would miss other
+  users'. Filters live in the URL query alongside `tab`.
 - List rows: timestamp (UI date/time format from `useUiSettings`), level
-  badge, category, product link (or struck-out snapshot name if the product
-  was deleted), message. Rows with `details`/`duration_ms` expand to show a
+  badge, category, product name (click = filter; struck-out snapshot name if
+  the product was deleted), message.
+- Links to `/products/:id` (Schedulers tab) are only rendered when the job's
+  owner is the viewing admin: product pages are owner-scoped and would 404. Rows with `details`/`duration_ms` expand to show a
   key/value list.
 - "Load more" button for the next page; auto-refresh toggle (default on,
   pauses while any row is expanded or the user has loaded past page 1).
