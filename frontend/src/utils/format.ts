@@ -104,3 +104,23 @@ export function normalizeCheckTimeHHMM(value?: string | null) {
   return CHECK_TIME_HHMM_RE.test(trimmed) ? trimmed : DEFAULT_CHECK_TIME_HHMM
 }
 
+export function formatRelativeTime(value: string | null, now: number = Date.now()) {
+  if (!value) return '—'
+  const t = new Date(value).getTime()
+  if (Number.isNaN(t)) return '—'
+  const diff = Math.round((t - now) / 1000)
+  const abs = Math.abs(diff)
+  if (abs < 45) return diff >= 0 ? 'in a moment' : 'just now'
+  const [amount, unit] =
+    abs < 3600 ? [Math.round(abs / 60), 'min'] : abs < 86400 ? [Math.round(abs / 3600), 'h'] : [Math.round(abs / 86400), 'd']
+  return diff > 0 ? `in ${amount} ${unit}` : `${amount} ${unit} ago`
+}
+
+export function formatDuration(ms: number | null) {
+  if (ms == null) return '—'
+  if (ms < 1000) return `${ms} ms`
+  if (ms < 60_000) return `${(ms / 1000).toFixed(1)} s`
+  const totalSeconds = Math.round(ms / 1000)
+  return `${Math.floor(totalSeconds / 60)} min ${totalSeconds % 60} s`
+}
+

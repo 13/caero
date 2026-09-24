@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Bell, Clock, Download, Eye, EyeOff, Upload, Users } from 'lucide-react'
+import { Bell, Download, Eye, EyeOff, Upload, Users } from 'lucide-react'
 import {
   useAdminChangeUserPassword,
   useAdminDeleteUserProducts,
@@ -7,7 +7,6 @@ import {
   useDeleteUser,
   useExportData,
   useImportData,
-  useJobs,
   useMe,
   useNotificationStatus,
   useSaveSettings,
@@ -249,34 +248,6 @@ export function NotificationTestsSection({ showToast }: { showToast: (msg: strin
     </Section>
   )
 }
-
-/** Live view of APScheduler jobs (per-product checks + maintenance). */
-export function SchedulerJobsSection() {
-  const { data: jobs = [] } = useJobs()
-  const { data: uiSettings } = useUiSettings()
-
-  return (
-    <Section icon={Clock} title="Scheduler" description="Upcoming scrape and maintenance runs (refreshes every 30s)">
-      {jobs.length === 0 ? (
-        <p className="text-sm text-gray-500 dark:text-gray-400">No jobs scheduled.</p>
-      ) : (
-        <ul className="divide-y divide-gray-100 dark:divide-gray-800">
-          {[...jobs]
-            .sort((a, b) => (a.next_run_time ?? '').localeCompare(b.next_run_time ?? ''))
-            .map((job) => (
-              <li key={job.id} className="flex items-center justify-between gap-3 py-2 text-sm">
-                <span className="font-mono text-xs text-gray-600 dark:text-gray-300 truncate">{job.id}</span>
-                <span className="shrink-0 text-gray-500 dark:text-gray-400">
-                  {job.next_run_time ? formatDateTime(job.next_run_time, uiSettings?.date_format) : 'paused'}
-                </span>
-              </li>
-            ))}
-        </ul>
-      )}
-    </Section>
-  )
-}
-
 
 export function FullDataSection({ showToast }: { showToast: (msg: string) => void }) {
   const exportDataMutation = useExportData()

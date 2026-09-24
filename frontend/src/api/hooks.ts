@@ -10,7 +10,7 @@ import type {
   CheckResult,
   ChangePasswordRequest,
   DataExportPayload,
-  JobOut,
+  JobsResponse,
   NotificationChannelStatus,
   NotificationDefaultsUpdate,
   PriceHistory,
@@ -391,11 +391,28 @@ export function useSystemInfo() {
 
 /** Scheduler job list — admin only. */
 export function useJobs(enabled = true) {
-  return useQuery<JobOut[]>({
+  return useQuery<JobsResponse>({
     queryKey: ['scheduler-jobs'],
-    queryFn: () => apiFetch<JobOut[]>('/api/settings/jobs'),
+    queryFn: () => apiFetch<JobsResponse>('/api/settings/jobs'),
     enabled,
     refetchInterval: 30_000,
+  })
+}
+
+/** Queue a one-off run of a scheduler job — admin only. */
+export function useRunJob() {
+  const qc = useQueryClient()
+  return useMutation<{ queued: boolean }, Error, string>({
+    mutationFn: (jobId) =>
+      apiFetch<{ queued: boolean }>(`/api/settings/jobs/${encodeURIComponent(jobId)}/run`, { method: 'POST' }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['scheduler-jobs'] })
+      qc.invalidateQueries({ queryKey: ['event-log'] })
+    },
+    onError: () => {
+      // e.g. 404: the job vanished (product deleted) — refresh the list.
+      qc.invalidateQueries({ queryKey: ['scheduler-jobs'] })
+    },
   })
 }
 

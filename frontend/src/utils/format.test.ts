@@ -3,9 +3,11 @@ import {
   currencySymbol,
   formatDate,
   formatDateTime,
+  formatDuration,
   formatIntervalHours,
   formatPercent,
   formatPrice,
+  formatRelativeTime,
   normalizeCheckTimeHHMM,
   normalizeIntervalHoursToMinutes,
   priceChangeSentiment,
@@ -115,5 +117,34 @@ describe('normalizeCheckTimeHHMM', () => {
     expect(normalizeCheckTimeHHMM('9:30')).toBe('10:00')
     expect(normalizeCheckTimeHHMM('')).toBe('10:00')
     expect(normalizeCheckTimeHHMM(null)).toBe('10:00')
+  })
+})
+
+describe('formatRelativeTime', () => {
+  const now = Date.parse('2026-09-24T12:00:00Z')
+  const at = (offsetSeconds: number) => new Date(now + offsetSeconds * 1000).toISOString()
+
+  it('handles near times', () => {
+    expect(formatRelativeTime(at(-10), now)).toBe('just now')
+    expect(formatRelativeTime(at(10), now)).toBe('in a moment')
+  })
+  it('uses minutes, hours and days', () => {
+    expect(formatRelativeTime(at(-5 * 60), now)).toBe('5 min ago')
+    expect(formatRelativeTime(at(3 * 3600), now)).toBe('in 3 h')
+    expect(formatRelativeTime(at(-2 * 86400), now)).toBe('2 d ago')
+  })
+  it('returns a dash for missing or invalid values', () => {
+    expect(formatRelativeTime(null, now)).toBe('—')
+    expect(formatRelativeTime('nope', now)).toBe('—')
+  })
+})
+
+describe('formatDuration', () => {
+  it('formats ms, seconds and minutes', () => {
+    expect(formatDuration(850)).toBe('850 ms')
+    expect(formatDuration(12345)).toBe('12.3 s')
+    expect(formatDuration(125000)).toBe('2 min 5 s')
+    expect(formatDuration(119600)).toBe('2 min 0 s')
+    expect(formatDuration(null)).toBe('—')
   })
 })

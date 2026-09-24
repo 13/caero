@@ -252,7 +252,25 @@ export interface SystemInfoOut {
   scraper_headless: boolean
 }
 
+export type JobStatus = 'ok' | 'failed' | 'skipped'
+
 export interface JobOut {
   id: string
+  kind: 'product' | 'maintenance'
+  name: string
+  product_id: number | null
+  owner: string | null
+  schedule: string
   next_run_time: string | null
+  last_run_at: string | null
+  last_status: JobStatus | null
+  last_duration_ms: number | null
+  last_message: string | null
+  consecutive_failures: number
+  running: boolean
+}
+
+export interface JobsResponse {
+  jobs: JobOut[]
+  check_all_running: boolean
 }

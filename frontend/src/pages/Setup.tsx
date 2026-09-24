@@ -13,9 +13,9 @@ import {
 import {
   FullDataSection,
   NotificationTestsSection,
-  SchedulerJobsSection,
   UserManagementSection,
 } from '../components/setup/AdminSections'
+import SchedulersTab from '../components/setup/SchedulersTab'
 import AboutSection from '../components/setup/AboutSection'
 import { resolveTab, visibleTabs, type SettingsTab } from '../components/setup/settingsTabs'
 
@@ -99,11 +99,7 @@ export default function Setup() {
         </div>
       )}
 
-      {activeTab === 'schedulers' && (
-        <div className="space-y-4">
-          <SchedulerJobsSection />
-        </div>
-      )}
+      {activeTab === 'schedulers' && <SchedulersTab showToast={showToast} />}
 
       {activeTab === 'admin' && (
         <div className="space-y-4">
