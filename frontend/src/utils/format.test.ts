@@ -8,6 +8,7 @@ import {
   formatPercent,
   formatPrice,
   formatRelativeTime,
+  formatRunTime,
   normalizeCheckTimeHHMM,
   normalizeIntervalHoursToMinutes,
   pluralize,
@@ -156,5 +157,26 @@ describe('pluralize', () => {
     expect(pluralize(0, 'check')).toBe('checks')
     expect(pluralize(3, 'check')).toBe('checks')
     expect(pluralize(2, 'entry', 'entries')).toBe('entries')
+  })
+})
+
+describe('formatRunTime', () => {
+  const now = new Date('2026-07-14T06:00:00').getTime()
+
+  it('shows only the clock time for today', () => {
+    expect(formatRunTime('2026-07-14T08:07:42', 'DD.MM.YYYY', '24h', now)).toBe('08:07')
+    expect(formatRunTime('2026-07-14T20:07:00', 'DD.MM.YYYY', '12h', now)).toBe('8:07 PM')
+    expect(formatRunTime('2026-07-14T00:05:00', 'DD.MM.YYYY', '12h', now)).toBe('12:05 AM')
+  })
+
+  it('prefixes day and month on other days', () => {
+    expect(formatRunTime('2026-07-15T08:07:00', 'DD.MM.YYYY', '24h', now)).toBe('15.07. 08:07')
+    expect(formatRunTime('2026-07-15T08:07:00', 'MM/DD/YYYY', '12h', now)).toBe('07/15 8:07 AM')
+    expect(formatRunTime('2026-07-13T23:59:00', 'YYYY-MM-DD', '24h', now)).toBe('07-13 23:59')
+  })
+
+  it('handles missing and invalid values', () => {
+    expect(formatRunTime(null, 'DD.MM.YYYY', '24h', now)).toBe('—')
+    expect(formatRunTime('nope', 'DD.MM.YYYY', '24h', now)).toBe('—')
   })
 })

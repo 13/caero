@@ -2,8 +2,8 @@ import { Clock, Loader2, Play, Wrench } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { ApiError } from '../../api/client'
 import { useJobs, useMe, useRunJob, useUiSettings } from '../../api/hooks'
-import type { JobOut, JobStatus } from '../../api/types'
-import { formatDateTime, formatDuration, formatRelativeTime } from '../../utils/format'
+import type { JobOut, JobStatus, TimeFormat } from '../../api/types'
+import { formatDateTime, formatDuration, formatRelativeTime, formatRunTime } from '../../utils/format'
 import Section from './Section'
 
 const STATUS: Record<JobStatus | 'never', { dot: string; label: string }> = {
@@ -13,10 +13,11 @@ const STATUS: Record<JobStatus | 'never', { dot: string; label: string }> = {
   never: { dot: 'bg-gray-300 dark:bg-gray-600', label: 'Not run yet' },
 }
 
-function JobRow({ job, linkable, dateFormat, busy, onRun }: {
+function JobRow({ job, linkable, dateFormat, timeFormat, busy, onRun }: {
   job: JobOut
   linkable: boolean
   dateFormat?: string
+  timeFormat?: TimeFormat
   busy: boolean
   onRun: () => void
 }) {
@@ -50,14 +51,17 @@ function JobRow({ job, linkable, dateFormat, busy, onRun }: {
           )}
         </div>
       </div>
-      <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 text-xs sm:w-56 shrink-0 text-gray-700 dark:text-gray-300">
+      <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 text-xs sm:w-64 shrink-0 text-gray-700 dark:text-gray-300">
         <dt className="text-gray-500 dark:text-gray-400">Next</dt>
         <dd title={formatDateTime(job.next_run_time, dateFormat)}>
-          {job.next_run_time ? formatRelativeTime(job.next_run_time) : 'paused'}
+          {job.next_run_time
+            ? `${formatRelativeTime(job.next_run_time)} · ${formatRunTime(job.next_run_time, dateFormat, timeFormat)}`
+            : 'paused'}
         </dd>
         <dt className="text-gray-500 dark:text-gray-400">Last</dt>
         <dd title={formatDateTime(job.last_run_at, dateFormat)}>
           {formatRelativeTime(job.last_run_at)}
+          {job.last_run_at ? ` · ${formatRunTime(job.last_run_at, dateFormat, timeFormat)}` : ''}
           {job.last_duration_ms != null ? ` · ${formatDuration(job.last_duration_ms)}` : ''}
         </dd>
       </dl>
@@ -101,6 +105,7 @@ export default function SchedulersTab({ showToast }: { showToast: (msg: string) 
           job={job}
           linkable={!!me && job.owner === me.username}
           dateFormat={uiSettings?.date_format}
+          timeFormat={uiSettings?.time_format}
           busy={job.running || (runJob.isPending && runJob.variables === job.id)}
           onRun={() => run(job)}
         />

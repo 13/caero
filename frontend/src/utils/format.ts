@@ -84,6 +84,37 @@ export function formatDateTime(value: string | null, format = 'DD.MM.YYYY') {
   return `${dateStr} ${hours}:${minutes}`
 }
 
+export function formatClockTime(d: Date, timeFormat: '12h' | '24h' = '24h') {
+  const minutes = String(d.getMinutes()).padStart(2, '0')
+  if (timeFormat === '12h') {
+    const h = d.getHours() % 12 || 12
+    return `${h}:${minutes} ${d.getHours() < 12 ? 'AM' : 'PM'}`
+  }
+  return `${String(d.getHours()).padStart(2, '0')}:${minutes}`
+}
+
+/** Clock time of a run; prefixed with day and month (no year) when it isn't today. */
+export function formatRunTime(
+  value: string | null,
+  format = 'DD.MM.YYYY',
+  timeFormat: '12h' | '24h' = '24h',
+  now: number = Date.now(),
+) {
+  if (!value) return '—'
+  const d = new Date(value)
+  if (Number.isNaN(d.getTime())) return '—'
+  const time = formatClockTime(d, timeFormat)
+  if (d.toDateString() === new Date(now).toDateString()) return time
+  const day = String(d.getDate()).padStart(2, '0')
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const date =
+    format === 'DD/MM/YYYY' ? `${day}/${month}`
+      : format === 'MM/DD/YYYY' ? `${month}/${day}`
+        : format === 'YYYY-MM-DD' ? `${month}-${day}`
+          : `${day}.${month}.`
+  return `${date} ${time}`
+}
+
 export function intervalMinutesToHours(minutes: number) {
   return minutes / 60
 }
