@@ -110,6 +110,31 @@ async def test_deleting_product_detaches_events():
 
 
 @pytest.mark.asyncio(loop_scope="session")
+async def test_record_event_redacts_secrets_in_message_and_details(monkeypatch):
+    import app.notifier as notifier
+
+    fake_url = "https://discord.com/api/webhooks/1/eventsecrettoken"
+    monkeypatch.setattr(notifier.settings, "discord_webhook_url", fake_url)
+    pid = await make_product("ev-redact")
+
+    await events.record_event(
+        level="error",
+        category="notification",
+        event="notify_failed",
+        message=f"Discord delivery failed: POST {fake_url} 500",
+        product_id=pid,
+        details={"error": f"POST {fake_url} returned 500", "nested": {"url": fake_url}},
+    )
+
+    [row] = await events_where(product_id=pid)
+    assert fake_url not in row.message
+    assert "***" in row.message
+    assert fake_url not in row.details["error"]
+    assert fake_url not in row.details["nested"]["url"]
+    assert "***" in row.details["error"]
+
+
+@pytest.mark.asyncio(loop_scope="session")
 async def test_spawn_event_from_worker_thread_records_after_drain():
     """Email delivery bookkeeping runs inside asyncio.to_thread(...), where there
     is no running loop — spawn_event must still schedule the event via the

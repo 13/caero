@@ -35,6 +35,10 @@ async def get_logs(client, headers, **params):
 
 @pytest.mark.asyncio(loop_scope="session")
 async def test_logs_require_admin(client):
+    # The first registered user in the whole suite becomes admin automatically;
+    # register a throwaway admin first so this user is guaranteed non-admin
+    # when this file runs on its own.
+    await login(client, "logs-first-admin", admin=True)
     user = await login(client, "logs-user", admin=False)
     assert (await client.get("/api/settings/logs")).status_code == 401
     assert (await client.get("/api/settings/logs", headers=user)).status_code == 403

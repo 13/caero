@@ -74,3 +74,52 @@ async def test_export_import_roundtrip_and_insert_after_import(client):
         json={"name": "After Import", "url": "https://example.com/ai", "selector": ".p"},
     )
     assert resp.status_code == 201, resp.text
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_import_detaches_events_from_reused_product_ids(client):
+    """The bulk product delete in import_data bypasses the ORM before_delete
+    listener, and SQLite doesn't enforce ON DELETE SET NULL — so a product
+    re-inserted with its old id could silently inherit the old product's
+    events. Import must detach product_id from every event first."""
+    from sqlalchemy import select, update
+
+    from app.database import AsyncSessionLocal
+    from app.events import record_event
+    from app.models import EventLog, User
+
+    resp = await client.post(
+        "/api/auth/register", json={"username": "impex-events-admin", "password": "secret1"}
+    )
+    assert resp.status_code == 201
+    async with AsyncSessionLocal() as db:
+        await db.execute(update(User).where(User.username == "impex-events-admin").values(is_admin=True))
+        await db.commit()
+    headers = await _login(client, "impex-events-admin")
+
+    resp = await client.post(
+        "/api/products",
+        headers=headers,
+        json={"name": "Event Carrier", "url": "https://example.com/ec", "selector": ".price"},
+    )
+    assert resp.status_code == 201
+    product_id = resp.json()["id"]
+
+    marker_message = f"impex-events-marker-{product_id}"
+    await record_event(
+        level="info", category="scrape", event="scrape_ok", message=marker_message,
+        product_id=product_id, product_name="Event Carrier",
+    )
+
+    export = (await client.get("/api/settings/export", headers=headers)).json()
+    assert any(p["id"] == product_id for p in export["products"])
+
+    resp = await client.post("/api/settings/import", headers=headers, json=export)
+    assert resp.status_code == 200, resp.text
+
+    async with AsyncSessionLocal() as db:
+        row = (
+            await db.execute(select(EventLog).where(EventLog.message == marker_message))
+        ).scalar_one()
+    assert row.product_id is None
+    assert row.product_name == "Event Carrier"

@@ -51,6 +51,17 @@ def _json_safe(value: Any) -> Any:
     return str(value)
 
 
+def _redact_strings(value: Any, redact) -> Any:
+    """Apply notifier._redact recursively to every string in a _json_safe value."""
+    if isinstance(value, dict):
+        return {k: _redact_strings(v, redact) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_redact_strings(v, redact) for v in value]
+    if isinstance(value, str):
+        return redact(value)
+    return value
+
+
 def _build(
     *,
     level: str,
@@ -69,6 +80,12 @@ def _build(
         raise ValueError(f"unknown event category {category!r}")
     if product is not None:
         product_id, product_name = product.id, product.name
+
+    # Lazy import: notifier imports app.events (spawn_event) for its own
+    # delivery-failure bookkeeping, so a module-level import here would cycle.
+    from app.notifier import _redact
+
+    safe_details = _redact_strings(_json_safe(details), _redact) if details else None
     return EventLog(
         created_at=datetime.now(UTC),
         level=level,
@@ -76,9 +93,9 @@ def _build(
         event=event[:40],
         product_id=product_id,
         product_name=product_name[:256] if product_name else None,
-        message=message[:MAX_MESSAGE_LENGTH],
+        message=_redact(message)[:MAX_MESSAGE_LENGTH],
         duration_ms=duration_ms,
-        details=_json_safe(details) if details else None,
+        details=safe_details,
     )
 
 

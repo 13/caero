@@ -9,7 +9,7 @@ from decimal import Decimal
 from email.message import EmailMessage
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
-from sqlalchemy import func, or_, select, text
+from sqlalchemy import func, or_, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import PROJECT_VERSION, settings
@@ -667,6 +667,11 @@ async def import_data(
 
     await db.execute(Alert.__table__.delete())
     await db.execute(PriceHistory.__table__.delete())
+    # Bulk delete bypasses the ORM before_delete listener that detaches events
+    # (app/events.py), and SQLite doesn't enforce ON DELETE SET NULL — without
+    # this, a product re-inserted below with its old id would silently
+    # inherit that old product's events.
+    await db.execute(update(EventLog).where(EventLog.product_id.is_not(None)).values(product_id=None))
     await db.execute(Product.__table__.delete())
     await db.execute(User.__table__.delete())
     await db.execute(AppSettings.__table__.delete())

@@ -67,8 +67,18 @@ _channel_status: dict[str, ChannelStatus] = {}
 
 
 def _redact(text: str) -> str:
-    # httpx errors include the request URL, which carries the bot token.
-    for secret in (_bot_token, settings.telegram_bot_token, settings.gotify_token, settings.smtp_password):
+    # httpx errors include the request URL, which carries the bot token. A
+    # Discord webhook URL's path is itself the secret, and ntfy/Gotify URLs
+    # may embed credentials, so the whole configured URL is redacted too.
+    for secret in (
+        _bot_token,
+        settings.telegram_bot_token,
+        settings.gotify_token,
+        settings.smtp_password,
+        settings.discord_webhook_url,
+        settings.ntfy_url,
+        settings.gotify_url,
+    ):
         if secret:
             text = text.replace(secret, "***")
     return text

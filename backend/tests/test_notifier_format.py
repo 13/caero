@@ -179,6 +179,31 @@ def test_channel_status_tracks_outcomes_and_redacts_secrets(monkeypatch):
     notifier.reset_channel_status()
 
 
+def test_redact_covers_webhook_urls(monkeypatch):
+    # A Discord webhook URL's path is itself the secret, and ntfy/Gotify URLs
+    # may embed credentials — so the whole configured URL is redacted.
+    monkeypatch.setattr(settings, "discord_webhook_url", "https://discord.com/api/webhooks/1/DISCTOKEN")
+    monkeypatch.setattr(settings, "ntfy_url", "https://ntfy.example/my-secret-topic")
+    monkeypatch.setattr(settings, "gotify_url", "https://gotify.example/TOKEN")
+
+    text = (
+        "error hitting https://discord.com/api/webhooks/1/DISCTOKEN and "
+        "https://ntfy.example/my-secret-topic and https://gotify.example/TOKEN"
+    )
+    redacted = notifier._redact(text)
+    assert "DISCTOKEN" not in redacted
+    assert "my-secret-topic" not in redacted
+    assert "gotify.example/TOKEN" not in redacted
+    assert redacted.count("***") == 3
+
+
+def test_redact_skips_falsy_webhook_settings(monkeypatch):
+    monkeypatch.setattr(settings, "discord_webhook_url", "")
+    monkeypatch.setattr(settings, "ntfy_url", "")
+    monkeypatch.setattr(settings, "gotify_url", "")
+    assert notifier._redact("nothing secret here") == "nothing secret here"
+
+
 @pytest.mark.asyncio(loop_scope="session")
 async def test_webhook_failure_after_retries_is_recorded(monkeypatch):
     notifier.reset_channel_status()
