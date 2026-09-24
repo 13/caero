@@ -54,6 +54,15 @@ _storm_notified_users: set[int] = set()
 # One "Check all" pass at a time (see run_check_all).
 _check_all_running = False
 
+# Nightly maintenance jobs, registered in main.py. One table so the Schedulers
+# tab can name them and find their last run in the event log.
+MAINTENANCE_JOBS: dict[str, dict] = {
+    "maintenance_backup": {"name": "Nightly backup", "event": "backup", "hour": 3, "minute": 30},
+    "maintenance_retention": {"name": "Nightly retention", "event": "retention", "hour": 4, "minute": 0},
+}
+
+RUN_NOW_SUFFIX = "__run_now"
+
 
 def last_successful_scrape_at() -> datetime | None:
     return _last_success_at
@@ -720,3 +729,46 @@ async def load_all_jobs() -> None:
         for product in schedulable:
             add_product_job(product)
     logger.info("Loaded %d product jobs into scheduler", len(products))
+
+
+def product_id_from_job(job_id: str) -> int | None:
+    base = job_id.removesuffix(RUN_NOW_SUFFIX)
+    if not base.startswith("product_"):
+        return None
+    try:
+        return int(base.removeprefix("product_"))
+    except ValueError:
+        return None
+
+
+def _on_job_event(ev) -> None:
+    """APScheduler listener: a missed or crashed run otherwise leaves no trace."""
+    from apscheduler.events import EVENT_JOB_MISSED
+
+    from app.events import spawn_event
+
+    product_id = product_id_from_job(ev.job_id)
+    if ev.code == EVENT_JOB_MISSED:
+        spawn_event(
+            level="warning",
+            category="system",
+            event="job_missed",
+            message=f"Job {ev.job_id} missed its run at {ev.scheduled_run_time:%Y-%m-%d %H:%M}",
+            product_id=product_id,
+            details={"job_id": ev.job_id, "scheduled_run_time": ev.scheduled_run_time},
+        )
+    else:
+        spawn_event(
+            level="error",
+            category="system",
+            event="job_error",
+            message=f"Job {ev.job_id} raised {type(ev.exception).__name__}: {ev.exception}",
+            product_id=product_id,
+            details={"job_id": ev.job_id, "exception": repr(ev.exception)[:300]},
+        )
+
+
+def install_job_listener() -> None:
+    from apscheduler.events import EVENT_JOB_ERROR, EVENT_JOB_MISSED
+
+    scheduler.add_listener(_on_job_event, EVENT_JOB_MISSED | EVENT_JOB_ERROR)

@@ -96,6 +96,10 @@ class Settings(BaseSettings):
     # file). Keeps the newest N files; 0 disables backups.
     backup_keep: int = Field(default=7, ge=0)
 
+    # Admin event log (Settings → Logs): rows older than this are deleted
+    # nightly. 0 = keep forever.
+    event_log_retention_days: int = Field(default=30, ge=0)
+
     # Application log level: DEBUG, INFO, WARNING, ERROR
     log_level: str = Field(default="INFO")
 

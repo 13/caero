@@ -102,6 +102,16 @@ async def start_browser() -> None:
         _backend = "unavailable"
         await _reset_playwright()
 
+        from app.events import record_event
+
+        await record_event(
+            level="error",
+            category="system",
+            event="browser_launch_failed",
+            message=f"Could not start scraping browser: {exc}",
+            details={"error": str(exc)[:300]},
+        )
+
 
 async def ensure_browser() -> Browser | None:
     """Return a live browser, relaunching it if the current one is gone.
@@ -137,7 +147,27 @@ async def ensure_browser() -> Browser | None:
             # The Playwright driver may be the broken part; drop it so the next
             # attempt starts a fresh one.
             await _reset_playwright()
+
+            from app.events import record_event
+
+            await record_event(
+                level="error",
+                category="system",
+                event="browser_launch_failed",
+                message=f"Could not relaunch scraping browser: {exc}",
+                details={"error": str(exc)[:300]},
+            )
             return None
+
+        from app.events import record_event
+
+        await record_event(
+            level="warning",
+            category="system",
+            event="browser_relaunched",
+            message="Scraping browser relaunched",
+            details={"reason": "crashed" if dead is not None else "not_running"},
+        )
 
         logger.warning("Relaunched scraping browser after it became unavailable")
         return _browser

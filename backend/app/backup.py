@@ -26,7 +26,11 @@ def _isoformat(value: datetime | None) -> str | None:
 
 
 async def build_export_payload(db: AsyncSession) -> dict:
-    """Full-database export used by both the admin export API and backups."""
+    """Full-database export used by both the admin export API and backups.
+
+    The admin event log is deliberately not exported — it is operational data,
+    not user data.
+    """
     result = await db.execute(select(AppSettings).where(AppSettings.id == 1))
     app_settings = result.scalar_one_or_none()
     users = (await db.execute(select(User))).scalars().all()
@@ -123,11 +127,7 @@ def _rotate_backups(backups_dir: Path, keep: int) -> None:
             logger.warning("Could not remove old backup %s: %s", old, exc)
 
 
-async def run_backup() -> Path | None:
-    """Write one full-export backup file and rotate old ones."""
-    if settings.backup_keep <= 0:
-        return None
-
+async def _write_backup() -> Path:
     async with AsyncSessionLocal() as db:
         payload = await build_export_payload(db)
 
@@ -142,4 +142,33 @@ async def run_backup() -> Path | None:
     logger.info("Backup written: %s", target)
 
     _rotate_backups(backups_dir, settings.backup_keep)
+    return target
+
+
+async def run_backup() -> Path | None:
+    """Write one full-export backup file and rotate old ones (nightly cron)."""
+    if settings.backup_keep <= 0:
+        return None
+
+    from app.events import record_event
+
+    try:
+        target = await _write_backup()
+    except Exception as exc:
+        logger.exception("Backup failed")
+        await record_event(
+            level="error",
+            category="maintenance",
+            event="backup",
+            message=f"Backup failed: {exc}",
+        )
+        return None
+
+    await record_event(
+        level="info",
+        category="maintenance",
+        event="backup",
+        message=f"Backup written: {target.name}",
+        details={"file": target.name, "kept": settings.backup_keep},
+    )
     return target

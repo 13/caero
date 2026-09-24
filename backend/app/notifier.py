@@ -85,6 +85,17 @@ def _record_delivery(channel: str, error: BaseException | None = None) -> None:
         status.last_error = _redact(f"{type(error).__name__}: {error}")[:300]
         status.consecutive_failures += 1
 
+        from app.events import spawn_event
+
+        # last_error is already redacted (bot token, SMTP password, …).
+        spawn_event(
+            level="error",
+            category="notification",
+            event="notify_failed",
+            message=f"{channel} delivery failed: {status.last_error}",
+            details={"channel": channel, "consecutive_failures": status.consecutive_failures},
+        )
+
 
 def channel_statuses() -> list[ChannelStatus]:
     return sorted(_channel_status.values(), key=lambda s: s.channel)

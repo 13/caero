@@ -1,6 +1,7 @@
 """FastAPI application entry point."""
 from __future__ import annotations
 
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -19,7 +20,7 @@ from app.routers import (
     products_router,
     settings_router,
 )
-from app.scheduler import load_all_jobs, scheduler
+from app.scheduler import MAINTENANCE_JOBS, install_job_listener, load_all_jobs, scheduler
 
 logging.basicConfig(
     level=getattr(logging, _settings.log_level.upper(), logging.INFO),
@@ -80,19 +81,25 @@ async def lifespan(application: FastAPI):
     except Exception as _exc:
         logger.warning("Could not load notification settings from DB at startup: %s", _exc)
 
+    # Bind this loop so spawn_event can reach the log from worker threads (e.g.
+    # email delivery bookkeeping inside asyncio.to_thread(...)).
+    from app.events import bind_event_loop
+
+    bind_event_loop(asyncio.get_running_loop())
+
     # Start APScheduler and load product jobs
     scheduler.start()
+    install_job_listener()
     await load_all_jobs()
 
-    # Nightly maintenance: JSON backup + price-history thinning (both no-op
-    # when disabled via settings).
+    # Nightly maintenance: JSON backup + retention (price-history thinning and
+    # event-log pruning; each a no-op when disabled via settings).
     from app.backup import run_backup
-    from app.retention import thin_price_history
+    from app.retention import run_nightly_retention
 
-    scheduler.add_job(run_backup, "cron", hour=3, minute=30, id="maintenance_backup", replace_existing=True)
-    scheduler.add_job(
-        thin_price_history, "cron", hour=4, minute=0, id="maintenance_retention", replace_existing=True
-    )
+    for job_id, func in (("maintenance_backup", run_backup), ("maintenance_retention", run_nightly_retention)):
+        spec = MAINTENANCE_JOBS[job_id]
+        scheduler.add_job(func, "cron", hour=spec["hour"], minute=spec["minute"], id=job_id, replace_existing=True)
 
     yield
 
@@ -102,6 +109,10 @@ async def lifespan(application: FastAPI):
     from app.browser import stop_browser
 
     await stop_browser()
+
+    from app.events import drain_pending_events
+
+    await drain_pending_events()
 
     logger.info("Caero shutdown complete")
 

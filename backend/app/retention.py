@@ -15,7 +15,7 @@ from sqlalchemy import delete, select
 
 from app.config import settings
 from app.database import AsyncSessionLocal
-from app.models import PriceHistory
+from app.models import EventLog, PriceHistory
 
 logger = logging.getLogger(__name__)
 
@@ -72,3 +72,47 @@ async def thin_price_history() -> int:
 
     logger.info("Thinned price history: deleted %d row(s) older than %d days", len(to_delete), days)
     return len(to_delete)
+
+
+async def prune_event_log() -> int:
+    """Delete event-log rows older than EVENT_LOG_RETENTION_DAYS. Returns the count."""
+    days = settings.event_log_retention_days
+    if days <= 0:
+        return 0
+
+    cutoff = datetime.now(UTC) - timedelta(days=days)
+    async with AsyncSessionLocal() as db:
+        ids = (await db.execute(select(EventLog.id).where(EventLog.created_at < cutoff))).scalars().all()
+        for i in range(0, len(ids), 500):
+            await db.execute(delete(EventLog).where(EventLog.id.in_(ids[i:i + 500])))
+        await db.commit()
+
+    if ids:
+        logger.info("Pruned %d event-log row(s) older than %d days", len(ids), days)
+    return len(ids)
+
+
+async def run_nightly_retention() -> None:
+    """Nightly cron entry: thin price history, prune the event log, log the result."""
+    from app.events import record_event
+
+    try:
+        price_rows = await thin_price_history()
+        events_deleted = await prune_event_log()
+    except Exception as exc:
+        logger.exception("Nightly retention failed")
+        await record_event(
+            level="error",
+            category="maintenance",
+            event="retention",
+            message=f"Retention failed: {exc}",
+        )
+        return
+
+    await record_event(
+        level="info",
+        category="maintenance",
+        event="retention",
+        message=f"Retention finished: {price_rows} price rows thinned, {events_deleted} events pruned",
+        details={"price_rows_deleted": price_rows, "events_deleted": events_deleted},
+    )
