@@ -1,8 +1,10 @@
 """Events from outside the scrape path: browser, notifier, APScheduler, maintenance."""
 import asyncio
+import uuid
 from datetime import UTC, datetime, timedelta
 
 import pytest
+import pytest_asyncio
 from apscheduler.events import EVENT_JOB_ERROR, EVENT_JOB_MISSED, JobExecutionEvent
 from sqlalchemy import select
 
@@ -23,7 +25,9 @@ async def latest(event: str) -> EventLog | None:
         )).scalar_one_or_none()
 
 
-@pytest.fixture(autouse=True)
+# Session loop like the tests: a function-loop fixture would hand asyncpg's
+# pooled connections to a second loop ("attached to a different loop").
+@pytest_asyncio.fixture(autouse=True, loop_scope="session")
 async def migrated():
     await run_migrations()
 
@@ -110,7 +114,7 @@ async def test_job_listener_records_missed_and_error():
 
 @pytest.mark.asyncio(loop_scope="session")
 async def test_prune_event_log_respects_cutoff(monkeypatch):
-    marker = "prune-marker-7f3a"
+    marker = f"prune-marker-{uuid.uuid4().hex[:10]}"
     async with AsyncSessionLocal() as db:
         db.add(EventLog(created_at=datetime.now(UTC) - timedelta(days=40), level="info",
                         category="system", event="old", message=marker))
