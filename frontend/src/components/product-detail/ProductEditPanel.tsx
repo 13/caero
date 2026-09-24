@@ -1,25 +1,32 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { X } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { useUiSettings, useUpdateProduct } from '../../api/hooks'
+import { useCheckProduct, useUiSettings, useUpdateProduct } from '../../api/hooks'
 import type { PriceFormat, Product } from '../../api/types'
 import TimePicker from '../TimePicker'
 import {
   CHECK_INTERVAL_HOUR_STEP,
+  formatPrice,
   DEFAULT_CHECK_TIME_HHMM,
   MIN_CHECK_INTERVAL_HOURS,
   intervalMinutesToHours,
   normalizeCheckTimeHHMM,
   normalizeIntervalHoursToMinutes,
 } from '../../utils/format'
+import { checkFailureMessage } from '../../utils/scrapeFailure'
 import { inputCls, labelCls } from '../../utils/styles'
 
-export default function ProductEditPanel({ product, onClose }: {
+export type EditFocusField = 'url' | 'selector'
+
+export default function ProductEditPanel({ product, onClose, focusRequest }: {
   product: Product
   onClose: () => void
+  /** New object per request so asking for the same field twice refocuses it. */
+  focusRequest?: { field: EditFocusField } | null
 }) {
   const { data: settings } = useUiSettings()
   const updateMutation = useUpdateProduct(product.id)
+  const checkMutation = useCheckProduct()
 
   const [editForm, setEditForm] = useState({
     name: product.name,
@@ -37,6 +44,32 @@ export default function ProductEditPanel({ product, onClose }: {
     active: product.active && product.check_interval_minutes > 0,
   })
   const [editImageError, setEditImageError] = useState<string | null>(null)
+  const urlRef = useRef<HTMLInputElement>(null)
+  const selectorRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (!focusRequest) return
+    const input = focusRequest.field === 'url' ? urlRef.current : selectorRef.current
+    input?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    input?.focus({ preventScroll: true })
+  }, [focusRequest])
+
+  // Check right away with the new URL/selector: the failure warning otherwise
+  // lingers until the next scheduled run. mutateAsync, not per-call callbacks —
+  // the panel unmounts on save and those would never fire.
+  const recheck = () => {
+    const toastId = toast.loading('Checking price…')
+    checkMutation.mutateAsync(product.id).then(
+      (data) => {
+        if (data.price !== null) {
+          toast.success(`Price found: ${formatPrice(data.price, settings?.date_format, product.currency)}`, { id: toastId })
+        } else {
+          toast.error(checkFailureMessage(data), { id: toastId })
+        }
+      },
+      (err: Error) => toast.error(err.message || 'Check failed', { id: toastId }),
+    )
+  }
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault()
@@ -45,6 +78,10 @@ export default function ProductEditPanel({ product, onClose }: {
       setEditImageError('Please enter the original image URL (https://...), not a local cached path.')
       return
     }
+    const scrapeInputsChanged =
+      editForm.url !== product.url ||
+      editForm.selector !== product.selector ||
+      editForm.price_format !== (product.price_format ?? 'auto')
     updateMutation.mutate(
       {
         ...editForm,
@@ -60,6 +97,7 @@ export default function ProductEditPanel({ product, onClose }: {
       {
         onSuccess: () => {
           toast.success('Product updated')
+          if (scrapeInputsChanged) recheck()
           onClose()
         },
         onError: (err: Error) => toast.error(err?.message ?? 'Save failed'),
@@ -119,11 +157,11 @@ export default function ProductEditPanel({ product, onClose }: {
             </div>
             <div className="col-span-2">
               <label className={labelCls}>URL</label>
-              <input type="url" value={editForm.url} onChange={(e) => setEditForm({ ...editForm, url: e.target.value })} className={inputCls} />
+              <input ref={urlRef} type="url" value={editForm.url} onChange={(e) => setEditForm({ ...editForm, url: e.target.value })} className={inputCls} />
             </div>
             <div className="col-span-2">
               <label className={labelCls}>CSS selector</label>
-              <input type="text" value={editForm.selector} onChange={(e) => setEditForm({ ...editForm, selector: e.target.value })} className={`${inputCls} font-mono text-xs`} />
+              <input ref={selectorRef} type="text" value={editForm.selector} onChange={(e) => setEditForm({ ...editForm, selector: e.target.value })} className={`${inputCls} font-mono text-xs`} />
             </div>
             <div className="col-span-2">
               <label className={labelCls}>Price number format <span className="font-normal text-gray-400">(when prices parse wrong)</span></label>

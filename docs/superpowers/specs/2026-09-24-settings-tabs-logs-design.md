@@ -140,6 +140,7 @@ set until done.
 
 `ScrapeResult` gains two fields (defaults keep existing constructors valid):
 
+- (Merged with v1.12.0, which introduced `ScrapeResult.error` with `FAILURE_*` codes: `timeout`, `page_error`, `unavailable`, `no_match`, `unparseable`. Those codes replace the ones below; `source` and `error_detail` are this feature's additions.)
 - `error: str | None` — one of `timeout`, `navigation` (exception during
   goto/context), `unavailable`, `no_match` (page loaded, no price from
   selector or fallbacks).

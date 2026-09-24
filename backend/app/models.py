@@ -64,6 +64,10 @@ class Product(Base):
     # (products where increasing value is good news).
     inverse_price: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0", nullable=False)
     consecutive_scrape_failures: Mapped[int] = mapped_column(Integer, default=0)
+    # Why the latest failed check found no price (scraper.FAILURE_* code) and
+    # when the current failure streak began; both cleared on a successful check.
+    last_scrape_error: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    scrape_failing_since: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     url_redirected: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     last_checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

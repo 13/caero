@@ -104,7 +104,7 @@ async def test_ld_json_fallback_reports_its_source():
 async def test_nothing_found_is_no_match():
     result = await scrape(FakePage())
     assert result.price is None
-    assert result.error == scraper.ERROR_NO_MATCH
+    assert result.error == scraper.FAILURE_NO_MATCH
     assert result.source is None
 
 
@@ -112,13 +112,13 @@ async def test_nothing_found_is_no_match():
 async def test_unavailable_page():
     result = await scrape(FakePage(selector_text="9.99", availability="Currently unavailable."))
     assert result.price is None
-    assert result.error == scraper.ERROR_UNAVAILABLE
+    assert result.error == scraper.FAILURE_UNAVAILABLE
 
 
 @pytest.mark.asyncio(loop_scope="session")
 async def test_navigation_error_keeps_detail():
     result = await scrape(FakePage(goto_error=RuntimeError("net::ERR_NAME_NOT_RESOLVED")))
-    assert result.error == scraper.ERROR_NAVIGATION
+    assert result.error == scraper.FAILURE_PAGE_ERROR
     assert "ERR_NAME_NOT_RESOLVED" in result.error_detail
 
 
@@ -130,7 +130,7 @@ async def test_timeout(monkeypatch):
     monkeypatch.setattr(scraper, "_scrape_price", slow)
     monkeypatch.setattr(scraper.settings, "scrape_timeout_seconds", 0.05)
     result = await scrape(FakePage())
-    assert result.error == scraper.ERROR_TIMEOUT
+    assert result.error == scraper.FAILURE_TIMEOUT
 
 
 def test_positional_constructor_still_works():

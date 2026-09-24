@@ -16,23 +16,26 @@ logger = logging.getLogger(__name__)
 _scrape_sem = asyncio.Semaphore(settings.scraper_concurrency)
 
 
-ERROR_TIMEOUT = "timeout"
-ERROR_NAVIGATION = "navigation"
-ERROR_UNAVAILABLE = "unavailable"
-ERROR_NO_MATCH = "no_match"
-
-
 @dataclass
 class ScrapeResult:
     price: float | None
     currency: str | None
     final_url: str | None
-    # Why no price was found (ERROR_*) — surfaced in the admin event log.
+    # Why no price was found (a FAILURE_* code), None on success. Shown to the
+    # user so "check failed" can say whether to fix the selector or wait it out.
     error: str | None = None
     # Which strategy produced the price: selector | ld_json | itemprop | data_price.
     # A product that only works via a fallback has a silently broken selector.
     source: str | None = None
+    # For FAILURE_PAGE_ERROR, the exception text — kept in the admin event log.
     error_detail: str | None = None
+
+
+FAILURE_TIMEOUT = "timeout"          # whole scrape exceeded SCRAPE_TIMEOUT_SECONDS
+FAILURE_PAGE_ERROR = "page_error"    # navigation/browser error (blocked, DNS, crash)
+FAILURE_UNAVAILABLE = "unavailable"  # page says the product is unavailable
+FAILURE_NO_MATCH = "no_match"        # selector matched nothing, no fallback price
+FAILURE_UNPARSEABLE = "unparseable"  # selector matched, text wasn't a price
 
 
 async def _is_unavailable(page: Page) -> bool:
@@ -143,7 +146,7 @@ async def scrape_price(
                 return await _scrape_price(browser, url, selector, price_format)
         except TimeoutError:
             logger.warning("scrape_price timed out after %ss for %s", timeout, url)
-            return ScrapeResult(None, None, None, error=ERROR_TIMEOUT)
+            return ScrapeResult(None, None, None, FAILURE_TIMEOUT)
 
 
 async def _scrape_price(
@@ -173,17 +176,19 @@ async def _scrape_price(
         # unrelated price elsewhere on the page.
         if await _is_unavailable(page):
             logger.info("Product page reports unavailable, returning no price: %s", url)
-            return ScrapeResult(None, None, await _current_url(page), error=ERROR_UNAVAILABLE)
+            return ScrapeResult(None, None, await _current_url(page), FAILURE_UNAVAILABLE)
 
         price = None
         currency = None
         source = None
+        selector_matched = False
 
         # Primary: user-supplied CSS selector
         try:
             await page.wait_for_selector(selector, timeout=10000)
             el = page.locator(selector).first
             if await el.count() > 0:
+                selector_matched = True
                 text = await el.inner_text()
                 price = parse_price(text, price_format)
                 currency = detect_currency(text)
@@ -211,17 +216,14 @@ async def _scrape_price(
             if price is not None:
                 source = "data_price"
 
-        return ScrapeResult(
-            price,
-            currency,
-            await _current_url(page),
-            error=None if price is not None else ERROR_NO_MATCH,
-            source=source,
-        )
+        error = None
+        if price is None:
+            error = FAILURE_UNPARSEABLE if selector_matched else FAILURE_NO_MATCH
+        return ScrapeResult(price, currency, await _current_url(page), error, source=source)
 
     except Exception as exc:
         logger.warning("scrape_price failed for %s: %s", url, exc)
-        return ScrapeResult(None, None, None, error=ERROR_NAVIGATION, error_detail=str(exc)[:300])
+        return ScrapeResult(None, None, None, FAILURE_PAGE_ERROR, error_detail=str(exc)[:300])
     finally:
         # Bounded: this cleanup also runs when the outer timeout fires, and a
         # browser wedged enough to trip that can wedge its own teardown too.

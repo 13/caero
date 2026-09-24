@@ -264,11 +264,36 @@ async def get_sparklines(
     user: User = Depends(require_user),
     db: AsyncSession = Depends(get_db, scope="function"),
 ) -> dict[int, list[SparklinePoint]]:
-    """Recent price points for all of the user's products, for dashboard sparklines."""
+    """Recent price trend for all of the user's products, for dashboard sparklines.
+
+    Prices are stored on change only, so the rows inside the window alone would
+    leave a stable price with one point or none — no line. Each series therefore
+    starts with the price in effect at the window start and ends with the
+    current price at "now": a price that never moved draws a flat line.
+    """
     from datetime import UTC, datetime, timedelta
 
     days = max(1, min(days, 365))
-    cutoff = datetime.now(UTC) - timedelta(days=days)
+    now = datetime.now(UTC)
+    cutoff = now - timedelta(days=days)
+
+    # Latest row before the window per product: the price in effect at cutoff.
+    before = (
+        select(PriceHistory.product_id, func.max(PriceHistory.scraped_at).label("at"))
+        .join(Product, Product.id == PriceHistory.product_id)
+        .where(Product.user_id == user.id, PriceHistory.scraped_at < cutoff)
+        .group_by(PriceHistory.product_id)
+        .subquery()
+    )
+    anchors = await db.execute(
+        select(PriceHistory.product_id, PriceHistory.price).join(
+            before,
+            (PriceHistory.product_id == before.c.product_id) & (PriceHistory.scraped_at == before.c.at),
+        )
+    )
+    out: dict[int, list[SparklinePoint]] = {}
+    for product_id, price in anchors.all():
+        out[product_id] = [SparklinePoint(t=cutoff, p=price)]
 
     result = await db.execute(
         select(PriceHistory.product_id, PriceHistory.price, PriceHistory.scraped_at)
@@ -276,10 +301,11 @@ async def get_sparklines(
         .where(Product.user_id == user.id, PriceHistory.scraped_at >= cutoff)
         .order_by(PriceHistory.product_id, PriceHistory.scraped_at.asc())
     )
-
-    out: dict[int, list[SparklinePoint]] = {}
     for product_id, price, scraped_at in result.all():
         out.setdefault(product_id, []).append(SparklinePoint(t=scraped_at, p=price))
+
+    for points in out.values():
+        points.append(SparklinePoint(t=now, p=points[-1].p))
     return out
 
 
@@ -374,6 +400,7 @@ async def check_product_now(
 
     from app.scheduler import (
         check_url_redirect,
+        clear_scrape_failures,
         log_scrape_failure,
         log_scrape_skipped,
         log_scrape_success,
@@ -400,10 +427,17 @@ async def check_product_now(
 
     if result.price is None:
         log_scrape_failure(db, product, result, duration_ms=duration_ms, manual=True)
-        return CheckResult(product_id=product_id, price=None, error="Could not scrape price")
+        # A manual check doesn't extend the streak, but its reason is the freshest.
+        if product.consecutive_scrape_failures > 0 and result.error:
+            product.last_scrape_error = result.error
+        return CheckResult(
+            product_id=product_id,
+            price=None,
+            error="Could not scrape price",
+            reason=result.error,
+        )
 
-    if product.consecutive_scrape_failures > 0:
-        product.consecutive_scrape_failures = 0
+    clear_scrape_failures(product)
 
     price = Decimal(str(result.price)).quantize(Decimal("0.01"))
 

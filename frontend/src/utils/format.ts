@@ -124,3 +124,6 @@ export function formatDuration(ms: number | null) {
   return `${Math.floor(totalSeconds / 60)} min ${totalSeconds % 60} s`
 }
 
+export function pluralize(count: number, singular: string, plural = `${singular}s`) {
+  return count === 1 ? singular : plural
+}

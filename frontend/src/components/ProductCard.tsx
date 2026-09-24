@@ -5,9 +5,11 @@ import { useState } from 'react'
 import type { Product, SparklinePoint } from '../api/types'
 import { useCheckProduct, useDeleteProduct, useUiSettings } from '../api/hooks'
 import { currencySymbol, formatDate, formatIntervalHours, formatPercent, formatPrice, priceChangeSentiment } from '../utils/format'
+import { checkFailureMessage, hasHealthIssue } from '../utils/scrapeFailure'
 import { getTagColorClass } from '../utils/tags'
 import ConfirmDialog from './ConfirmDialog'
 import Sparkline from './Sparkline'
+import { ProductHealthNotice } from './ProductHealth'
 
 interface ProductCardProps {
   product: Product
@@ -33,6 +35,10 @@ export default function ProductCard({ product, onKeywordClick, hasActiveAlerts, 
     : checkIntervalHours
   const pct = product.last_price_change_percent !== null ? parseFloat(product.last_price_change_percent) : null
   const displaySrc = product.cached_image_url ?? product.image_url
+  const productLink = `/products/${product.id}${searchSuffix}`
+  const hasTrend = (sparkline?.length ?? 0) >= 2
+  // The trend slot holds a health notice instead of the chart when there is one.
+  const showSlot = sparkline !== undefined || hasHealthIssue(product)
 
   const handleDelete = () => {
     setShowDeleteConfirm(true)
@@ -111,28 +117,6 @@ export default function ProductCard({ product, onKeywordClick, hasActiveAlerts, 
           </div>
         </div>
 
-        {/* Warning banners — link straight to the product to fix the issue */}
-        {product.url_redirected && (
-          <Link
-            to={`/products/${product.id}${searchSuffix}`}
-            className="text-xs px-3 py-2 rounded-lg bg-yellow-50 text-yellow-800 border border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-300 dark:border-yellow-800/50 flex items-center gap-2 hover:bg-yellow-100 dark:hover:bg-yellow-900/50 transition-colors"
-          >
-            <span className="font-semibold">URL redirected</span>
-            <span>— update the product URL</span>
-          </Link>
-        )}
-        {product.consecutive_scrape_failures > 0 && (
-          <Link
-            to={`/products/${product.id}${searchSuffix}`}
-            className="text-xs px-3 py-2 rounded-lg bg-orange-50 text-orange-700 border border-orange-200 dark:bg-orange-900/30 dark:text-orange-300 dark:border-orange-800/50 flex items-center gap-2 hover:bg-orange-100 dark:hover:bg-orange-900/50 transition-colors"
-          >
-            <span className="font-semibold px-1.5 py-0.5 rounded bg-orange-100 dark:bg-orange-900 leading-none">
-              {product.consecutive_scrape_failures}
-            </span>
-            <span>Failed checks (selector may be broken)</span>
-          </Link>
-        )}
-
         {/* Tags + category */}
         {(product.category || product.tags.length > 0) && (
           <div className="flex flex-wrap items-center gap-1.5">
@@ -173,17 +157,29 @@ export default function ProductCard({ product, onKeywordClick, hasActiveAlerts, 
           <span className="truncate">{product.url}</span>
         </a>
 
-        {/* Sparkline — recent price trend, opens the detail page */}
-        {sparkline && sparkline.length >= 2 && (
-          <Link to={`/products/${product.id}${searchSuffix}`} className="block mt-auto pt-2">
-            <Sparkline points={sparkline} invert={product.inverse_price} />
-          </Link>
+        {/* Trend slot: health notice if tracking is off, else the recent price
+            trend — both open the detail page. Always present while sparklines
+            are on, so cards line up whatever state they're in. */}
+        {showSlot && (
+          <div className="mt-auto pt-2">
+            {hasHealthIssue(product) ? (
+              <ProductHealthNotice product={product} to={productLink} />
+            ) : hasTrend ? (
+              <Link to={productLink} className="block">
+                <Sparkline points={sparkline!} invert={product.inverse_price} />
+              </Link>
+            ) : (
+              <p className="h-7 flex items-center text-xs text-gray-400 dark:text-gray-500">
+                {product.latest_price === null ? 'No price history yet' : ''}
+              </p>
+            )}
+          </div>
         )}
 
         {/* Price + change — pushed to bottom, opens the detail page */}
         <Link
           to={`/products/${product.id}${searchSuffix}`}
-          className={`flex items-end justify-between pt-3 border-t border-gray-100 dark:border-gray-800 ${sparkline && sparkline.length >= 2 ? '' : 'mt-auto'}`}
+          className={`flex items-end justify-between pt-3 border-t border-gray-100 dark:border-gray-800 ${showSlot ? '' : 'mt-auto'}`}
         >
           <div>
             <p className="text-xs text-gray-400 dark:text-gray-500 mb-0.5">Latest price</p>
@@ -225,10 +221,8 @@ export default function ProductCard({ product, onKeywordClick, hasActiveAlerts, 
               onSuccess: (data) => {
                 if (data.price !== null) {
                   toast.success(`Successfully checked: ${currencySymbol(product.currency)}${data.price}`)
-                } else if (data.error) {
-                  toast.error(data.error)
                 } else {
-                  toast.error('No price found (check selector)')
+                  toast.error(checkFailureMessage(data))
                 }
               },
               onError: (err) => toast.error(err.message || 'Check failed')

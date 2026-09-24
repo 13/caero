@@ -21,7 +21,8 @@ export default function Sparkline({ points, className = '', invert = false }: {
     // 100×28 viewBox with 2px vertical padding
     const coords = points.map((_, i) => {
       const x = ((xs[i] - minX) / spanX) * 100
-      const y = 26 - ((ys[i] - minY) / spanY) * 24
+      // A price that never moved sits mid-height, not on the floor.
+      const y = maxY === minY ? 14 : 26 - ((ys[i] - minY) / spanY) * 24
       return `${x.toFixed(1)},${y.toFixed(1)}`
     })
     return {

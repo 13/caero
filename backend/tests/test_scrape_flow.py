@@ -12,7 +12,7 @@ import app.scheduler as scheduler_mod
 from app.browser import set_browser
 from app.database import AsyncSessionLocal, run_migrations
 from app.models import Alert, EventLog, PriceHistory, Product, User
-from app.scraper import ScrapeResult
+from app.scraper import FAILURE_NO_MATCH, FAILURE_TIMEOUT, ScrapeResult
 
 
 @pytest.fixture(autouse=True)
@@ -141,6 +141,31 @@ async def test_failure_threshold_and_recovery_notifications(monkeypatch, sent_no
     recovered = [n for n in sent_notifications["notify"] if "Recovered" in n["message"].title]
     assert len(recovered) == 1
     assert (await product_by_id(pid)).consecutive_scrape_failures == 0
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_failure_streak_records_reason_and_start(monkeypatch, sent_notifications):
+    pid = await make_product("flow-reason")
+
+    scrape_returning(monkeypatch, ScrapeResult(None, None, None, FAILURE_NO_MATCH))
+    await scheduler_mod.scrape_and_record(pid)
+    first = await product_by_id(pid)
+    assert first.last_scrape_error == FAILURE_NO_MATCH
+    assert first.scrape_failing_since is not None
+
+    # The streak start stays put; the reason follows the latest check.
+    scrape_returning(monkeypatch, ScrapeResult(None, None, None, FAILURE_TIMEOUT))
+    await scheduler_mod.scrape_and_record(pid)
+    second = await product_by_id(pid)
+    assert second.last_scrape_error == FAILURE_TIMEOUT
+    assert second.scrape_failing_since == first.scrape_failing_since
+
+    scrape_returning(monkeypatch, ScrapeResult(9.5, "EUR", "https://shop.example/item"))
+    await scheduler_mod.scrape_and_record(pid)
+    recovered = await product_by_id(pid)
+    assert recovered.consecutive_scrape_failures == 0
+    assert recovered.last_scrape_error is None
+    assert recovered.scrape_failing_since is None
 
 
 @pytest.mark.asyncio(loop_scope="session")

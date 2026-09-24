@@ -11,12 +11,13 @@ import {
 } from '../api/hooks'
 import PriceChart, { type PricePoint } from '../components/PriceChart'
 import ProductHero from '../components/product-detail/ProductHero'
-import ProductEditPanel from '../components/product-detail/ProductEditPanel'
+import ProductEditPanel, { type EditFocusField } from '../components/product-detail/ProductEditPanel'
 import StatsStrip from '../components/product-detail/StatsStrip'
 import AlertsSection from '../components/product-detail/AlertsSection'
 import { AddPriceDialog, PricePointDialog } from '../components/product-detail/PriceDialogs'
 import ConfirmDialog from '../components/ConfirmDialog'
 import { currencySymbol } from '../utils/format'
+import { checkFailureMessage } from '../utils/scrapeFailure'
 import toast from 'react-hot-toast'
 
 const CHART_RANGES = [
@@ -48,6 +49,7 @@ export default function ProductDetail() {
   const checkMutation = useCheckProduct()
 
   const [editMode, setEditMode] = useState(false)
+  const [editFocus, setEditFocus] = useState<{ field: EditFocusField } | null>(null)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [selectedPoint, setSelectedPoint] = useState<PricePoint | null>(null)
   const [showAddPrice, setShowAddPrice] = useState(false)
@@ -95,10 +97,8 @@ export default function ProductDetail() {
       onSuccess: (data) => {
         if (data.price !== null) {
           toast.success(`Successfully checked: ${currencySymbol(product?.currency)}${data.price}`)
-        } else if (data.error) {
-          toast.error(data.error)
         } else {
-          toast.error('No price found (check selector)')
+          toast.error(checkFailureMessage(data))
         }
       },
       onError: (err) => toast.error(err.message || 'Check failed'),
@@ -171,9 +171,24 @@ export default function ProductDetail() {
         product={product}
         onToggleActive={handleToggleActive}
         togglePending={updateMutation.isPending}
+        onCheckNow={runCheckNow}
+        checkPending={checkMutation.isPending}
+        onEdit={(field) => {
+          setEditMode(true)
+          setEditFocus({ field })
+        }}
       />
 
-      {editMode && <ProductEditPanel product={product} onClose={() => setEditMode(false)} />}
+      {editMode && (
+        <ProductEditPanel
+          product={product}
+          focusRequest={editFocus}
+          onClose={() => {
+            setEditMode(false)
+            setEditFocus(null)
+          }}
+        />
+      )}
 
       <ConfirmDialog
         open={showDeleteConfirm}

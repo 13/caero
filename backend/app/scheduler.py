@@ -306,6 +306,13 @@ async def check_url_redirect(product: Product, final_url: str | None, db) -> Non
         product.url_redirected = False
 
 
+def clear_scrape_failures(product: Product) -> None:
+    """Reset the failure streak after a check that found a price."""
+    product.consecutive_scrape_failures = 0
+    product.last_scrape_error = None
+    product.scrape_failing_since = None
+
+
 async def scrape_and_record(product_id: int) -> str | None:
     """Scrape the current price for a product and persist it.
 
@@ -426,7 +433,10 @@ async def _scrape_and_record_locked(product_id: int, browser) -> str | None:
 
         if result.price is None:
             logger.warning("Could not scrape price for product %d (%s)", product_id, product.url)
+            if product.consecutive_scrape_failures == 0:
+                product.scrape_failing_since = datetime.now(UTC)
             product.consecutive_scrape_failures += 1
+            product.last_scrape_error = result.error
             _record_scrape_failure(product_id)
             log_scrape_failure(db, product, result, duration_ms=duration_ms)
 
@@ -520,8 +530,7 @@ async def _scrape_and_record_locked(product_id: int, browser) -> str | None:
                     links=product_links(product.id, product.url),
                 ),
             )
-        if product.consecutive_scrape_failures > 0:
-            product.consecutive_scrape_failures = 0
+        clear_scrape_failures(product)
 
         price = Decimal(str(result.price)).quantize(Decimal("0.01"))
 

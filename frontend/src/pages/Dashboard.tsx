@@ -251,7 +251,7 @@ export default function Dashboard() {
                   isUpdating={updatingProductIds.has(p.id)}
                   isStarred={starredIds.includes(p.id)}
                   onToggleStar={handleToggleStar}
-                  sparkline={showSparklines ? sparklines?.[p.id] : undefined}
+                  sparkline={showSparklines ? (sparklines?.[p.id] ?? []) : undefined}
                 />
               ))}
             </div>
@@ -266,7 +266,7 @@ export default function Dashboard() {
               onToggleActive={handleToggleActive}
               hasActiveAlerts={hasAlertsActive}
               onSearchTerm={updateSearchTerm}
-              sparklines={showSparklines ? sparklines : undefined}
+              sparklines={showSparklines ? (sparklines ?? {}) : undefined}
             />
           )}
 

@@ -10,6 +10,7 @@ import {
   formatRelativeTime,
   normalizeCheckTimeHHMM,
   normalizeIntervalHoursToMinutes,
+  pluralize,
   priceChangeSentiment,
 } from './format'
 
@@ -146,5 +147,14 @@ describe('formatDuration', () => {
     expect(formatDuration(125000)).toBe('2 min 5 s')
     expect(formatDuration(119600)).toBe('2 min 0 s')
     expect(formatDuration(null)).toBe('—')
+  })
+})
+
+describe('pluralize', () => {
+  it('picks singular only for exactly one', () => {
+    expect(pluralize(1, 'check')).toBe('check')
+    expect(pluralize(0, 'check')).toBe('checks')
+    expect(pluralize(3, 'check')).toBe('checks')
+    expect(pluralize(2, 'entry', 'entries')).toBe('entries')
   })
 })

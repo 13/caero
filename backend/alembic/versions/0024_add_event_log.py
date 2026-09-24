@@ -1,13 +1,13 @@
 """Add event_log — operational events for the admin Logs tab.
 
-Revision ID: 0023
-Revises: 0022
+Revision ID: 0024
+Revises: 0023
 """
 from alembic import op
 import sqlalchemy as sa
 
-revision = "0023"
-down_revision = "0022"
+revision = "0024"
+down_revision = "0023"
 branch_labels = None
 depends_on = None
 
