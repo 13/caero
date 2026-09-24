@@ -103,7 +103,16 @@ export default function LogsTab() {
 
   useEffect(() => {
     if (search.trim() === filters.q) return
-    const timer = setTimeout(() => update({ q: search }), 300)
+    const timer = setTimeout(() => {
+      setExpanded(new Set())
+      // Read the latest URL state when the timer fires, not what was captured
+      // when it started — otherwise a level/category change made within the
+      // debounce window gets reverted by this stale search update.
+      setSearchParams(
+        (prev) => writeLogFilters(prev, { ...parseLogFilters(prev), q: search }),
+        { replace: true },
+      )
+    }, 300)
     return () => clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search])

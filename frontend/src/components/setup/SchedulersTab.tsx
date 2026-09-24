@@ -1,5 +1,6 @@
 import { Clock, Loader2, Play, Wrench } from 'lucide-react'
 import { Link } from 'react-router-dom'
+import { ApiError } from '../../api/client'
 import { useJobs, useMe, useRunJob, useUiSettings } from '../../api/hooks'
 import type { JobOut, JobStatus } from '../../api/types'
 import { formatDateTime, formatDuration, formatRelativeTime } from '../../utils/format'
@@ -88,7 +89,8 @@ export default function SchedulersTab({ showToast }: { showToast: (msg: string) 
   const run = (job: JobOut) =>
     runJob.mutate(job.id, {
       onSuccess: () => showToast(`Queued: ${job.name}`),
-      onError: (err) => showToast(err.message || 'Could not start the job'),
+      onError: (err) =>
+        showToast(err instanceof ApiError && err.status === 404 ? 'Job no longer exists' : err.message || 'Could not start the job'),
     })
 
   const renderRows = (list: JobOut[]) => (
