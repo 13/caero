@@ -355,9 +355,32 @@ class SystemInfoOut(BaseModel):
 
 class JobOut(BaseModel):
     id: str
+    kind: Literal["product", "maintenance"]
+    name: str
+    product_id: int | None = None
+    owner: str | None = None
+    schedule: str
     next_run_time: datetime | None
+    last_run_at: datetime | None = None
+    last_status: Literal["ok", "failed", "skipped"] | None = None
+    last_duration_ms: int | None = None
+    last_message: str | None = None
+    consecutive_failures: int = 0
+    running: bool = False
 
-    model_config = {"from_attributes": True}
+    @field_validator("last_run_at")
+    @classmethod
+    def _assume_utc(cls, value: datetime | None) -> datetime | None:
+        return value.replace(tzinfo=UTC) if value is not None and value.tzinfo is None else value
+
+
+class JobsOut(BaseModel):
+    jobs: list[JobOut]
+    check_all_running: bool
+
+
+class JobRunOut(BaseModel):
+    queued: bool
 
 
 class EventLogOut(BaseModel):

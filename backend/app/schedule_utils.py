@@ -60,3 +60,13 @@ def jitter_window_seconds(
         window = min(window, max(max_seconds, 0))
     return window
 
+
+def describe_schedule(interval_minutes: int, check_time_hhmm: str) -> str:
+    """Human-readable schedule for the admin Schedulers tab."""
+    if interval_minutes % 1440 == 0:
+        days = interval_minutes // 1440
+        return f"Daily at {check_time_hhmm}" if days == 1 else f"Every {days} d at {check_time_hhmm}"
+    if interval_minutes % 60 == 0:
+        return f"Every {interval_minutes // 60} h from {check_time_hhmm}"
+    return f"Every {interval_minutes} min from {check_time_hhmm}"
+

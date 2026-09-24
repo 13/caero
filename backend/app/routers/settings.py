@@ -14,10 +14,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import PROJECT_VERSION, settings
 from app.database import get_db
-from app.events import EventCategory, EventLevel
+from app.events import SCRAPE_RESULT_EVENTS, EventCategory, EventLevel
 from app.images import schedule_image_download
 from app.models import Alert, AppSettings, EventLog, PriceHistory, Product, SelectorDefault, User
 from app.routers.auth import require_admin, require_user
+from app.schedule_utils import describe_schedule
 from app.scheduler import add_product_job, remove_product_job
 from app.schemas import (
     AppSettingsIn,
@@ -26,6 +27,8 @@ from app.schemas import (
     EventLogOut,
     EventLogPage,
     JobOut,
+    JobRunOut,
+    JobsOut,
     NotificationChannelStatusOut,
     SelectorDefaultIn,
     SelectorDefaultOut,
@@ -361,16 +364,128 @@ async def system_info(
     )
 
 
-@router.get("/jobs", response_model=list[JobOut])
-async def list_jobs(
-    _user=Depends(require_admin),
-) -> list[JobOut]:
-    from app.scheduler import scheduler
+_STATUS_BY_EVENT = {
+    "scrape_ok": "ok",
+    "scrape_unchanged": "ok",
+    "scrape_failed": "failed",
+    "scrape_skipped": "skipped",
+}
 
-    jobs = []
-    for job in scheduler.get_jobs():
-        jobs.append(JobOut(id=job.id, next_run_time=job.next_run_time))
-    return jobs
+
+def _last_status(row: EventLog | None) -> str | None:
+    if row is None:
+        return None
+    if row.event in _STATUS_BY_EVENT:
+        return _STATUS_BY_EVENT[row.event]
+    return "failed" if row.level == "error" else "ok"
+
+
+@router.get("/jobs", response_model=JobsOut)
+async def list_jobs(
+    db: AsyncSession = Depends(get_db, scope="function"),
+    _user=Depends(require_admin),
+) -> JobsOut:
+    from app.scheduler import (
+        MAINTENANCE_JOBS,
+        RUN_NOW_SUFFIX,
+        check_all_in_progress,
+        product_id_from_job,
+        scheduler,
+        scrape_in_progress,
+    )
+
+    jobs = [j for j in scheduler.get_jobs() if not j.id.endswith(RUN_NOW_SUFFIX)]
+    product_ids = [pid for j in jobs if (pid := product_id_from_job(j.id)) is not None]
+
+    products: dict[int, tuple[Product, str]] = {}
+    last_scrape: dict[int, EventLog] = {}
+    if product_ids:
+        rows = await db.execute(
+            select(Product, User.username).join(User, Product.user_id == User.id).where(Product.id.in_(product_ids))
+        )
+        products = {p.id: (p, username) for p, username in rows.all()}
+        newest = (
+            select(func.max(EventLog.id))
+            .where(EventLog.product_id.in_(product_ids), EventLog.event.in_(SCRAPE_RESULT_EVENTS))
+            .group_by(EventLog.product_id)
+        )
+        for row in (await db.execute(select(EventLog).where(EventLog.id.in_(newest)))).scalars():
+            last_scrape[row.product_id] = row
+
+    maintenance_events = [spec["event"] for spec in MAINTENANCE_JOBS.values()]
+    newest_maintenance = (
+        select(func.max(EventLog.id)).where(EventLog.event.in_(maintenance_events)).group_by(EventLog.event)
+    )
+    last_maintenance = {
+        row.event: row
+        for row in (await db.execute(select(EventLog).where(EventLog.id.in_(newest_maintenance)))).scalars()
+    }
+
+    out: list[JobOut] = []
+    for job in jobs:
+        next_run = getattr(job, "next_run_time", None)
+        pid = product_id_from_job(job.id)
+        if pid is not None:
+            product, owner = products.get(pid, (None, None))
+            last = last_scrape.get(pid)
+            out.append(JobOut(
+                id=job.id,
+                kind="product",
+                name=product.name if product else f"Product #{pid}",
+                product_id=pid,
+                owner=owner,
+                schedule=(
+                    describe_schedule(product.check_interval_minutes, product.check_time_hhmm)
+                    if product else "—"
+                ),
+                next_run_time=next_run,
+                last_run_at=last.created_at if last else None,
+                last_status=_last_status(last),
+                last_duration_ms=last.duration_ms if last else None,
+                last_message=last.message if last else None,
+                consecutive_failures=product.consecutive_scrape_failures if product else 0,
+                running=scrape_in_progress(pid),
+            ))
+        else:
+            spec = MAINTENANCE_JOBS.get(job.id)
+            last = last_maintenance.get(spec["event"]) if spec else None
+            out.append(JobOut(
+                id=job.id,
+                kind="maintenance",
+                name=spec["name"] if spec else job.id,
+                schedule=f"Daily at {spec['hour']:02d}:{spec['minute']:02d}" if spec else str(job.trigger),
+                next_run_time=next_run,
+                last_run_at=last.created_at if last else None,
+                last_status=_last_status(last),
+                last_message=last.message if last else None,
+            ))
+
+    far_future = datetime.max.replace(tzinfo=UTC)
+    out.sort(key=lambda j: (j.last_status != "failed", j.next_run_time or far_future))
+    return JobsOut(jobs=out, check_all_running=check_all_in_progress())
+
+
+@router.post("/jobs/{job_id}/run", response_model=JobRunOut, status_code=status.HTTP_202_ACCEPTED)
+async def run_job_now(job_id: str, _user=Depends(require_admin)) -> JobRunOut:
+    from app.scheduler import RUN_NOW_SUFFIX, scheduler
+
+    job = scheduler.get_job(job_id)
+    if job is None or job_id.endswith(RUN_NOW_SUFFIX):
+        raise HTTPException(status_code=404, detail="Job not found")
+    # A separate one-off job: modify_job(next_run_time=now) would re-anchor the
+    # interval trigger and drift the product away from its check time. The
+    # per-product lock still serialises it against a scheduled run.
+    scheduler.add_job(
+        job.func,
+        "date",
+        run_date=datetime.now(UTC),
+        args=job.args,
+        kwargs=job.kwargs,
+        id=job_id + RUN_NOW_SUFFIX,
+        replace_existing=True,
+        misfire_grace_time=None,
+    )
+    return JobRunOut(queued=True)
 
 
 def _escape_like(value: str) -> str:

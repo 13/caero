@@ -96,6 +96,12 @@ def product_scrape_lock(product_id: int) -> asyncio.Lock:
     return _product_locks[product_id]
 
 
+def scrape_in_progress(product_id: int) -> bool:
+    # .get, not product_scrape_lock(): looking must not create a lock.
+    lock = _product_locks.get(product_id)
+    return lock is not None and lock.locked()
+
+
 def evaluate_alert(
     condition: str,
     threshold_price: Decimal | None,
@@ -710,6 +716,8 @@ def remove_product_job(product_id: int) -> None:
     if scheduler.get_job(job_id):
         scheduler.remove_job(job_id)
         logger.debug("Removed job %s", job_id)
+    if scheduler.get_job(job_id + RUN_NOW_SUFFIX):
+        scheduler.remove_job(job_id + RUN_NOW_SUFFIX)
 
 
 async def load_all_jobs() -> None:
