@@ -8,20 +8,23 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from email.message import EmailMessage
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
-from sqlalchemy import select, text
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
+from sqlalchemy import func, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import PROJECT_VERSION, settings
 from app.database import get_db
+from app.events import EventCategory, EventLevel
 from app.images import schedule_image_download
-from app.models import Alert, AppSettings, PriceHistory, Product, SelectorDefault, User
+from app.models import Alert, AppSettings, EventLog, PriceHistory, Product, SelectorDefault, User
 from app.routers.auth import require_admin, require_user
 from app.scheduler import add_product_job, remove_product_job
 from app.schemas import (
     AppSettingsIn,
     AppSettingsOut,
     DataExportPayload,
+    EventLogOut,
+    EventLogPage,
     JobOut,
     NotificationChannelStatusOut,
     SelectorDefaultIn,
@@ -368,6 +371,47 @@ async def list_jobs(
     for job in scheduler.get_jobs():
         jobs.append(JobOut(id=job.id, next_run_time=job.next_run_time))
     return jobs
+
+
+def _escape_like(value: str) -> str:
+    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
+@router.get("/logs", response_model=EventLogPage)
+async def list_event_log(
+    level: list[EventLevel] = Query(default=[]),
+    category: list[EventCategory] = Query(default=[]),
+    product_id: int | None = Query(default=None, ge=1),
+    q: str | None = Query(default=None, max_length=200),
+    before_id: int | None = Query(default=None, ge=1),
+    limit: int = Query(default=100, ge=1, le=500),
+    db: AsyncSession = Depends(get_db, scope="function"),
+    _admin: User = Depends(require_admin),
+) -> EventLogPage:
+    # Keyset pagination on id: stable while new events keep arriving.
+    stmt = select(EventLog).order_by(EventLog.id.desc()).limit(limit)
+    if before_id is not None:
+        stmt = stmt.where(EventLog.id < before_id)
+    if level:
+        stmt = stmt.where(EventLog.level.in_(level))
+    if category:
+        stmt = stmt.where(EventLog.category.in_(category))
+    if product_id is not None:
+        stmt = stmt.where(EventLog.product_id == product_id)
+    if q and q.strip():
+        pattern = f"%{_escape_like(q.strip().lower())}%"
+        stmt = stmt.where(
+            or_(
+                func.lower(EventLog.message).like(pattern, escape="\\"),
+                func.lower(EventLog.product_name).like(pattern, escape="\\"),
+            )
+        )
+
+    rows = (await db.execute(stmt)).scalars().all()
+    return EventLogPage(
+        items=[EventLogOut.model_validate(r) for r in rows],
+        next_before_id=rows[-1].id if len(rows) == limit else None,
+    )
 
 
 # ── Import / export ────────────────────────────────────────────────────────────

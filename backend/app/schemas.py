@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any, Literal
 
@@ -358,3 +358,29 @@ class JobOut(BaseModel):
     next_run_time: datetime | None
 
     model_config = {"from_attributes": True}
+
+
+class EventLogOut(BaseModel):
+    id: int
+    created_at: datetime
+    level: str
+    category: str
+    event: str
+    product_id: int | None
+    product_name: str | None
+    message: str
+    duration_ms: int | None
+    details: dict[str, Any] | None
+
+    model_config = {"from_attributes": True}
+
+    @field_validator("created_at")
+    @classmethod
+    def _assume_utc(cls, value: datetime) -> datetime:
+        # SQLite hands back naive datetimes; they are UTC (func.now / datetime.now(UTC)).
+        return value.replace(tzinfo=UTC) if value.tzinfo is None else value
+
+
+class EventLogPage(BaseModel):
+    items: list[EventLogOut]
+    next_before_id: int | None
