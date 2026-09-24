@@ -22,6 +22,7 @@ from app.models import Alert, PriceHistory, Product, User
 from app.notifier import Notification, caero_url, format_price, notify, product_links, send_alert
 
 if TYPE_CHECKING:
+    from app.maintenance import MaintenanceConfig
     from app.scraper import ScrapeResult
 
 logger = logging.getLogger(__name__)
@@ -54,12 +55,20 @@ _storm_notified_users: set[int] = set()
 # One "Check all" pass at a time (see run_check_all).
 _check_all_running = False
 
-# Nightly maintenance jobs, registered in main.py. One table so the Schedulers
-# tab can name them and find their last run in the event log.
+# Nightly maintenance jobs, scheduled by apply_maintenance_schedule. One table
+# so the Schedulers tab can name them and find their last run in the event
+# log. "key" names the job in app.maintenance.MaintenanceConfig.
 MAINTENANCE_JOBS: dict[str, dict] = {
-    "maintenance_backup": {"name": "Nightly backup", "event": "backup", "hour": 3, "minute": 30},
-    "maintenance_retention": {"name": "Nightly retention", "event": "retention", "hour": 4, "minute": 0},
+    "maintenance_backup": {
+        "name": "Nightly backup", "event": "backup", "func": "app.backup:run_backup", "key": "backup",
+    },
+    "maintenance_retention": {
+        "name": "Nightly retention", "event": "retention", "func": "app.retention:run_nightly_retention",
+        "key": "retention",
+    },
 }
+# A busy loop at 03:30 must delay the backup, not drop it for the night.
+MAINTENANCE_MISFIRE_GRACE_SECONDS = 3600
 
 RUN_NOW_SUFFIX = "__run_now"
 
@@ -783,6 +792,45 @@ def _on_job_event(ev) -> None:
             product_id=product_id,
             details={"job_id": ev.job_id, "exception": repr(ev.exception)[:300]},
         )
+
+
+def apply_maintenance_schedule(config: MaintenanceConfig) -> None:
+    """(Re)schedule the nightly maintenance jobs.
+
+    A disabled job stays registered but paused, so the Schedulers tab still
+    lists it and "Run now" still works.
+    """
+    from apscheduler.triggers.cron import CronTrigger
+
+    for job_id, spec in MAINTENANCE_JOBS.items():
+        hour, minute = map(int, config.time(spec["key"]).split(":"))
+        trigger = CronTrigger(hour=hour, minute=minute, timezone=scheduler.timezone)
+        if scheduler.get_job(job_id) is None:
+            paused = {} if config.enabled(spec["key"]) else {"next_run_time": None}
+            scheduler.add_job(
+                spec["func"], trigger, id=job_id,
+                misfire_grace_time=MAINTENANCE_MISFIRE_GRACE_SECONDS, coalesce=True, **paused,
+            )
+        else:
+            # reschedule_job also computes a fresh next run, i.e. resumes.
+            scheduler.reschedule_job(job_id, trigger=trigger)
+            if not config.enabled(spec["key"]):
+                scheduler.pause_job(job_id)
+
+
+def apply_maintenance_schedule_after_commit(db, config: MaintenanceConfig) -> None:
+    """Apply the schedule once db commits, so a failed commit can't leave the
+    scheduler running a config the DB never stored."""
+    from sqlalchemy import event
+
+    event.listen(db.sync_session, "after_commit", lambda _session: apply_maintenance_schedule(config), once=True)
+
+
+async def load_maintenance_schedule() -> None:
+    """Startup: schedule the maintenance jobs from the stored settings."""
+    from app.maintenance import load_maintenance_config
+
+    apply_maintenance_schedule(await load_maintenance_config())
 
 
 def install_job_listener() -> None:

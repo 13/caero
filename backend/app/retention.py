@@ -13,8 +13,8 @@ from decimal import Decimal
 
 from sqlalchemy import delete, select
 
-from app.config import settings
 from app.database import AsyncSessionLocal
+from app.maintenance import load_maintenance_config
 from app.models import EventLog, PriceHistory
 
 logger = logging.getLogger(__name__)
@@ -39,9 +39,13 @@ def select_ids_to_delete(
     return [row_id for row_id, _, _, _ in rows if row_id not in keep]
 
 
-async def thin_price_history() -> int:
-    """Run one thinning pass. Returns the number of deleted rows."""
-    days = settings.price_history_thin_after_days
+async def thin_price_history(days: int | None = None) -> int:
+    """Run one thinning pass. Returns the number of deleted rows.
+
+    days defaults to the effective PRICE_HISTORY_THIN_AFTER_DAYS (app.maintenance).
+    """
+    if days is None:
+        days = (await load_maintenance_config()).price_history_thin_after_days
     if days <= 0:
         return 0
 
@@ -74,9 +78,11 @@ async def thin_price_history() -> int:
     return len(to_delete)
 
 
-async def prune_event_log() -> int:
-    """Delete event-log rows older than EVENT_LOG_RETENTION_DAYS. Returns the count."""
-    days = settings.event_log_retention_days
+async def prune_event_log(days: int | None = None) -> int:
+    """Delete event-log rows older than the effective EVENT_LOG_RETENTION_DAYS
+    (or days, when given). Returns the count."""
+    if days is None:
+        days = (await load_maintenance_config()).event_log_retention_days
     if days <= 0:
         return 0
 
@@ -97,8 +103,9 @@ async def run_nightly_retention() -> None:
     from app.events import record_event
 
     try:
-        price_rows = await thin_price_history()
-        events_deleted = await prune_event_log()
+        config = await load_maintenance_config()
+        price_rows = await thin_price_history(config.price_history_thin_after_days)
+        events_deleted = await prune_event_log(config.event_log_retention_days)
     except Exception as exc:
         logger.exception("Nightly retention failed")
         await record_event(

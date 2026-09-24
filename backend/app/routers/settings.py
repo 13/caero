@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import smtplib
+from dataclasses import asdict
 from datetime import UTC, datetime
 from decimal import Decimal
 from email.message import EmailMessage
@@ -16,6 +17,7 @@ from app.config import PROJECT_VERSION, settings
 from app.database import get_db
 from app.events import SCRAPE_RESULT_EVENTS, EventCategory, EventLevel
 from app.images import schedule_image_download
+from app.maintenance import OVERRIDABLE_KNOBS, MaintenanceConfig, config_from_row, valid_hhmm
 from app.models import Alert, AppSettings, EventLog, PriceHistory, Product, SelectorDefault, User
 from app.routers.auth import require_admin, require_user
 from app.schedule_utils import describe_schedule
@@ -23,6 +25,7 @@ from app.scheduler import add_product_job, remove_product_job
 from app.schemas import (
     AppSettingsIn,
     AppSettingsOut,
+    AppSettingsPatch,
     DataExportPayload,
     EventLogOut,
     EventLogPage,
@@ -49,6 +52,8 @@ router = APIRouter(prefix="/settings", tags=["settings"])
 _IMPORTABLE_SETTINGS_KEYS = {
     "allow_registration", "date_format", "time_format", "telegram_bot_token", "public_url",
     "show_sparklines", "chart_line_style",
+    "backup_enabled", "backup_time", "retention_enabled", "retention_time",
+    *OVERRIDABLE_KNOBS,
 }
 
 
@@ -87,8 +92,60 @@ def _settings_out(row: AppSettings) -> AppSettingsOut:
         telegram_bot_token_set=bool(row.telegram_bot_token),
         public_url=row.public_url,
         public_url_env=settings.public_url,
+        backup_enabled=row.backup_enabled,
+        backup_time=row.backup_time,
+        retention_enabled=row.retention_enabled,
+        retention_time=row.retention_time,
+        **{name: getattr(row, name) for name in OVERRIDABLE_KNOBS},
+        **{f"{name}_env": getattr(settings, name) for name in OVERRIDABLE_KNOBS},
         updated_at=row.updated_at,
     )
+
+
+def _describe_maintenance_change(before: MaintenanceConfig, after: MaintenanceConfig) -> list[str]:
+    changes = []
+    for key, label in (("backup", "Backup"), ("retention", "Retention")):
+        if before.enabled(key) != after.enabled(key):
+            changes.append(f"{label} {'enabled' if after.enabled(key) else 'disabled'}")
+        if before.time(key) != after.time(key):
+            changes.append(f"{label} time {before.time(key)} → {after.time(key)}")
+    for name in OVERRIDABLE_KNOBS:
+        if getattr(before, name) != getattr(after, name):
+            changes.append(f"{name} {getattr(before, name)} → {getattr(after, name)}")
+    return changes
+
+
+async def _update_settings(db: AsyncSession, row: AppSettings, changes: dict, admin: User) -> None:
+    """Apply field changes to the settings row. Maintenance changes are logged
+    and reach the scheduler only once the request's transaction commits."""
+    before = config_from_row(row)
+    if "telegram_bot_token" in changes:
+        from app.notifier import configure_telegram
+        configure_telegram(changes["telegram_bot_token"])
+    if "public_url" in changes:
+        changes["public_url"] = changes["public_url"].strip().rstrip("/")
+        from app.notifier import configure_public_url
+        configure_public_url(changes["public_url"])
+    for field, value in changes.items():
+        setattr(row, field, value)
+    row.updated_at = datetime.now(UTC)
+    await db.flush()
+
+    after = config_from_row(row)
+    if after == before:
+        return
+    from app.events import log_event
+    from app.scheduler import apply_maintenance_schedule_after_commit
+
+    log_event(
+        db,
+        level="info",
+        category="maintenance",
+        event="maintenance_settings",
+        message=f"{admin.username}: " + "; ".join(_describe_maintenance_change(before, after)),
+        details={"by": admin.username, "before": asdict(before), "after": asdict(after)},
+    )
+    apply_maintenance_schedule_after_commit(db, after)
 
 
 @router.get("", response_model=AppSettingsOut)
@@ -104,22 +161,26 @@ async def get_settings(
 async def save_settings(
     body: AppSettingsIn,
     db: AsyncSession = Depends(get_db, scope="function"),
-    _admin: User = Depends(require_admin),
+    admin: User = Depends(require_admin),
 ) -> AppSettingsOut:
     row = await _get_or_create_settings(db)
-    row.allow_registration = body.allow_registration
-    row.date_format = body.date_format
-    row.time_format = body.time_format
-    if body.telegram_bot_token is not None:
-        row.telegram_bot_token = body.telegram_bot_token
-        from app.notifier import configure_telegram
-        configure_telegram(row.telegram_bot_token)
-    if body.public_url is not None:
-        row.public_url = body.public_url.strip().rstrip("/")
-        from app.notifier import configure_public_url
-        configure_public_url(row.public_url)
-    row.updated_at = datetime.now(UTC)
-    await db.flush()
+    await _update_settings(db, row, body.model_dump(exclude_none=True), admin)
+    return _settings_out(row)
+
+
+@router.patch("", response_model=AppSettingsOut)
+async def patch_settings(
+    body: AppSettingsPatch,
+    db: AsyncSession = Depends(get_db, scope="function"),
+    admin: User = Depends(require_admin),
+) -> AppSettingsOut:
+    row = await _get_or_create_settings(db)
+    changes = {
+        field: value
+        for field, value in body.model_dump(exclude_unset=True).items()
+        if value is not None or field in OVERRIDABLE_KNOBS
+    }
+    await _update_settings(db, row, changes, admin)
     return _settings_out(row)
 
 
@@ -417,6 +478,7 @@ async def list_jobs(
     newest_maintenance = (
         select(func.max(EventLog.id)).where(EventLog.event.in_(maintenance_events)).group_by(EventLog.event)
     )
+    maintenance = config_from_row(await db.get(AppSettings, 1))
     last_maintenance = {
         row.event: row
         for row in (await db.execute(select(EventLog).where(EventLog.id.in_(newest_maintenance)))).scalars()
@@ -446,19 +508,26 @@ async def list_jobs(
                 last_message=last.message if last else None,
                 consecutive_failures=product.consecutive_scrape_failures if product else 0,
                 running=scrape_in_progress(pid),
+                interval_minutes=product.check_interval_minutes if product else None,
+                time_hhmm=product.check_time_hhmm if product else None,
             ))
         else:
             spec = MAINTENANCE_JOBS.get(job.id)
             last = last_maintenance.get(spec["event"]) if spec else None
+            key = spec["key"] if spec else None
             out.append(JobOut(
                 id=job.id,
                 kind="maintenance",
                 name=spec["name"] if spec else job.id,
-                schedule=f"Daily at {spec['hour']:02d}:{spec['minute']:02d}" if spec else str(job.trigger),
+                schedule=f"Daily at {maintenance.time(key)}" if key else str(job.trigger),
                 next_run_time=next_run,
                 last_run_at=last.created_at if last else None,
                 last_status=_last_status(last),
                 last_message=last.message if last else None,
+                paused=bool(key) and not maintenance.enabled(key),
+                noop_reason=maintenance.noop_reason(key) if key else None,
+                interval_minutes=1440 if key else None,
+                time_hhmm=maintenance.time(key) if key else None,
             ))
 
     far_future = datetime.max.replace(tzinfo=UTC)
@@ -654,6 +723,25 @@ async def export_my_data(
     )
 
 
+def _importable_settings(raw: dict) -> dict:
+    """app_settings keys from an export, minus maintenance values that don't
+    validate (hand-edited files) — those fall back to their defaults."""
+    data = {key: value for key, value in raw.items() if key in _IMPORTABLE_SETTINGS_KEYS}
+    checks = {
+        "backup_enabled": lambda v: isinstance(v, bool),
+        "retention_enabled": lambda v: isinstance(v, bool),
+        "backup_time": valid_hhmm,
+        "retention_time": valid_hhmm,
+        **{name: lambda v: v is None or (isinstance(v, int) and not isinstance(v, bool) and v >= 0)
+           for name in OVERRIDABLE_KNOBS},
+    }
+    for key, is_valid in checks.items():
+        if key in data and not is_valid(data[key]):
+            logger.warning("Import: ignoring invalid app_settings.%s %r", key, data[key])
+            del data[key]
+    return data
+
+
 @router.post("/import")
 async def import_data(
     payload: DataExportPayload,
@@ -678,11 +766,7 @@ async def import_data(
     await db.execute(AppSettings.__table__.delete())
     await db.flush()
 
-    settings_data = {
-        key: value
-        for key, value in payload.app_settings.items()
-        if key in _IMPORTABLE_SETTINGS_KEYS
-    }
+    settings_data = _importable_settings(payload.app_settings)
     app_settings = AppSettings(id=1, **settings_data)
     db.add(app_settings)
 
@@ -761,6 +845,9 @@ async def import_data(
 
     await db.flush()
     await _reset_pg_sequences(db)
+
+    from app.scheduler import apply_maintenance_schedule_after_commit
+    apply_maintenance_schedule_after_commit(db, config_from_row(app_settings))
 
     imported_products = (await db.execute(select(Product))).scalars().all()
     for product in imported_products:

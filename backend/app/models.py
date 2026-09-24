@@ -160,6 +160,17 @@ class AppSettings(Base):
     telegram_bot_token: Mapped[str] = mapped_column(String(256), default="", nullable=False, server_default="")
     # Base URL for "Open in Caero" links; empty falls back to the PUBLIC_URL env var.
     public_url: Mapped[str] = mapped_column(String(512), default="", nullable=False, server_default="")
+    # Nightly maintenance jobs (app.scheduler.MAINTENANCE_JOBS): on/off and
+    # HH:MM run time in the container's local timezone.
+    backup_enabled: Mapped[bool] = mapped_column(Boolean, default=True, server_default="1", nullable=False)
+    backup_time: Mapped[str] = mapped_column(String(5), default="03:30", server_default="03:30", nullable=False)
+    retention_enabled: Mapped[bool] = mapped_column(Boolean, default=True, server_default="1", nullable=False)
+    retention_time: Mapped[str] = mapped_column(String(5), default="04:00", server_default="04:00", nullable=False)
+    # Admin overrides of BACKUP_KEEP / PRICE_HISTORY_THIN_AFTER_DAYS /
+    # EVENT_LOG_RETENTION_DAYS; NULL = use the env var (app.maintenance).
+    backup_keep: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    price_history_thin_after_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    event_log_retention_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )

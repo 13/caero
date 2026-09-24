@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import {
   currencySymbol,
+  describeSchedule,
   formatDate,
   formatDateTime,
   formatDuration,
+  formatHHMM,
   formatIntervalHours,
   formatPercent,
   formatPrice,
@@ -178,5 +180,22 @@ describe('formatRunTime', () => {
   it('handles missing and invalid values', () => {
     expect(formatRunTime(null, 'DD.MM.YYYY', '24h', now)).toBe('—')
     expect(formatRunTime('nope', 'DD.MM.YYYY', '24h', now)).toBe('—')
+  })
+})
+
+describe('describeSchedule', () => {
+  it('matches the backend wording in 24h', () => {
+    expect(describeSchedule(60, '08:00')).toBe('Every 1 h from 08:00')
+    expect(describeSchedule(30, '10:00')).toBe('Every 30 min from 10:00')
+    expect(describeSchedule(1440, '09:30')).toBe('Daily at 09:30')
+    expect(describeSchedule(2880, '09:30')).toBe('Every 2 d at 09:30')
+    expect(describeSchedule(90, '07:00')).toBe('Every 90 min from 07:00')
+  })
+
+  it('honours the 12h preference', () => {
+    expect(describeSchedule(1440, '03:30', '12h')).toBe('Daily at 3:30 AM')
+    expect(describeSchedule(60, '00:00', '12h')).toBe('Every 1 h from 12:00 AM')
+    expect(formatHHMM('19:05', '12h')).toBe('7:05 PM')
+    expect(formatHHMM('bogus', '12h')).toBe('bogus')
   })
 })

@@ -88,3 +88,35 @@ test('settings tabs: about for everyone, schedulers and logs for admins', async 
     await expect(page.getByText(/Retention finished/).first()).toBeVisible({ timeout: 2_000 })
   }).toPass({ timeout: 30_000 })
 })
+
+test('schedulers: disable and re-enable the nightly backup inline', async ({ page }) => {
+  await page.goto('/')
+  await page.getByLabel('Username').fill(USERNAME)
+  await page.getByLabel('Password').fill(PASSWORD)
+  await page.getByRole('button', { name: 'Sign in' }).click()
+  await expect(page.getByLabel('Search products')).toBeVisible()
+
+  await page.goto('/setup?tab=about')
+  await expect(page.getByText('Signed in as')).toBeVisible()
+  if (!(await page.getByRole('tab', { name: 'Logs' }).isVisible())) return // not admin on a reused DB
+
+  await page.goto('/setup?tab=schedulers')
+  const toggle = page.getByRole('checkbox', { name: 'Enable Nightly backup' })
+  const backupRow = page.getByRole('listitem').filter({ has: toggle })
+  // State-agnostic, so a retry on a reused DB still passes: normalise to on first.
+  // The box is controlled by the saved setting, so click and wait for the state.
+  if (!(await toggle.isChecked())) {
+    await toggle.click()
+    await expect(toggle).toBeChecked()
+    await expect(backupRow.getByText('Disabled', { exact: true })).toHaveCount(0)
+  }
+
+  await toggle.click()
+  await expect(toggle).not.toBeChecked()
+  await expect(backupRow.getByText('Disabled', { exact: true })).toBeVisible()
+  await expect(backupRow.getByText('disabled', { exact: true })).toBeVisible()
+
+  await toggle.click()
+  await expect(toggle).toBeChecked()
+  await expect(backupRow.getByText('Disabled', { exact: true })).toHaveCount(0)
+})

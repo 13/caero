@@ -20,7 +20,7 @@ from app.routers import (
     products_router,
     settings_router,
 )
-from app.scheduler import MAINTENANCE_JOBS, install_job_listener, load_all_jobs, scheduler
+from app.scheduler import install_job_listener, load_all_jobs, load_maintenance_schedule, scheduler
 
 logging.basicConfig(
     level=getattr(logging, _settings.log_level.upper(), logging.INFO),
@@ -67,10 +67,11 @@ async def lifespan(application: FastAPI):
 
     await start_browser()
 
+    from app.database import AsyncSessionLocal
+    from app.models import AppSettings as AppSettingsModel
+
     # Load Telegram token and public URL from DB (both override their env vars if set)
     try:
-        from app.database import AsyncSessionLocal
-        from app.models import AppSettings as AppSettingsModel
         from app.notifier import configure_public_url, configure_telegram
         async with AsyncSessionLocal() as _db:
             _row = await _db.get(AppSettingsModel, 1)
@@ -93,13 +94,8 @@ async def lifespan(application: FastAPI):
     await load_all_jobs()
 
     # Nightly maintenance: JSON backup + retention (price-history thinning and
-    # event-log pruning; each a no-op when disabled via settings).
-    from app.backup import run_backup
-    from app.retention import run_nightly_retention
-
-    for job_id, func in (("maintenance_backup", run_backup), ("maintenance_retention", run_nightly_retention)):
-        spec = MAINTENANCE_JOBS[job_id]
-        scheduler.add_job(func, "cron", hour=spec["hour"], minute=spec["minute"], id=job_id, replace_existing=True)
+    # event-log pruning); on/off, run times and keep knobs from app.maintenance.
+    await load_maintenance_schedule()
 
     yield
 

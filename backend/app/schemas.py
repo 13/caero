@@ -4,6 +4,10 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+from app.schedule_utils import CHECK_TIME_HHMM_RE
+
+HHMM_PATTERN = CHECK_TIME_HHMM_RE.pattern
+
 # ── Users ────────────────────────────────────────────────────────────────────
 
 class UserCreate(BaseModel):
@@ -208,7 +212,17 @@ TimeFormat = Literal["12h", "24h"]
 ChartLineStyle = Literal["curved", "straight", "stepped"]
 
 
-class AppSettingsIn(BaseModel):
+class _MaintenanceSettingsIn(BaseModel):
+    # Nightly maintenance jobs; None/absent = keep. Times are HH:MM, container-local.
+    backup_enabled: bool | None = None
+    backup_time: str | None = Field(default=None, pattern=HHMM_PATTERN)
+    retention_enabled: bool | None = None
+    retention_time: str | None = Field(default=None, pattern=HHMM_PATTERN)
+
+
+class AppSettingsIn(_MaintenanceSettingsIn):
+    """POST /api/settings — full save of the core fields (legacy; prefer PATCH)."""
+
     allow_registration: bool = True
     date_format: DateFormat = "DD.MM.YYYY"
     time_format: TimeFormat = "24h"
@@ -219,6 +233,23 @@ class AppSettingsIn(BaseModel):
     public_url: str | None = Field(default=None, max_length=512, pattern=r"^(https?://\S+)?$")
 
 
+class AppSettingsPatch(_MaintenanceSettingsIn):
+    """PATCH /api/settings — only the fields sent are changed.
+
+    For the keep/retention knobs an explicit null resets to the env var; for
+    every other field null is the same as leaving it out.
+    """
+
+    allow_registration: bool | None = None
+    date_format: DateFormat | None = None
+    time_format: TimeFormat | None = None
+    telegram_bot_token: str | None = None
+    public_url: str | None = Field(default=None, max_length=512, pattern=r"^(https?://\S+)?$")
+    backup_keep: int | None = Field(default=None, ge=0, le=10_000)
+    price_history_thin_after_days: int | None = Field(default=None, ge=0, le=100_000)
+    event_log_retention_days: int | None = Field(default=None, ge=0, le=100_000)
+
+
 class AppSettingsOut(BaseModel):
     allow_registration: bool
     date_format: str
@@ -227,6 +258,17 @@ class AppSettingsOut(BaseModel):
     public_url: str = ""
     # The PUBLIC_URL env fallback, shown so admins know what an empty field means.
     public_url_env: str = ""
+    backup_enabled: bool = True
+    backup_time: str = "03:30"
+    retention_enabled: bool = True
+    retention_time: str = "04:00"
+    # Admin overrides (None = the env var applies) and the env values behind them.
+    backup_keep: int | None = None
+    backup_keep_env: int = 0
+    price_history_thin_after_days: int | None = None
+    price_history_thin_after_days_env: int = 0
+    event_log_retention_days: int | None = None
+    event_log_retention_days_env: int = 0
     updated_at: datetime | None = None
 
 
@@ -374,6 +416,13 @@ class JobOut(BaseModel):
     last_message: str | None = None
     consecutive_failures: int = 0
     running: bool = False
+    # Maintenance jobs switched off in settings (still runnable via "Run now").
+    paused: bool = False
+    # Why an enabled maintenance job would do nothing (e.g. keep = 0).
+    noop_reason: str | None = None
+    # Raw schedule so the client can format it (12h/24h); schedule is the 24h text.
+    interval_minutes: int | None = None
+    time_hhmm: str | None = None
 
     @field_validator("last_run_at")
     @classmethod

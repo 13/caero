@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.database import AsyncSessionLocal
+from app.maintenance import OVERRIDABLE_KNOBS
 from app.models import Alert, AppSettings, PriceHistory, Product, User
 
 logger = logging.getLogger(__name__)
@@ -47,6 +48,11 @@ async def build_export_payload(db: AsyncSession) -> dict:
             "public_url": app_settings.public_url if app_settings else "",
             "show_sparklines": app_settings.show_sparklines if app_settings else True,
             "chart_line_style": app_settings.chart_line_style if app_settings else "curved",
+            "backup_enabled": app_settings.backup_enabled if app_settings else True,
+            "backup_time": app_settings.backup_time if app_settings else "03:30",
+            "retention_enabled": app_settings.retention_enabled if app_settings else True,
+            "retention_time": app_settings.retention_time if app_settings else "04:00",
+            **{name: getattr(app_settings, name, None) for name in OVERRIDABLE_KNOBS},
         },
         "users": [
             {
@@ -127,7 +133,7 @@ def _rotate_backups(backups_dir: Path, keep: int) -> None:
             logger.warning("Could not remove old backup %s: %s", old, exc)
 
 
-async def _write_backup() -> Path:
+async def _write_backup(keep: int) -> Path:
     async with AsyncSessionLocal() as db:
         payload = await build_export_payload(db)
 
@@ -141,19 +147,21 @@ async def _write_backup() -> Path:
     target.write_text(json.dumps(payload, separators=(",", ":")), encoding="utf-8")
     logger.info("Backup written: %s", target)
 
-    _rotate_backups(backups_dir, settings.backup_keep)
+    _rotate_backups(backups_dir, keep)
     return target
 
 
 async def run_backup() -> Path | None:
     """Write one full-export backup file and rotate old ones (nightly cron)."""
-    if settings.backup_keep <= 0:
+    from app.events import record_event
+    from app.maintenance import load_maintenance_config
+
+    keep = (await load_maintenance_config()).backup_keep
+    if keep <= 0:
         return None
 
-    from app.events import record_event
-
     try:
-        target = await _write_backup()
+        target = await _write_backup(keep)
     except Exception as exc:
         logger.exception("Backup failed")
         await record_event(
@@ -169,6 +177,6 @@ async def run_backup() -> Path | None:
         category="maintenance",
         event="backup",
         message=f"Backup written: {target.name}",
-        details={"file": target.name, "kept": settings.backup_keep},
+        details={"file": target.name, "kept": keep},
     )
     return target

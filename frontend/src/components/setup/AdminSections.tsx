@@ -45,12 +45,7 @@ export function NotificationTestsSection({ showToast }: { showToast: (msg: strin
       return
     }
     saveMutation.mutate(
-      {
-        allow_registration: settings.allow_registration,
-        date_format: settings.date_format,
-        time_format: settings.time_format,
-        public_url: value,
-      },
+      { public_url: value },
       {
         onSuccess: () => {
           setPublicUrlDraft(null)
@@ -70,12 +65,7 @@ export function NotificationTestsSection({ showToast }: { showToast: (msg: strin
   const saveBotToken = (token: string) => {
     if (!settings) return
     saveMutation.mutate(
-      {
-        allow_registration: settings.allow_registration,
-        date_format: settings.date_format,
-        time_format: settings.time_format,
-        telegram_bot_token: token,
-      },
+      { telegram_bot_token: token },
       {
         onSuccess: () => {
           setBotTokenInput('')
@@ -319,11 +309,7 @@ export function UserManagementSection({ showToast }: { showToast: (msg: string) 
   const toggleRegistration = (allow: boolean) => {
     if (!settings) return
     saveMutation.mutate(
-      {
-        allow_registration: allow,
-        date_format: settings.date_format,
-        time_format: settings.time_format,
-      },
+      { allow_registration: allow },
       { onSuccess: () => showToast('Settings saved successfully.') }
     )
   }

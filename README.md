@@ -58,8 +58,8 @@ Everything is configured through `.env` — see [`.env.example`](.env.example) f
 | `TZ` | Timezone for the daily check times (`10:00` means *your* 10:00) |
 | `TELEGRAM_BOT_TOKEN` / `SMTP_*` | Per-alert notification channels (Telegram token can also be set in the admin UI) |
 | `NTFY_URL` / `GOTIFY_*` / `DISCORD_WEBHOOK_URL` | Broadcast webhooks — every notification from **all** users goes to each configured channel (household-style setups) |
-| `BACKUP_KEEP` | Daily JSON backups to keep in `/data/backups` (0 = off) |
-| `PRICE_HISTORY_THIN_AFTER_DAYS` | Auto-thin old price rows to daily min/max (0 = keep everything) |
+| `BACKUP_KEEP` | Daily JSON backups to keep in `/data/backups` (0 = off). Default only — on/off, run time and this value can be changed in Settings → Schedulers |
+| `PRICE_HISTORY_THIN_AFTER_DAYS` | Auto-thin old price rows to daily min/max (0 = keep everything; overridable in Settings → Schedulers) |
 | `SINGLE_USER_MODE` | Skip login entirely for single-person setups |
 
 ## Backups & Health

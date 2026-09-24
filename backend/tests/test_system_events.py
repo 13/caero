@@ -13,6 +13,7 @@ import app.events as events
 import app.notifier as notifier
 import app.retention as retention
 import app.scheduler as scheduler_mod
+from app.config import settings as config_settings
 from app.database import AsyncSessionLocal, run_migrations
 from app.events import drain_pending_events
 from app.models import EventLog
@@ -122,10 +123,10 @@ async def test_prune_event_log_respects_cutoff(monkeypatch):
                         category="system", event="new", message=marker))
         await db.commit()
 
-    monkeypatch.setattr(retention.settings, "event_log_retention_days", 0)
+    monkeypatch.setattr(config_settings, "event_log_retention_days", 0)
     assert await retention.prune_event_log() == 0
 
-    monkeypatch.setattr(retention.settings, "event_log_retention_days", 30)
+    monkeypatch.setattr(config_settings, "event_log_retention_days", 30)
     assert await retention.prune_event_log() >= 1
     async with AsyncSessionLocal() as db:
         left = (await db.execute(select(EventLog.event).where(EventLog.message == marker))).scalars().all()
@@ -134,7 +135,7 @@ async def test_prune_event_log_respects_cutoff(monkeypatch):
 
 @pytest.mark.asyncio(loop_scope="session")
 async def test_nightly_retention_records_event(monkeypatch):
-    monkeypatch.setattr(retention.settings, "price_history_thin_after_days", 0)
+    monkeypatch.setattr(config_settings, "price_history_thin_after_days", 0)
     await retention.run_nightly_retention()
     row = await latest("retention")
     assert row.category == "maintenance"
@@ -145,7 +146,7 @@ async def test_nightly_retention_records_event(monkeypatch):
 async def test_backup_records_success_and_failure(monkeypatch, tmp_path):
     import app.backup as backup
 
-    monkeypatch.setattr(backup.settings, "backup_keep", 2)
+    monkeypatch.setattr(config_settings, "backup_keep", 2)
     monkeypatch.setattr(backup, "get_backups_dir", lambda: tmp_path)
     assert await backup.run_backup() is not None
     row = await latest("backup")

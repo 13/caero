@@ -56,6 +56,8 @@ async def test_export_import_roundtrip_and_insert_after_import(client):
 
     export = (await client.get("/api/settings/export", headers=headers)).json()
     assert any(p["name"] == "Roundtrip" for p in export["products"])
+    assert export["app_settings"]["backup_time"] == "03:30"
+    assert export["app_settings"]["retention_enabled"] is True
 
     resp = await client.post("/api/settings/import", headers=headers, json=export)
     assert resp.status_code == 200, resp.text

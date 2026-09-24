@@ -7,7 +7,7 @@ import type {
   Alert,
   AlertCreate,
   AppSettings,
-  AppSettingsIn,
+  AppSettingsPatch,
   CheckResult,
   ChangePasswordRequest,
   DataExportPayload,
@@ -345,12 +345,14 @@ export function useSettings(enabled = true) {
 
 export function useSaveSettings() {
   const qc = useQueryClient()
-  return useMutation<AppSettings, Error, AppSettingsIn>({
+  return useMutation<AppSettings, Error, AppSettingsPatch>({
     mutationFn: (body) =>
-      apiFetch<AppSettings>('/api/settings', { method: 'POST', body: JSON.stringify(body) }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['settings'] })
+      apiFetch<AppSettings>('/api/settings', { method: 'PATCH', body: JSON.stringify(body) }),
+    onSuccess: (saved) => {
+      // The response is the full new state: no refetch gap where toggles snap back.
+      qc.setQueryData(['settings'], saved)
       qc.invalidateQueries({ queryKey: ['ui-settings'] })
+      qc.invalidateQueries({ queryKey: ['scheduler-jobs'] })
     },
   })
 }

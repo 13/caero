@@ -135,17 +135,39 @@ export interface AppSettings {
   public_url: string
   /** PUBLIC_URL env fallback. */
   public_url_env: string
+  backup_enabled: boolean
+  /** HH:mm, container-local time */
+  backup_time: string
+  retention_enabled: boolean
+  retention_time: string
+  /** Admin overrides of the env knobs; null = the *_env value applies. */
+  backup_keep: number | null
+  backup_keep_env: number
+  price_history_thin_after_days: number | null
+  price_history_thin_after_days_env: number
+  event_log_retention_days: number | null
+  event_log_retention_days_env: number
   updated_at: string | null
 }
 
-export interface AppSettingsIn {
-  allow_registration: boolean
-  date_format: DateFormat
-  time_format: TimeFormat
-  /** undefined/null = keep stored token, '' = clear it */
-  telegram_bot_token?: string | null
-  /** undefined/null = keep, '' = clear (fall back to PUBLIC_URL) */
-  public_url?: string | null
+/** PATCH /api/settings — only the fields sent change. */
+export interface AppSettingsPatch {
+  allow_registration?: boolean
+  date_format?: DateFormat
+  time_format?: TimeFormat
+  /** '' = clear */
+  telegram_bot_token?: string
+  /** '' = clear (fall back to PUBLIC_URL) */
+  public_url?: string
+  backup_enabled?: boolean
+  /** HH:mm, container-local time */
+  backup_time?: string
+  retention_enabled?: boolean
+  retention_time?: string
+  /** null = reset to the env value */
+  backup_keep?: number | null
+  price_history_thin_after_days?: number | null
+  event_log_retention_days?: number | null
 }
 
 export interface NotificationChannelStatus {
@@ -283,6 +305,12 @@ export interface JobOut {
   last_message: string | null
   consecutive_failures: number
   running: boolean
+  /** Maintenance job switched off; "Run now" still works. */
+  paused: boolean
+  /** Why an enabled maintenance job would do nothing (e.g. keep = 0). */
+  noop_reason: string | null
+  interval_minutes: number | null
+  time_hhmm: string | null
 }
 
 export interface JobsResponse {

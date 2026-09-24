@@ -93,6 +93,25 @@ export function formatClockTime(d: Date, timeFormat: '12h' | '24h' = '24h') {
   return `${String(d.getHours()).padStart(2, '0')}:${minutes}`
 }
 
+/** "HH:mm" in the user's time format ("7:05 PM" for 12h). */
+export function formatHHMM(hhmm: string, timeFormat: '12h' | '24h' = '24h') {
+  const match = hhmm.match(/^(\d{1,2}):(\d{2})$/)
+  if (!match) return hhmm
+  const d = new Date(2000, 0, 1, Number(match[1]), Number(match[2]))
+  return formatClockTime(d, timeFormat)
+}
+
+/** Schedulers-tab label; mirrors describe_schedule in backend/app/schedule_utils.py. */
+export function describeSchedule(intervalMinutes: number, hhmm: string, timeFormat: '12h' | '24h' = '24h') {
+  const time = formatHHMM(hhmm, timeFormat)
+  if (intervalMinutes % 1440 === 0) {
+    const days = intervalMinutes / 1440
+    return days === 1 ? `Daily at ${time}` : `Every ${days} d at ${time}`
+  }
+  if (intervalMinutes % 60 === 0) return `Every ${intervalMinutes / 60} h from ${time}`
+  return `Every ${intervalMinutes} min from ${time}`
+}
+
 /** Clock time of a run; prefixed with day and month (no year) when it isn't today. */
 export function formatRunTime(
   value: string | null,
