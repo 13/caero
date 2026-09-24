@@ -7,6 +7,7 @@ import time
 from collections import defaultdict
 from datetime import UTC, datetime
 from decimal import Decimal
+from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -16,8 +17,12 @@ from sqlalchemy.sql import func
 from app.browser import ensure_browser
 from app.config import settings
 from app.database import AsyncSessionLocal
+from app.events import log_event, record_event
 from app.models import Alert, PriceHistory, Product, User
 from app.notifier import Notification, caero_url, format_price, notify, product_links, send_alert
+
+if TYPE_CHECKING:
+    from app.scraper import ScrapeResult
 
 logger = logging.getLogger(__name__)
 
@@ -180,6 +185,76 @@ async def _notify_scraping_recovered(product: Product, db) -> None:
     )
 
 
+def log_scrape_success(
+    db,
+    product: Product,
+    *,
+    price: Decimal,
+    prev_price: Decimal | None,
+    currency: str,
+    changed: bool,
+    source: str | None,
+    duration_ms: int | None,
+    manual: bool = False,
+) -> None:
+    prefix = "Manual check: " if manual else ""
+    if changed:
+        was = f" (was {format_price(prev_price, currency)})" if prev_price is not None else ""
+        message = f"{prefix}Price {format_price(price, currency)}{was}"
+    else:
+        message = f"{prefix}Price unchanged at {format_price(price, currency)}"
+    details = {"price": price, "prev_price": prev_price, "currency": currency, "source": source}
+    if manual:
+        details["manual"] = True
+    log_event(
+        db,
+        level="info",
+        category="scrape",
+        event="scrape_ok" if changed else "scrape_unchanged",
+        message=message,
+        product=product,
+        duration_ms=duration_ms,
+        details=details,
+    )
+
+
+def log_scrape_failure(
+    db, product: Product, result: ScrapeResult, *, duration_ms: int | None, manual: bool = False
+) -> None:
+    prefix = "Manual check: " if manual else ""
+    details = {
+        "error": result.error,
+        "error_detail": result.error_detail,
+        "consecutive_failures": product.consecutive_scrape_failures,
+        "url": product.url,
+    }
+    if manual:
+        details["manual"] = True
+    log_event(
+        db,
+        level="warning",
+        category="scrape",
+        event="scrape_failed",
+        message=f"{prefix}No price found ({result.error or 'unknown'})",
+        product=product,
+        duration_ms=duration_ms,
+        details=details,
+    )
+
+
+def log_scrape_skipped(db, product: Product, *, reason: str, message: str, duration_ms: int | None = None) -> None:
+    log_event(
+        db,
+        level="warning",
+        category="scrape",
+        event="scrape_skipped",
+        message=message,
+        product=product,
+        duration_ms=duration_ms,
+        details={"reason": reason},
+    )
+
+
 async def check_url_redirect(product: Product, final_url: str | None, db) -> None:
     """Compare the scraped final URL to the stored URL and update url_redirected accordingly."""
     if not final_url:
@@ -188,6 +263,15 @@ async def check_url_redirect(product: Product, final_url: str | None, db) -> Non
         logger.debug("product %d URL redirected: %s -> %s", product.id, product.url, final_url)
         if not product.url_redirected:
             product.url_redirected = True
+            log_event(
+                db,
+                level="warning",
+                category="scrape",
+                event="url_redirected",
+                message=f"URL now redirects to {final_url}",
+                product=product,
+                details={"from": product.url, "to": final_url},
+            )
             await _notify_product_owner(
                 product,
                 db,
@@ -207,15 +291,30 @@ async def check_url_redirect(product: Product, final_url: str | None, db) -> Non
         product.url_redirected = False
 
 
-async def scrape_and_record(product_id: int) -> None:
-    """Scrape the current price for a product and persist it."""
+async def scrape_and_record(product_id: int) -> str | None:
+    """Scrape the current price for a product and persist it.
+
+    Returns the outcome ("ok" | "unchanged" | "failed" | "skipped"), or None
+    when the product no longer exists or is inactive.
+    """
     browser = await ensure_browser()
     if browser is None:
         logger.warning("Browser not available, skipping job for product %d", product_id)
-        return
+        async with AsyncSessionLocal() as db:
+            product = await db.get(Product, product_id)
+        if product is not None:
+            await record_event(
+                level="warning",
+                category="scrape",
+                event="scrape_skipped",
+                message="Scrape skipped: browser unavailable",
+                product=product,
+                details={"reason": "browser_unavailable"},
+            )
+        return "skipped"
 
     async with product_scrape_lock(product_id):
-        await _scrape_and_record_locked(product_id, browser)
+        return await _scrape_and_record_locked(product_id, browser)
 
 
 def check_all_in_progress() -> bool:
@@ -235,24 +334,41 @@ async def run_check_all(product_ids: list[int]) -> None:
         return
 
     _check_all_running = True
+    counts = {"ok": 0, "failed": 0, "skipped": 0}
     try:
         for product_id in product_ids:
             try:
-                await scrape_and_record(product_id)
+                outcome = await scrape_and_record(product_id)
             except Exception:
                 # One bad product must not abort the rest of the pass.
                 logger.exception("Check-all failed for product %d", product_id)
+                outcome = "failed"
+            if outcome in ("ok", "unchanged"):
+                counts["ok"] += 1
+            elif outcome in counts:
+                counts[outcome] += 1
     finally:
         _check_all_running = False
 
+    await record_event(
+        level="warning" if counts["failed"] else "info",
+        category="system",
+        event="check_all",
+        message=(
+            f"Check all finished: {counts['ok']} ok, {counts['failed']} failed, "
+            f"{counts['skipped']} skipped of {len(product_ids)}"
+        ),
+        details={"total": len(product_ids), **counts},
+    )
 
-async def _scrape_and_record_locked(product_id: int, browser) -> None:
+
+async def _scrape_and_record_locked(product_id: int, browser) -> str | None:
     # Short read-only session: the scrape itself can take up to a minute, so
     # never hold a transaction across it (SQLite locks, PG idle-in-transaction).
     async with AsyncSessionLocal() as db:
         product = await db.get(Product, product_id)
         if product is None or not product.active:
-            return
+            return None
         url, selector, price_format = product.url, product.selector, product.price_format
 
     from app.scraper import scrape_price
@@ -266,12 +382,13 @@ async def _scrape_and_record_locked(product_id: int, browser) -> None:
         logger.info("Slow scrape: product %d took %.1fs", product_id, elapsed)
     else:
         logger.debug("Scraped product %d in %.1fs", product_id, elapsed)
+    duration_ms = int(elapsed * 1000)
 
     async with AsyncSessionLocal() as db:
         # Re-fetch: the product may have been edited or deleted during the scrape.
         product = await db.get(Product, product_id)
         if product is None or not product.active:
-            return
+            return None
 
         # Always update last_checked_at
         product.last_checked_at = func.now()
@@ -280,8 +397,15 @@ async def _scrape_and_record_locked(product_id: int, browser) -> None:
 
         if product.url_redirected:
             logger.debug("Skipping price record for product %d — URL redirected", product_id)
+            log_scrape_skipped(
+                db,
+                product,
+                reason="redirected",
+                message="Price not recorded: URL redirects elsewhere",
+                duration_ms=duration_ms,
+            )
             await db.commit()
-            return
+            return "skipped"
 
         failure_threshold = settings.scraper_failure_alert_threshold
 
@@ -289,11 +413,35 @@ async def _scrape_and_record_locked(product_id: int, browser) -> None:
             logger.warning("Could not scrape price for product %d (%s)", product_id, product.url)
             product.consecutive_scrape_failures += 1
             _record_scrape_failure(product_id)
-            await db.commit()
+            log_scrape_failure(db, product, result, duration_ms=duration_ms)
 
             # Exactly-once notification when the threshold is first reached.
-            if product.consecutive_scrape_failures == failure_threshold:
-                if scraping_looks_broken():
+            threshold_reached = product.consecutive_scrape_failures == failure_threshold
+            storm = threshold_reached and scraping_looks_broken()
+            if threshold_reached and storm and product.user_id not in _storm_notified_users:
+                log_event(
+                    db,
+                    level="error",
+                    category="system",
+                    event="scraping_down",
+                    message=f"Scraping looks down: {len(_failing_products)} products failing",
+                    product=product,
+                    details={"failing_products": len(_failing_products)},
+                )
+            elif threshold_reached and not storm:
+                log_event(
+                    db,
+                    level="error",
+                    category="alert",
+                    event="selector_broken",
+                    message=f"Selector broken: {failure_threshold} failed checks in a row",
+                    product=product,
+                    details={"failures": failure_threshold},
+                )
+            await db.commit()
+
+            if threshold_reached:
+                if storm:
                     # Everything is failing — one outage notice per user beats a
                     # selector warning per product. The first product or two to
                     # cross the threshold may still get the per-product mail:
@@ -303,7 +451,7 @@ async def _scrape_and_record_locked(product_id: int, browser) -> None:
                     await _notify_product_owner(
                         product,
                         db,
-                        Notification(
+                        Notification(  # unchanged "Selector broken" notification
                             emoji="⚠️",
                             title="Selector broken",
                             product=product.name,
@@ -315,7 +463,7 @@ async def _scrape_and_record_locked(product_id: int, browser) -> None:
                             links=product_links(product.id, product.url),
                         ),
                     )
-            return
+            return "failed"
 
         _record_scrape_success(product_id)
 
@@ -324,8 +472,25 @@ async def _scrape_and_record_locked(product_id: int, browser) -> None:
         if product.user_id in _storm_notified_users:
             # They were told scraping was down, not that this selector broke —
             # answer the message they actually got, once.
+            log_event(
+                db,
+                level="info",
+                category="system",
+                event="scraping_recovered",
+                message="Scraping recovered",
+                product=product,
+            )
             await _notify_scraping_recovered(product, db)
         elif product.consecutive_scrape_failures >= failure_threshold:
+            log_event(
+                db,
+                level="info",
+                category="alert",
+                event="scrape_recovered",
+                message=f"Recovered after {product.consecutive_scrape_failures} failed checks",
+                product=product,
+                details={"failures_before": product.consecutive_scrape_failures},
+            )
             await _notify_product_owner(
                 product,
                 db,
@@ -371,6 +536,15 @@ async def _scrape_and_record_locked(product_id: int, browser) -> None:
                 logger.warning(
                     "product %d currency changed %s -> %s", product_id, prev.currency, currency
                 )
+                log_event(
+                    db,
+                    level="warning",
+                    category="scrape",
+                    event="currency_changed",
+                    message=f"Currency changed {prev.currency} → {currency}",
+                    product=product,
+                    details={"was": prev.currency, "now": currency},
+                )
                 await _notify_product_owner(
                     product,
                     db,
@@ -409,6 +583,21 @@ async def _scrape_and_record_locked(product_id: int, browser) -> None:
 
             if triggered:
                 alert.last_triggered_at = now
+                log_event(
+                    db,
+                    level="info",
+                    category="alert",
+                    event="alert_triggered",
+                    message=f"Alert fired ({alert.condition}) at {format_price(price, currency)}",
+                    product=product,
+                    details={
+                        "alert_id": alert.id,
+                        "condition": alert.condition,
+                        "price": price,
+                        "threshold_price": alert.threshold_price,
+                        "threshold_percent": alert.threshold_percent,
+                    },
+                )
                 await send_alert(
                     to_email=alert.email,
                     telegram_chat_id=alert.telegram_chat_id,
@@ -423,11 +612,23 @@ async def _scrape_and_record_locked(product_id: int, browser) -> None:
                     previous_price=prev_price,
                 )
 
+        log_scrape_success(
+            db,
+            product,
+            price=price,
+            prev_price=prev_price,
+            currency=currency,
+            changed=changed,
+            source=result.source,
+            duration_ms=duration_ms,
+        )
+
         await db.commit()
         if changed or product.record_all_prices:
             logger.info("Recorded price %.2f for product %d", price, product_id)
         else:
             logger.debug("Price for product %d unchanged (%.2f) — no record", product_id, price)
+        return "ok" if changed else "unchanged"
 
 
 def _cohort_size(hhmm: str) -> int:

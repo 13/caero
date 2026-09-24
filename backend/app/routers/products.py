@@ -1,6 +1,7 @@
 """Products router."""
 from __future__ import annotations
 
+import time
 from datetime import UTC
 from decimal import Decimal
 
@@ -371,18 +372,34 @@ async def check_product_now(
     if browser is None:
         return CheckResult(product_id=product_id, price=None, error="Browser not available")
 
-    from app.scheduler import check_url_redirect, product_scrape_lock
+    from app.scheduler import (
+        check_url_redirect,
+        log_scrape_failure,
+        log_scrape_skipped,
+        log_scrape_success,
+        product_scrape_lock,
+    )
     from app.scraper import scrape_price
 
+    started = time.monotonic()
     async with product_scrape_lock(product_id):
         result = await scrape_price(browser, product.url, product.selector, product.price_format)
+    duration_ms = int((time.monotonic() - started) * 1000)
 
     await check_url_redirect(product, result.final_url, db)
 
     if product.url_redirected:
+        log_scrape_skipped(
+            db,
+            product,
+            reason="redirected",
+            message="Manual check: price not recorded, URL redirects elsewhere",
+            duration_ms=duration_ms,
+        )
         return CheckResult(product_id=product_id, price=None, error="URL redirected")
 
     if result.price is None:
+        log_scrape_failure(db, product, result, duration_ms=duration_ms, manual=True)
         return CheckResult(product_id=product_id, price=None, error="Could not scrape price")
 
     if product.consecutive_scrape_failures > 0:
@@ -400,10 +417,21 @@ async def check_product_now(
     ).scalar_one_or_none()
 
     changed = prev is None or prev.price != price
+    currency = result.currency or (prev.currency if prev else None) or "EUR"
     if changed or product.record_all_prices:
-        currency = result.currency or (prev.currency if prev else None) or "EUR"
         db.add(PriceHistory(product_id=product_id, price=price, currency=currency))
 
+    log_scrape_success(
+        db,
+        product,
+        price=price,
+        prev_price=prev.price if prev else None,
+        currency=currency,
+        changed=changed,
+        source=result.source,
+        duration_ms=duration_ms,
+        manual=True,
+    )
     return CheckResult(product_id=product_id, price=price)
 
 

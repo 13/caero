@@ -11,7 +11,7 @@ from sqlalchemy import select
 import app.scheduler as scheduler_mod
 from app.browser import set_browser
 from app.database import AsyncSessionLocal, run_migrations
-from app.models import Alert, PriceHistory, Product, User
+from app.models import Alert, EventLog, PriceHistory, Product, User
 from app.scraper import ScrapeResult
 
 
@@ -227,3 +227,145 @@ async def test_redirect_blocks_recording_and_notifies(monkeypatch, sent_notifica
     assert (await product_by_id(pid)).url_redirected is True
     redirected = [n for n in sent_notifications["notify"] if "URL redirected" in n["message"].title]
     assert len(redirected) == 1
+
+
+async def events_for(product_id: int) -> list[EventLog]:
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(
+            select(EventLog).where(EventLog.product_id == product_id).order_by(EventLog.id)
+        )
+        return list(result.scalars().all())
+
+
+def codes(rows: list[EventLog]) -> list[str]:
+    return [r.event for r in rows]
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_scrape_events_changed_then_unchanged(monkeypatch, sent_notifications):
+    pid = await make_product("ev-flow-ok")
+    scrape_returning(monkeypatch, ScrapeResult(10.0, "EUR", "https://shop.example/item", source="selector"))
+
+    assert await scheduler_mod.scrape_and_record(pid) == "ok"
+    assert await scheduler_mod.scrape_and_record(pid) == "unchanged"
+
+    rows = await events_for(pid)
+    assert codes(rows) == ["scrape_ok", "scrape_unchanged"]
+    assert rows[0].level == "info" and rows[0].category == "scrape"
+    assert rows[0].details["price"] == "10.00"
+    assert rows[0].details["source"] == "selector"
+    assert rows[0].duration_ms is not None
+    assert rows[0].product_name == "P-ev-flow-ok"
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_record_all_prices_unchanged_is_still_unchanged_event(monkeypatch, sent_notifications):
+    pid = await make_product("ev-flow-all", record_all_prices=True)
+    scrape_returning(monkeypatch, ScrapeResult(10.0, "EUR", "https://shop.example/item"))
+    await scheduler_mod.scrape_and_record(pid)
+    await scheduler_mod.scrape_and_record(pid)
+    assert codes(await events_for(pid)) == ["scrape_ok", "scrape_unchanged"]
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_failure_events_threshold_and_recovery(monkeypatch, sent_notifications):
+    pid = await make_product("ev-flow-fail")
+    monkeypatch.setattr(scheduler_mod.settings, "scraper_failure_alert_threshold", 2)
+    scrape_returning(monkeypatch, ScrapeResult(None, None, None, error="no_match"))
+
+    assert await scheduler_mod.scrape_and_record(pid) == "failed"
+    await scheduler_mod.scrape_and_record(pid)
+
+    rows = await events_for(pid)
+    assert codes(rows) == ["scrape_failed", "scrape_failed", "selector_broken"]
+    assert rows[0].level == "warning"
+    assert rows[0].details["error"] == "no_match"
+    assert rows[1].details["consecutive_failures"] == 2
+    assert rows[2].level == "error" and rows[2].category == "alert"
+
+    scrape_returning(monkeypatch, ScrapeResult(9.5, "EUR", "https://shop.example/item"))
+    await scheduler_mod.scrape_and_record(pid)
+    assert codes(await events_for(pid))[-2:] == ["scrape_recovered", "scrape_ok"]
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_redirect_events(monkeypatch, sent_notifications):
+    pid = await make_product("ev-flow-redirect")
+    scrape_returning(monkeypatch, ScrapeResult(10.0, "EUR", "https://other.example/different"))
+
+    assert await scheduler_mod.scrape_and_record(pid) == "skipped"
+    await scheduler_mod.scrape_and_record(pid)
+
+    rows = await events_for(pid)
+    assert codes(rows) == ["url_redirected", "scrape_skipped", "scrape_skipped"]
+    assert rows[0].details == {"from": "https://shop.example/item", "to": "https://other.example/different"}
+    assert rows[1].details["reason"] == "redirected"
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_alert_triggered_event(monkeypatch, sent_notifications):
+    pid = await make_product("ev-flow-alert")
+    async with AsyncSessionLocal() as db:
+        db.add(Alert(product_id=pid, condition="changed", email="a@example.com"))
+        await db.commit()
+    scrape_returning(
+        monkeypatch,
+        ScrapeResult(20.0, "EUR", "https://shop.example/item"),
+        ScrapeResult(18.0, "EUR", "https://shop.example/item"),
+    )
+    await scheduler_mod.scrape_and_record(pid)
+    await scheduler_mod.scrape_and_record(pid)
+
+    [alert_event] = [r for r in await events_for(pid) if r.event == "alert_triggered"]
+    assert alert_event.category == "alert"
+    assert alert_event.details["condition"] == "changed"
+    assert alert_event.details["price"] == "18.00"
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_browser_unavailable_is_skipped_event(monkeypatch, sent_notifications):
+    pid = await make_product("ev-flow-nobrowser")
+
+    async def no_browser():
+        return None
+
+    monkeypatch.setattr(scheduler_mod, "ensure_browser", no_browser)
+    assert await scheduler_mod.scrape_and_record(pid) == "skipped"
+    [row] = await events_for(pid)
+    assert (row.event, row.details["reason"]) == ("scrape_skipped", "browser_unavailable")
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_check_all_event_counts(monkeypatch, sent_notifications):
+    ok_pid = await make_product("ev-flow-ca-ok")
+    bad_pid = await make_product("ev-flow-ca-bad")
+    scrape_returning(
+        monkeypatch,
+        ScrapeResult(10.0, "EUR", "https://shop.example/item"),
+        ScrapeResult(None, None, None, error="timeout"),
+    )
+    await scheduler_mod.run_check_all([ok_pid, bad_pid])
+
+    async with AsyncSessionLocal() as db:
+        row = (await db.execute(
+            select(EventLog).where(EventLog.event == "check_all").order_by(EventLog.id.desc()).limit(1)
+        )).scalar_one()
+    assert row.details == {"total": 2, "ok": 1, "failed": 1, "skipped": 0}
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_manual_check_logs_event(monkeypatch, sent_notifications):
+    from app.routers.products import check_product_now
+
+    pid = await make_product("ev-flow-manual")
+    scrape_returning(monkeypatch, ScrapeResult(7.0, "EUR", "https://shop.example/item", source="itemprop"))
+    async with AsyncSessionLocal() as db:
+        product = await db.get(Product, pid)
+        user = await db.get(User, product.user_id)
+        await check_product_now(pid, user, db)
+        await db.commit()
+
+    [row] = await events_for(pid)
+    assert row.event == "scrape_ok"
+    assert row.details["manual"] is True
+    assert row.details["source"] == "itemprop"
