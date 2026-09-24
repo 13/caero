@@ -2,6 +2,7 @@ from datetime import datetime
 from decimal import Decimal
 
 from sqlalchemy import (
+    JSON,
     Boolean,
     DateTime,
     Enum,
@@ -158,3 +159,31 @@ class AppSettings(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
+
+
+class EventLog(Base):
+    """Operational event (scrape outcome, alert, delivery failure, …) for the
+    admin Logs tab. Written via app.events; pruned by EVENT_LOG_RETENTION_DAYS."""
+
+    __tablename__ = "event_log"
+    __table_args__ = (
+        Index("ix_event_log_product_created", "product_id", "created_at"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
+    )
+    level: Mapped[str] = mapped_column(String(10), nullable=False)
+    category: Mapped[str] = mapped_column(String(20), nullable=False)
+    event: Mapped[str] = mapped_column(String(40), nullable=False)
+    # SET NULL only fires on PostgreSQL (SQLite runs without foreign_keys);
+    # app.events detaches rows on ORM product deletes for both backends.
+    product_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("products.id", ondelete="SET NULL"), nullable=True
+    )
+    # Snapshot so rows stay readable after the product is deleted.
+    product_name: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    message: Mapped[str] = mapped_column(Text, nullable=False)
+    duration_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    details: Mapped[dict | None] = mapped_column(JSON, nullable=True)

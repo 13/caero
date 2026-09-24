@@ -9,6 +9,7 @@ from fastapi import FastAPI
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
+import app.events  # noqa: F401  — registers the product-delete listener
 from app.config import settings as _settings
 from app.database import run_migrations
 from app.routers import (
