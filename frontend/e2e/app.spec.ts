@@ -54,3 +54,37 @@ test('settings page is reachable', async ({ page }) => {
   await expect(page.getByText('Change password')).toBeVisible()
   await expect(page.getByText('Preferences')).toBeVisible()
 })
+
+test('settings tabs: about for everyone, schedulers and logs for admins', async ({ page }) => {
+  await page.goto('/')
+  await page.getByLabel('Username').fill(USERNAME)
+  await page.getByLabel('Password').fill(PASSWORD)
+  await page.getByRole('button', { name: 'Sign in' }).click()
+  await expect(page.getByLabel('Search products')).toBeVisible()
+
+  await page.goto('/setup?tab=about')
+  // Wait for /me so admin-ness is known before inspecting tabs.
+  await expect(page.getByText('Signed in as')).toBeVisible()
+  await expect(page.getByRole('tab', { name: 'About' })).toHaveAttribute('aria-selected', 'true')
+  await expect(page.getByText('Backend Version:')).toBeVisible()
+
+  // On a reused (non-fresh) DB this user may not be the admin — then only
+  // the non-admin expectations apply.
+  if (!(await page.getByRole('tab', { name: 'Logs' }).isVisible())) {
+    await expect(page.getByRole('tab', { name: 'Schedulers' })).toHaveCount(0)
+    return
+  }
+
+  await page.getByRole('tab', { name: 'Schedulers' }).click()
+  await expect(page).toHaveURL(/tab=schedulers/)
+  await page.getByRole('button', { name: 'Run Nightly retention now' }).click()
+
+  await page.getByRole('tab', { name: 'Logs' }).click()
+  await page.getByLabel('Category').selectOption('maintenance')
+  await expect(page).toHaveURL(/category=maintenance/)
+  // The one-off job runs asynchronously; reload until its event shows up.
+  await expect(async () => {
+    await page.reload()
+    await expect(page.getByText(/Retention finished/).first()).toBeVisible({ timeout: 2_000 })
+  }).toPass({ timeout: 30_000 })
+})
