@@ -125,3 +125,40 @@ async def test_import_detaches_events_from_reused_product_ids(client):
         ).scalar_one()
     assert row.product_id is None
     assert row.product_name == "Event Carrier"
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_import_keeps_starred_products(client):
+    from sqlalchemy import update
+
+    from app.database import AsyncSessionLocal
+    from app.models import User
+
+    resp = await client.post(
+        "/api/auth/register", json={"username": "impex-star-admin", "password": "secret1"}
+    )
+    assert resp.status_code == 201
+    async with AsyncSessionLocal() as db:
+        await db.execute(update(User).where(User.username == "impex-star-admin").values(is_admin=True))
+        await db.commit()
+    headers = await _login(client, "impex-star-admin")
+
+    resp = await client.post(
+        "/api/products",
+        headers=headers,
+        json={"name": "Starred Import", "url": "https://example.com/si", "selector": ".price"},
+    )
+    assert resp.status_code == 201
+    product_id = resp.json()["id"]
+    resp = await client.patch(
+        "/api/auth/me/starred", headers=headers, json={"starred_product_ids": [product_id]}
+    )
+    assert resp.status_code == 200, resp.text
+
+    export = (await client.get("/api/settings/export", headers=headers)).json()
+    resp = await client.post("/api/settings/import", headers=headers, json=export)
+    assert resp.status_code == 200, resp.text
+
+    headers = await _login(client, "impex-star-admin")
+    me = (await client.get("/api/auth/me", headers=headers)).json()
+    assert me["starred_product_ids"] == [product_id]

@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.models import PriceHistory, Product, User
-from app.routers.auth import require_user
+from app.routers.auth import require_user, unstar_product
 from app.scheduler import add_product_job, check_all_in_progress, remove_product_job, run_check_all
 from app.schemas import (
     CheckResult,
@@ -382,6 +382,7 @@ async def delete_product(
     remove_product_job(product_id)
     from app.images import delete_local_image
     delete_local_image(product.cached_image_url)
+    unstar_product(user, product_id)
     await db.delete(product)
 
 

@@ -60,6 +60,7 @@ async def build_export_payload(db: AsyncSession) -> dict:
                 "username": user.username,
                 "hashed_password": user.hashed_password,
                 "is_admin": user.is_admin,
+                "starred_product_ids": user.starred_product_ids,
                 "created_at": _isoformat(user.created_at),
             }
             for user in users

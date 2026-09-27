@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth import create_access_token, hash_password, verify_password
 from app.config import settings
 from app.database import get_db
-from app.models import AppSettings, User
+from app.models import AppSettings, Product, User
 from app.schemas import (
     MAX_STARRED_PRODUCTS,
     AdminUserCreate,
@@ -155,9 +155,42 @@ async def login(
     return Token(access_token=create_access_token(user.username, user.token_version))
 
 
+def _parse_starred(raw: str | None) -> list[int]:
+    return [int(i) for i in (raw or "").split(",") if i.strip().isdigit()]
+
+
+def _format_starred(ids: list[int]) -> str | None:
+    return ",".join(str(i) for i in ids) if ids else None
+
+
+async def _owned_starred(ids: list[int], user: User, db: AsyncSession) -> list[int]:
+    """`ids` minus products that no longer exist or belong to someone else.
+
+    Stored ids can go stale (a product deleted before deletes cleaned up
+    after themselves); counting those against the limit hid free slots.
+    """
+    if not ids:
+        return []
+    result = await db.execute(select(Product.id).where(Product.user_id == user.id, Product.id.in_(ids)))
+    owned = set(result.scalars())
+    return [i for i in ids if i in owned]
+
+
+def unstar_product(user: User, product_id: int) -> None:
+    """Drop a product from its owner's starred list (on product delete)."""
+    ids = _parse_starred(user.starred_product_ids)
+    if product_id in ids:
+        user.starred_product_ids = _format_starred([i for i in ids if i != product_id])
+
+
 @router.get("/me", response_model=UserOut)
-async def me(user: User = Depends(require_user)) -> User:
-    return user
+async def me(
+    user: User = Depends(require_user),
+    db: AsyncSession = Depends(get_db, scope="function"),
+) -> UserOut:
+    out = UserOut.model_validate(user)
+    out.starred_product_ids = await _owned_starred(out.starred_product_ids, user, db)
+    return out
 
 
 @router.post("/logout")
@@ -190,11 +223,12 @@ async def update_starred_products(
     user: User = Depends(require_user),
     db: AsyncSession = Depends(get_db, scope="function"),
 ) -> User:
-    if len(body.starred_product_ids) > MAX_STARRED_PRODUCTS:
+    ids = await _owned_starred(body.starred_product_ids, user, db)
+    if len(ids) > MAX_STARRED_PRODUCTS:
         raise HTTPException(
             status_code=400, detail=f"Maximum {MAX_STARRED_PRODUCTS} starred products allowed"
         )
-    user.starred_product_ids = ",".join(str(i) for i in body.starred_product_ids) if body.starred_product_ids else None
+    user.starred_product_ids = _format_starred(ids)
     await db.flush()
     await db.refresh(user)
     return user

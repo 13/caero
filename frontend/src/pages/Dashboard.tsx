@@ -105,15 +105,17 @@ export default function Dashboard() {
   const handleToggleStar = (productId: number) => {
     const product = products?.find(p => p.id === productId)
     const name = product?.name ?? 'Product'
+    // Only stars on products that still exist count, so a stale id can't eat a slot
+    const liveStarred = starredIds.filter(id => products?.some(p => p.id === id))
     let nextIds: number[]
     if (starredIds.includes(productId)) {
       nextIds = starredIds.filter(id => id !== productId)
       toast.success(`Removed "${name}" from favourites`)
-    } else if (starredIds.length >= maxStarred) {
+    } else if (liveStarred.length >= maxStarred) {
       toast.error(`Maximum ${maxStarred} starred products allowed`)
       return
     } else {
-      nextIds = [...starredIds, productId]
+      nextIds = [...liveStarred, productId]
       toast.success(`Added "${name}" to favourites`)
     }
     setStarredOverride(nextIds)

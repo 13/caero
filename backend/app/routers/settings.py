@@ -777,6 +777,8 @@ async def import_data(
                 username=user["username"],
                 hashed_password=user["hashed_password"],
                 is_admin=user.get("is_admin", False),
+                # Product ids are preserved on import, so stars stay valid
+                starred_product_ids=user.get("starred_product_ids"),
                 created_at=_parse_datetime(user.get("created_at")),
             )
         )
