@@ -128,7 +128,7 @@ async def test_import_detaches_events_from_reused_product_ids(client):
 
 
 @pytest.mark.asyncio(loop_scope="session")
-async def test_import_keeps_starred_products(client):
+async def test_import_keeps_per_user_preferences(client):
     from sqlalchemy import update
 
     from app.database import AsyncSessionLocal
@@ -154,6 +154,12 @@ async def test_import_keeps_starred_products(client):
         "/api/auth/me/starred", headers=headers, json={"starred_product_ids": [product_id]}
     )
     assert resp.status_code == 200, resp.text
+    resp = await client.patch(
+        "/api/auth/me/notification-defaults",
+        headers=headers,
+        json={"default_email": "star@example.com", "default_telegram_chat_id": "12345"},
+    )
+    assert resp.status_code == 200, resp.text
 
     export = (await client.get("/api/settings/export", headers=headers)).json()
     resp = await client.post("/api/settings/import", headers=headers, json=export)
@@ -162,3 +168,5 @@ async def test_import_keeps_starred_products(client):
     headers = await _login(client, "impex-star-admin")
     me = (await client.get("/api/auth/me", headers=headers)).json()
     assert me["starred_product_ids"] == [product_id]
+    assert me["default_email"] == "star@example.com"
+    assert me["default_telegram_chat_id"] == "12345"
