@@ -17,6 +17,7 @@ export default function Dashboard() {
   const { data: me } = useMe()
   const { data: uiSettings } = useUiSettings()
   const showSparklines = uiSettings?.show_sparklines ?? false
+  const maxStarred = uiSettings?.max_starred_products ?? 6
   const { data: sparklines } = useSparklines(showSparklines)
   const updateStarredMutation = useUpdateStarred()
   const location = useLocation()
@@ -108,8 +109,8 @@ export default function Dashboard() {
     if (starredIds.includes(productId)) {
       nextIds = starredIds.filter(id => id !== productId)
       toast.success(`Removed "${name}" from favourites`)
-    } else if (starredIds.length >= 3) {
-      toast.error('Maximum 3 starred products allowed')
+    } else if (starredIds.length >= maxStarred) {
+      toast.error(`Maximum ${maxStarred} starred products allowed`)
       return
     } else {
       nextIds = [...starredIds, productId]

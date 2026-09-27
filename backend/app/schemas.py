@@ -282,6 +282,9 @@ class NotificationChannelStatusOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+MAX_STARRED_PRODUCTS = 6
+
+
 class UiSettingsOut(BaseModel):
     date_format: str
     time_format: str
@@ -290,6 +293,8 @@ class UiSettingsOut(BaseModel):
     # Failed checks in a row before a product counts as broken (and the owner
     # is notified); the UI stays quiet about fewer. Read-only, from env.
     scrape_failure_threshold: int = 3
+    # Most products a user may star (pinned first on the dashboard). Read-only.
+    max_starred_products: int = MAX_STARRED_PRODUCTS
 
 
 class UiSettingsIn(BaseModel):
@@ -356,6 +361,12 @@ class NotificationDefaultsUpdate(BaseModel):
 
 class StarredProductsUpdate(BaseModel):
     starred_product_ids: list[int] = Field(default_factory=list)
+
+    @field_validator("starred_product_ids")
+    @classmethod
+    def dedupe(cls, value: list[int]) -> list[int]:
+        # Keep first-seen order; duplicates must not count against the limit
+        return list(dict.fromkeys(value))
 
 
 class AdminUserCreate(BaseModel):

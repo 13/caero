@@ -14,6 +14,7 @@ from app.config import settings
 from app.database import get_db
 from app.models import AppSettings, User
 from app.schemas import (
+    MAX_STARRED_PRODUCTS,
     AdminUserCreate,
     AdminUserPasswordUpdate,
     ChangePasswordRequest,
@@ -189,8 +190,10 @@ async def update_starred_products(
     user: User = Depends(require_user),
     db: AsyncSession = Depends(get_db, scope="function"),
 ) -> User:
-    if len(body.starred_product_ids) > 3:
-        raise HTTPException(status_code=400, detail="Maximum 3 starred products allowed")
+    if len(body.starred_product_ids) > MAX_STARRED_PRODUCTS:
+        raise HTTPException(
+            status_code=400, detail=f"Maximum {MAX_STARRED_PRODUCTS} starred products allowed"
+        )
     user.starred_product_ids = ",".join(str(i) for i in body.starred_product_ids) if body.starred_product_ids else None
     await db.flush()
     await db.refresh(user)

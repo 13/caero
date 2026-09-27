@@ -187,6 +187,8 @@ export interface UiSettings {
   chart_line_style: ChartLineStyle
   /** Failed checks in a row before a product counts as broken; read-only */
   scrape_failure_threshold?: number
+  /** Most products a user may star; read-only */
+  max_starred_products?: number
 }
 
 export interface SparklinePoint {
