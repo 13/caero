@@ -78,6 +78,11 @@ class Settings(BaseSettings):
     # not just page.goto. A wedged Chromium otherwise holds its concurrency slot
     # forever, and enough of them stop scraping entirely. 0 disables.
     scrape_timeout_seconds: int = Field(default=120, ge=0)
+    # Relaunch the browser and its Playwright driver once they are this old, at
+    # the next moment no scrape is using them. The Node driver's heap grows
+    # with every scrape until it dies of OOM (after ~16 days at ~35 products),
+    # costing memory all the way there. 0 disables.
+    scraper_browser_max_age_hours: float = Field(default=24, ge=0)
     # Infrastructure failures (dead browser, no network, host thrashing) make
     # every product fail at once. Past this many distinct products failing with
     # no successes in between, per-product "selector broken" mail is replaced by

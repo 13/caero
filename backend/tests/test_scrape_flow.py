@@ -8,6 +8,7 @@ from decimal import Decimal
 import pytest
 from sqlalchemy import select
 
+import app.browser as browser_mod
 import app.scheduler as scheduler_mod
 from app.browser import set_browser
 from app.database import AsyncSessionLocal, run_migrations
@@ -354,7 +355,7 @@ async def test_browser_unavailable_is_skipped_event(monkeypatch, sent_notificati
     async def no_browser():
         return None
 
-    monkeypatch.setattr(scheduler_mod, "ensure_browser", no_browser)
+    monkeypatch.setattr(browser_mod, "ensure_browser", no_browser)
     assert await scheduler_mod.scrape_and_record(pid) == "skipped"
     [row] = await events_for(pid)
     assert (row.event, row.details["reason"]) == ("scrape_skipped", "browser_unavailable")

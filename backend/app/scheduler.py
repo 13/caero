@@ -14,7 +14,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from sqlalchemy import select
 from sqlalchemy.sql import func
 
-from app.browser import ensure_browser
+from app.browser import borrow_browser
 from app.config import settings
 from app.database import AsyncSessionLocal
 from app.events import log_event, record_event
@@ -328,24 +328,24 @@ async def scrape_and_record(product_id: int) -> str | None:
     Returns the outcome ("ok" | "unchanged" | "failed" | "skipped"), or None
     when the product no longer exists or is inactive.
     """
-    browser = await ensure_browser()
-    if browser is None:
-        logger.warning("Browser not available, skipping job for product %d", product_id)
-        async with AsyncSessionLocal() as db:
-            product = await db.get(Product, product_id)
-        if product is not None:
-            await record_event(
-                level="warning",
-                category="scrape",
-                event="scrape_skipped",
-                message="Scrape skipped: browser unavailable",
-                product=product,
-                details={"reason": "browser_unavailable"},
-            )
-        return "skipped"
+    async with borrow_browser() as browser:
+        if browser is None:
+            logger.warning("Browser not available, skipping job for product %d", product_id)
+            async with AsyncSessionLocal() as db:
+                product = await db.get(Product, product_id)
+            if product is not None:
+                await record_event(
+                    level="warning",
+                    category="scrape",
+                    event="scrape_skipped",
+                    message="Scrape skipped: browser unavailable",
+                    product=product,
+                    details={"reason": "browser_unavailable"},
+                )
+            return "skipped"
 
-    async with product_scrape_lock(product_id):
-        return await _scrape_and_record_locked(product_id, browser)
+        async with product_scrape_lock(product_id):
+            return await _scrape_and_record_locked(product_id, browser)
 
 
 def check_all_in_progress() -> bool:

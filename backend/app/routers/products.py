@@ -393,12 +393,7 @@ async def check_product_now(
     db: AsyncSession = Depends(get_db, scope="function"),
 ) -> CheckResult:
     product = await _get_product(product_id, user, db)
-    from app.browser import ensure_browser
-
-    browser = await ensure_browser()
-    if browser is None:
-        return CheckResult(product_id=product_id, price=None, error="Browser not available")
-
+    from app.browser import borrow_browser
     from app.scheduler import (
         check_url_redirect,
         clear_scrape_failures,
@@ -410,8 +405,11 @@ async def check_product_now(
     from app.scraper import scrape_price
 
     started = time.monotonic()
-    async with product_scrape_lock(product_id):
-        result = await scrape_price(browser, product.url, product.selector, product.price_format)
+    async with borrow_browser() as browser:
+        if browser is None:
+            return CheckResult(product_id=product_id, price=None, error="Browser not available")
+        async with product_scrape_lock(product_id):
+            result = await scrape_price(browser, product.url, product.selector, product.price_format)
     duration_ms = int((time.monotonic() - started) * 1000)
 
     await check_url_redirect(product, result.final_url, db)

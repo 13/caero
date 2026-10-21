@@ -13,6 +13,9 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -23,6 +26,11 @@ logger = logging.getLogger(__name__)
 _browser: Browser | None = None
 _backend: str = "unknown"
 _playwright = None
+# time.monotonic() of the last real launch; None for test doubles, which are
+# never recycled.
+_launched_at: float | None = None
+# Scrapes currently holding the browser (borrow_browser). Recycling waits for 0.
+_in_use = 0
 # Serializes relaunches: a scrape burst notices the dead browser all at once,
 # and each caller must not start its own Chromium.
 _relaunch_lock = asyncio.Lock()
@@ -92,8 +100,20 @@ async def _reset_playwright() -> None:
             pass
 
 
+def _due_for_recycle() -> bool:
+    from app.config import settings
+
+    max_age = settings.scraper_browser_max_age_hours
+    return (
+        bool(max_age)
+        and _launched_at is not None
+        and _in_use == 0
+        and time.monotonic() - _launched_at >= max_age * 3600
+    )
+
+
 async def _launch() -> None:
-    global _browser, _backend, _playwright
+    global _browser, _backend, _playwright, _launched_at
 
     import patchright.async_api
 
@@ -105,6 +125,7 @@ async def _launch() -> None:
     headless = settings.scraper_headless
     _browser = await _playwright.chromium.launch(headless=headless, args=LAUNCH_ARGS)
     _backend = "patchright"
+    _launched_at = time.monotonic()
     logger.info("Patchright browser started in %s mode", "headless" if headless else "headed")
 
 
@@ -136,18 +157,21 @@ async def ensure_browser() -> Browser | None:
 
     Covers both a crashed browser and a startup launch that failed, so a
     transient problem no longer leaves the container running without ever
-    scraping again.
+    scraping again. Also recycles a browser past SCRAPER_BROWSER_MAX_AGE_HOURS
+    once no scrape holds it (see borrow_browser).
     """
     global _browser, _backend
 
-    if browser_connected():
+    if browser_connected() and not _due_for_recycle():
         return _browser
 
     async with _relaunch_lock:
         # Another caller may have relaunched while this one waited.
-        if browser_connected():
+        connected = browser_connected()
+        if connected and not _due_for_recycle():
             return _browser
 
+        reason = "recycled" if connected else "crashed" if _browser is not None else "not_running"
         dead = _browser
         _browser = None
         if dead is not None:
@@ -183,16 +207,43 @@ async def ensure_browser() -> Browser | None:
 
         from app.events import record_event
 
+        if reason == "recycled":
+            await record_event(
+                level="info",
+                category="system",
+                event="browser_relaunched",
+                message="Scraping browser recycled",
+                details={"reason": reason},
+            )
+            logger.info("Recycled scraping browser and driver")
+            return _browser
+
         await record_event(
             level="warning",
             category="system",
             event="browser_relaunched",
             message="Scraping browser relaunched",
-            details={"reason": "crashed" if dead is not None else "not_running"},
+            details={"reason": reason},
         )
 
         logger.warning("Relaunched scraping browser after it became unavailable")
         return _browser
+
+
+@asynccontextmanager
+async def borrow_browser() -> AsyncIterator[Browser | None]:
+    """ensure_browser() for the length of a scrape: a borrowed browser is
+    never recycled out from under its user."""
+    global _in_use
+    browser = await ensure_browser()
+    if browser is None:
+        yield None
+        return
+    _in_use += 1
+    try:
+        yield browser
+    finally:
+        _in_use -= 1
 
 
 async def stop_browser() -> None:

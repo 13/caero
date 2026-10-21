@@ -34,6 +34,14 @@ class LiveBrowser:
         return True
 
 
+class ClosableLiveBrowser(LiveBrowser):
+    def __init__(self) -> None:
+        self.closed = False
+
+    async def close(self) -> None:
+        self.closed = True
+
+
 class _ErroredFuture:
     def done(self) -> bool:
         return True
@@ -188,6 +196,60 @@ class TestBrowserRecovery:
 
         assert await browser_mod.ensure_browser() is replacement
         assert old_driver.stopped
+
+    @pytest.mark.asyncio(loop_scope="session")
+    async def test_old_idle_browser_is_recycled_on_a_fresh_driver(self, monkeypatch):
+        """The driver leaks heap until it dies; recycling keeps it short of that."""
+        old = ClosableLiveBrowser()
+        old_driver = FakePlaywright()
+        replacement = LiveBrowser()
+        browser_mod.set_browser(old, backend="patchright")
+        monkeypatch.setattr(browser_mod, "_playwright", old_driver)
+        monkeypatch.setattr(browser_mod, "_launched_at", 0.0)
+        monkeypatch.setattr(settings, "scraper_browser_max_age_hours", 24)
+        monkeypatch.setattr(browser_mod.time, "monotonic", lambda: 25 * 3600.0)
+
+        async def fake_launch():
+            assert browser_mod._playwright is None, "launched on the old driver"
+            browser_mod.set_browser(replacement, backend="patchright")
+
+        monkeypatch.setattr(browser_mod, "_launch", fake_launch)
+
+        assert await browser_mod.ensure_browser() is replacement
+        assert old.closed and old_driver.stopped
+
+    @pytest.mark.asyncio(loop_scope="session")
+    async def test_borrowed_browser_is_not_recycled(self, monkeypatch):
+        """Recycling mid-scrape would fail the scrape holding the browser."""
+        old = ClosableLiveBrowser()
+        replacement = LiveBrowser()
+        browser_mod.set_browser(old, backend="patchright")
+        monkeypatch.setattr(browser_mod, "_launched_at", 0.0)
+        monkeypatch.setattr(settings, "scraper_browser_max_age_hours", 24)
+        clock = [0.0]
+        monkeypatch.setattr(browser_mod.time, "monotonic", lambda: clock[0])
+
+        async def fake_launch():
+            browser_mod.set_browser(replacement, backend="patchright")
+
+        monkeypatch.setattr(browser_mod, "_launch", fake_launch)
+
+        async with browser_mod.borrow_browser() as borrowed:
+            assert borrowed is old
+            clock[0] = 25 * 3600.0  # ages past the limit while borrowed
+            assert await browser_mod.ensure_browser() is old
+            assert not old.closed
+        assert await browser_mod.ensure_browser() is replacement
+        assert old.closed
+
+    @pytest.mark.asyncio(loop_scope="session")
+    async def test_recycling_off_at_zero(self, monkeypatch):
+        live = ClosableLiveBrowser()
+        browser_mod.set_browser(live, backend="patchright")
+        monkeypatch.setattr(browser_mod, "_launched_at", 0.0)
+        monkeypatch.setattr(settings, "scraper_browser_max_age_hours", 0)
+        monkeypatch.setattr(browser_mod.time, "monotonic", lambda: 1000 * 3600.0)
+        assert await browser_mod.ensure_browser() is live
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_real_driver_death_is_detected(self):
