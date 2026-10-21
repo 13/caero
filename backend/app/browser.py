@@ -58,9 +58,25 @@ def browser_connected() -> bool:
     if is_connected is None:
         return True
     try:
-        return bool(is_connected())
+        return bool(is_connected()) and _driver_alive(_browser)
     except Exception:
         return False
+
+
+def _driver_alive(browser: Browser) -> bool:
+    """False once the Node driver behind the browser has died.
+
+    is_connected() only flips on a close event sent *by* the driver, so a
+    driver that died (it can run out of JS heap after weeks of uptime) leaves
+    a handle that claims to be connected while every call fails. The
+    transport's error future is set as soon as the driver pipe closes.
+    tests/test_stability.py kills a real driver to guard these private names.
+    """
+    try:
+        error_future = browser._impl_obj._connection._transport.on_error_future
+    except AttributeError:
+        return True  # test doubles
+    return not error_future.done()
 
 
 async def _reset_playwright() -> None:
@@ -68,8 +84,10 @@ async def _reset_playwright() -> None:
     pw = _playwright
     _playwright = None
     if pw is not None:
+        # Bounded: stopping a driver that already died must not hang the relaunch.
         try:
-            await pw.stop()
+            async with asyncio.timeout(10):
+                await pw.stop()
         except Exception:
             pass
 
@@ -134,9 +152,13 @@ async def ensure_browser() -> Browser | None:
         _browser = None
         if dead is not None:
             try:
-                await dead.close()
+                async with asyncio.timeout(10):
+                    await dead.close()
             except Exception:
                 pass
+        # Relaunch on a fresh driver: the old one may be what died, and a
+        # launch through it would fail on the same closed pipe.
+        await _reset_playwright()
 
         try:
             await _launch()

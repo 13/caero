@@ -4,6 +4,9 @@ duplicate check-all, and the SQLite locking pragmas.
 These cover the paths that turn a transient problem into a permanent one.
 """
 import asyncio
+import os
+import signal
+from types import SimpleNamespace
 
 import pytest
 
@@ -29,6 +32,32 @@ class DeadBrowser:
 class LiveBrowser:
     def is_connected(self) -> bool:
         return True
+
+
+class _ErroredFuture:
+    def done(self) -> bool:
+        return True
+
+
+class DeadDriverBrowser(DeadBrowser):
+    """A Patchright handle whose Node driver died: the driver never sent the
+    close event, so is_connected() still says True."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        transport = SimpleNamespace(on_error_future=_ErroredFuture())
+        self._impl_obj = SimpleNamespace(_connection=SimpleNamespace(_transport=transport))
+
+    def is_connected(self) -> bool:
+        return True
+
+
+class FakePlaywright:
+    def __init__(self) -> None:
+        self.stopped = False
+
+    async def stop(self) -> None:
+        self.stopped = True
 
 
 @pytest.fixture(autouse=True)
@@ -137,6 +166,56 @@ class TestBrowserRecovery:
     async def test_test_doubles_count_as_connected(self):
         browser_mod.set_browser(object(), backend="fake")
         assert browser_mod.browser_connected()
+
+    @pytest.mark.asyncio(loop_scope="session")
+    async def test_dead_driver_is_not_connected(self):
+        browser_mod.set_browser(DeadDriverBrowser(), backend="patchright")
+        assert not browser_mod.browser_connected()
+
+    @pytest.mark.asyncio(loop_scope="session")
+    async def test_dead_driver_is_relaunched_on_a_fresh_driver(self, monkeypatch):
+        """Relaunching on the dead driver would fail, and the next attempt with it."""
+        old_driver = FakePlaywright()
+        monkeypatch.setattr(browser_mod, "_playwright", old_driver)
+        browser_mod.set_browser(DeadDriverBrowser(), backend="patchright")
+        replacement = LiveBrowser()
+
+        async def fake_launch():
+            assert browser_mod._playwright is None, "launched on the old driver"
+            browser_mod.set_browser(replacement, backend="patchright")
+
+        monkeypatch.setattr(browser_mod, "_launch", fake_launch)
+
+        assert await browser_mod.ensure_browser() is replacement
+        assert old_driver.stopped
+
+    @pytest.mark.asyncio(loop_scope="session")
+    async def test_real_driver_death_is_detected(self):
+        """Guards the private Patchright attributes the detection relies on."""
+        patchright = pytest.importorskip("patchright.async_api")
+        try:
+            pw = await patchright.async_playwright().start()
+            browser = await pw.chromium.launch(headless=True)
+        except Exception as exc:
+            pytest.skip(f"no Patchright Chromium here: {exc}")
+        try:
+            browser_mod.set_browser(browser, backend="patchright")
+            assert browser_mod.browser_connected()
+
+            os.kill(browser._impl_obj._connection._transport._proc.pid, signal.SIGKILL)
+            for _ in range(50):
+                if not browser_mod.browser_connected():
+                    break
+                await asyncio.sleep(0.1)
+            assert browser.is_connected()  # the bug: Patchright never notices
+            assert not browser_mod.browser_connected()
+        finally:
+            browser_mod.set_browser(None, backend="unavailable")
+            try:
+                async with asyncio.timeout(10):
+                    await pw.stop()
+            except Exception:
+                pass
 
 
 class TestScrapeTimeout:
