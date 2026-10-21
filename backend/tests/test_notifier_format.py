@@ -224,3 +224,13 @@ async def test_webhook_failure_after_retries_is_recorded(monkeypatch):
     assert status.consecutive_failures == 1
     assert "500" in status.last_error
     notifier.reset_channel_status()
+
+
+def test_httpx_request_lines_are_not_logged():
+    """httpx logs every request URL at INFO, and Telegram's carries the bot token."""
+    import logging
+
+    import app.main  # noqa: F401  (configures logging)
+
+    # Its own level, so it holds whatever LOG_LEVEL sets the root logger to.
+    assert logging.getLogger("httpx").level >= logging.WARNING

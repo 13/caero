@@ -26,6 +26,9 @@ logging.basicConfig(
     level=getattr(logging, _settings.log_level.upper(), logging.INFO),
     format="%(asctime)s %(levelname)s %(name)s: %(message)s",
 )
+# httpx logs every request URL at INFO, and Telegram's embeds the bot token
+# (notifier._redact only covers our own error text).
+logging.getLogger("httpx").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 
 STATIC_DIR = Path(__file__).parent / "static"
